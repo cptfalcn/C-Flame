@@ -36,42 +36,50 @@ void Lu(N_Vector, N_Vector);
 void Mu(realtype, N_Vector, N_Vector);
 int RHS(realtype, N_Vector, N_Vector, void *);
 int Jtv(N_Vector, N_Vector, realtype, N_Vector, N_Vector , void *, N_Vector);
+int CheckStep(realtype, realtype);
 
 using namespace std;
 
 int main()
 {
     // Declaration of start and finish time
-    static const realtype InitTime = 0.0;
+    //static const realtype InitTime = 0.0;
     static const realtype FinalTime = 10.0;
     static const int NumBands = 3;
     static const realtype StepSize=1e-1;
+	//check if we can make the stepsize
+	static const int Steps=CheckStep(FinalTime, StepSize);
 	void *userData=nullptr;
+	realtype TNow=0;
+	realtype TNext=0;
     // Setup the initial condition (and solution) y
     N_Vector y = N_VNew_Serial(NEQ);
 	N_VScale(1., InitialConditions(), y);
 	realtype *data = NV_DATA_S(y);
-	//This block is testing, remove later 
-	N_Vector Is = N_VNew_Serial(NEQ);
-	N_Vector Jv = N_VNew_Serial(NEQ);
-	N_Vector rhs= N_VNew_Serial(NEQ);
+	//=====================================
+	//This block is testing, remove later
+	//actually, we need some of this.
+	//=====================================
+	//N_Vector Is = N_VNew_Serial(NEQ);
+	//N_Vector Jv = N_VNew_Serial(NEQ);
+	//N_Vector rhs= N_VNew_Serial(NEQ);
 	N_Vector y0 = N_VNew_Serial(NEQ);
-	realtype *IS = NV_DATA_S(Is);
-	realtype *JV = NV_DATA_S(Jv);
-	realtype *RHSy=NV_DATA_S(rhs);
+	//realtype *IS = NV_DATA_S(Is);
+	//realtype *JV = NV_DATA_S(Jv);
+	//realtype *RHSy=NV_DATA_S(rhs);
 	realtype *Y0= NV_DATA_S(y0);
 	N_VScale(1., InitialConditions(), y0);
-	for (int i=0; i<NEQ; i++){
-		IS[i]=1.0;}
-	RHS(0, y, rhs, userData);
-	Jtv(Is, Jv, 1, y , rhs, userData, Is);
-	cout << " =================Initial Data===================\n";
-	cout << " =========================y======================\n";
+	//for (int i=0; i<NEQ; i++){
+	//	IS[i]=1.0;}
+	//RHS(0, y, rhs, userData);
+	//Jtv(Is, Jv, 1, y , rhs, userData, Is);
+	//cout << "=================Initial Data===================\n";
+	cout << "=========================y======================\n";
 	cout << "y[0]=" << data[0] <<"\t\t y[1]=" << data[1] << "\t\t y[2]=" << data[2] << endl;
-	cout << "======================rhs========================\n";
-	cout << "rhs[0]=" << RHSy[0] << "\t\t rhs[1]=" << RHSy[1] << "\t\t rhs[2]="<<RHSy[2] <<endl;
-	cout << "========================JtV=====================\n";
-	cout <<  "Jtv[0] =" <<JV[0] <<"\t\t Jtv[1]="<< JV[1] <<"\t\t Jtv[2]=" << JV[2]  <<endl;
+	//cout << "======================rhs========================\n";
+	//cout << "rhs[0]=" << RHSy[0] << "\t\t rhs[1]=" << RHSy[1] << "\t\t rhs[2]="<<RHSy[2] <<endl;
+	//cout << "========================JtV=====================\n";
+	//cout <<  "Jtv[0] =" <<JV[0] <<"\t\t Jtv[1]="<< JV[1] <<"\t\t Jtv[2]=" << JV[2]  <<endl;
 	//end test 
 
     // Create the integrator
@@ -89,18 +97,36 @@ int main()
     const realtype KrylovTol = RCONST(1.0e-14);//1e-14
     int startingBasisSizes[] = {3, 3};
     
-    // Run the integrator
-    IntegratorStats *integratorStats = integrator->Integrate(StepSize,
-                                                             InitTime,
-                                                             FinalTime,
-                                                             NumBands,
-                                                             y,
-                                                             KrylovTol,
-                                                             startingBasisSizes);
+    // Run the integrator loop
+	for (int i=0; i<Steps; i++){
+		TNow= i*StepSize;
+		TNext=(i+1)*StepSize;
+		//cout<< "Completed step " << i+1 << endl;
+		//cout<< "Stepped from " <<TNow << " to " <<TNext <<endl;
+		integrator->Integrate(
+        	StepSize,TNow, TNext, NumBands, y,
+		KrylovTol, startingBasisSizes);
+		//If the data goes negative, which is not physical, correct it.
+		//Removing this loop will cause stalls.
+		for (int j=0; j<NEQ; j++){
+			if(data[j]<0){
+				data[j]=0;
+			}
+		}
 
-    // Print the statistics
-    printf("Run stats:\n");
-    integratorStats->PrintStats();
+	}
+
+
+
+    	//IntegratorStats *integratorStats = integrator->Integrate(
+	//StepSize,InitTime, FinalTime, NumBands, y, KrylovTol, startingBasisSizes);
+    	// Print the statistics
+    	//printf("Run stats:\n");
+    	//integratorStats->PrintStats();
+
+
+
+
     printf("\n\n");
 	cout<<"===========================Data========================\n";
 	cout <<"y=" << data[0] << "\t\t z=" << data[1] <<"\t\t Temp=" << data[2]<<endl;
@@ -109,6 +135,20 @@ int main()
     // Clean up the integrator
     delete integrator;
 
+}
+
+
+
+int CheckStep(realtype FinalTime, realtype StepSize){
+        if(fmod(FinalTime,1/StepSize) ==0){
+                static const int Steps= FinalTime/StepSize;
+                cout << "We will take " <<Steps << " steps.\n";
+		return Steps;
+        }else{
+                cout<<"Cannot perform non-integer number of steps!!\n";
+                cout<<"fmod(FinalTime, StepSize)="<<fmod(FinalTime,1/StepSize)<<endl;
+                exit(1);
+        }
 }
 
 /*
