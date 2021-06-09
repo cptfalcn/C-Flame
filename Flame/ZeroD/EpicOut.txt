@@ -1,0 +1,444 @@
+/usr/bin/cmake -S/home/jstewart23/Code/C++/Epic2/epic-cpp -B/home/jstewart23/Code/C++/Epic2/epic-cpp/build --check-build-system CMakeFiles/Makefile.cmake 0
+/usr/bin/cmake -E cmake_progress_start /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/progress.marks
+make -f CMakeFiles/Makefile2 all
+make[1]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f TestProblems/CMakeFiles/tests.dir/build.make TestProblems/CMakeFiles/tests.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems/CMakeFiles/tests.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems/CMakeFiles/tests.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems/CMakeFiles/tests.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems/CMakeFiles/tests.dir/depend.internal".
+Scanning dependencies of target tests
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f TestProblems/CMakeFiles/tests.dir/build.make TestProblems/CMakeFiles/tests.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[  1%] Building CXX object TestProblems/CMakeFiles/tests.dir/ADR2dParallel.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/tests.dir/ADR2dParallel.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems/ADR2dParallel.cpp
+[  2%] Building CXX object TestProblems/CMakeFiles/tests.dir/ADR2dSerial.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/tests.dir/ADR2dSerial.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems/ADR2dSerial.cpp
+[  4%] Building CXX object TestProblems/CMakeFiles/tests.dir/AllenCahn2dParallel.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/tests.dir/AllenCahn2dParallel.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems/AllenCahn2dParallel.cpp
+[  5%] Building CXX object TestProblems/CMakeFiles/tests.dir/AllenCahn2dSerial.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/tests.dir/AllenCahn2dSerial.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems/AllenCahn2dSerial.cpp
+[  6%] Building CXX object TestProblems/CMakeFiles/tests.dir/Brusselator2dParallel.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/tests.dir/Brusselator2dParallel.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems/Brusselator2dParallel.cpp
+[  8%] Building CXX object TestProblems/CMakeFiles/tests.dir/Brusselator2dSerial.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/tests.dir/Brusselator2dSerial.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems/Brusselator2dSerial.cpp
+[  9%] Building CXX object TestProblems/CMakeFiles/tests.dir/Burgers1dParallel.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/tests.dir/Burgers1dParallel.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems/Burgers1dParallel.cpp
+[ 10%] Building CXX object TestProblems/CMakeFiles/tests.dir/Burgers1dSerial.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/tests.dir/Burgers1dSerial.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems/Burgers1dSerial.cpp
+[ 12%] Building CXX object TestProblems/CMakeFiles/tests.dir/GrayScott2dParallel.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/tests.dir/GrayScott2dParallel.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems/GrayScott2dParallel.cpp
+[ 13%] Building CXX object TestProblems/CMakeFiles/tests.dir/GrayScott2dSerial.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/tests.dir/GrayScott2dSerial.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems/GrayScott2dSerial.cpp
+[ 15%] Linking CXX static library libtests.a
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems && /usr/bin/cmake -P CMakeFiles/tests.dir/cmake_clean_target.cmake
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/TestProblems && /usr/bin/cmake -E cmake_link_script CMakeFiles/tests.dir/link.txt --verbose=1
+/usr/bin/ar qc libtests.a  CMakeFiles/tests.dir/ADR2dParallel.cpp.o CMakeFiles/tests.dir/ADR2dSerial.cpp.o CMakeFiles/tests.dir/AllenCahn2dParallel.cpp.o CMakeFiles/tests.dir/AllenCahn2dSerial.cpp.o CMakeFiles/tests.dir/Brusselator2dParallel.cpp.o CMakeFiles/tests.dir/Brusselator2dSerial.cpp.o CMakeFiles/tests.dir/Burgers1dParallel.cpp.o CMakeFiles/tests.dir/Burgers1dSerial.cpp.o CMakeFiles/tests.dir/GrayScott2dParallel.cpp.o CMakeFiles/tests.dir/GrayScott2dSerial.cpp.o
+/usr/bin/ranlib libtests.a
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 15%] Built target tests
+make -f Integrators/CMakeFiles/epic1.0.0.dir/build.make Integrators/CMakeFiles/epic1.0.0.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators/CMakeFiles/epic1.0.0.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators/CMakeFiles/epic1.0.0.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators/CMakeFiles/epic1.0.0.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators/CMakeFiles/epic1.0.0.dir/depend.internal".
+Scanning dependencies of target epic1.0.0
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f Integrators/CMakeFiles/epic1.0.0.dir/build.make Integrators/CMakeFiles/epic1.0.0.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 16%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/AdaptiveKrylovPhi.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/AdaptiveKrylovPhi.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov/AdaptiveKrylovPhi.cpp
+[ 17%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/AdaptiveKrylovPhiMultipleTimes.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/AdaptiveKrylovPhiMultipleTimes.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov/AdaptiveKrylovPhiMultipleTimes.cpp
+[ 19%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/CBlasLapack.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/CBlasLapack.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov/CBlasLapack.cpp
+[ 20%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/EpicSundials.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/EpicSundials.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov/EpicSundials.cpp
+[ 21%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/ExpMHigham.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/ExpMHigham.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov/ExpMHigham.cpp
+[ 23%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/ExpPade.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/ExpPade.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov/ExpPade.cpp
+[ 24%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/IntegratorStats.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/IntegratorStats.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov/IntegratorStats.cpp
+[ 26%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/JTimesV.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/JTimesV.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov/JTimesV.cpp
+[ 27%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/Kiops.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/Kiops.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov/Kiops.cpp
+[ 28%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/EpiRK/Epi2_KIOPS.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/EpiRK/Epi2_KIOPS.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK/Epi2_KIOPS.cpp
+[ 30%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK4SC.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK4SC.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK/EpiRK4SC.cpp
+[ 31%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK4SC_KIOPS.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK4SC_KIOPS.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK/EpiRK4SC_KIOPS.cpp
+[ 32%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK4SV.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK4SV.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK/EpiRK4SV.cpp
+[ 34%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK5C.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK5C.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK/EpiRK5C.cpp
+[ 35%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK5SC.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK5SC.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK/EpiRK5SC.cpp
+[ 36%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK5V.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK5V.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK/EpiRK5V.cpp
+[ 38%] Building CXX object Integrators/CMakeFiles/epic1.0.0.dir/EpiRK/Hybrid_IMEXP.cpp.o
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/epic1.0.0.dir/EpiRK/Hybrid_IMEXP.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK/Hybrid_IMEXP.cpp
+[ 39%] Linking CXX static library libepic1.0.0.a
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/cmake -P CMakeFiles/epic1.0.0.dir/cmake_clean_target.cmake
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build/Integrators && /usr/bin/cmake -E cmake_link_script CMakeFiles/epic1.0.0.dir/link.txt --verbose=1
+/usr/bin/ar qc libepic1.0.0.a  CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/AdaptiveKrylovPhi.cpp.o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/AdaptiveKrylovPhiMultipleTimes.cpp.o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/CBlasLapack.cpp.o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/EpicSundials.cpp.o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/ExpMHigham.cpp.o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/ExpPade.cpp.o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/IntegratorStats.cpp.o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/JTimesV.cpp.o CMakeFiles/epic1.0.0.dir/AdaptiveKrylov/Kiops.cpp.o CMakeFiles/epic1.0.0.dir/EpiRK/Epi2_KIOPS.cpp.o CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK4SC.cpp.o CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK4SC_KIOPS.cpp.o CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK4SV.cpp.o CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK5C.cpp.o CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK5SC.cpp.o CMakeFiles/epic1.0.0.dir/EpiRK/EpiRK5V.cpp.o CMakeFiles/epic1.0.0.dir/EpiRK/Hybrid_IMEXP.cpp.o
+/usr/bin/ranlib libepic1.0.0.a
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 39%] Built target epic1.0.0
+make -f CMakeFiles/TestProblemExampleVar.dir/build.make CMakeFiles/TestProblemExampleVar.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/TestProblemExampleVar.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/TestProblemExampleVar.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/TestProblemExampleVar.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/TestProblemExampleVar.dir/depend.internal".
+Scanning dependencies of target TestProblemExampleVar
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/TestProblemExampleVar.dir/build.make CMakeFiles/TestProblemExampleVar.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 41%] Building CXX object CMakeFiles/TestProblemExampleVar.dir/Examples/TestProblemExampleVar.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/TestProblemExampleVar.dir/Examples/TestProblemExampleVar.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/TestProblemExampleVar.cpp
+[ 42%] Linking CXX executable ../installdir/examples/TestProblemExampleVar
+/usr/bin/cmake -E cmake_link_script CMakeFiles/TestProblemExampleVar.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/TestProblemExampleVar.dir/Examples/TestProblemExampleVar.cpp.o  -o ../installdir/examples/TestProblemExampleVar  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 42%] Built target TestProblemExampleVar
+make -f CMakeFiles/TestProblemExampleConst.dir/build.make CMakeFiles/TestProblemExampleConst.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/TestProblemExampleConst.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/TestProblemExampleConst.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/TestProblemExampleConst.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/TestProblemExampleConst.dir/depend.internal".
+Scanning dependencies of target TestProblemExampleConst
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/TestProblemExampleConst.dir/build.make CMakeFiles/TestProblemExampleConst.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 43%] Building CXX object CMakeFiles/TestProblemExampleConst.dir/Examples/TestProblemExampleConst.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/TestProblemExampleConst.dir/Examples/TestProblemExampleConst.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/TestProblemExampleConst.cpp
+[ 45%] Linking CXX executable ../installdir/examples/TestProblemExampleConst
+/usr/bin/cmake -E cmake_link_script CMakeFiles/TestProblemExampleConst.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/TestProblemExampleConst.dir/Examples/TestProblemExampleConst.cpp.o  -o ../installdir/examples/TestProblemExampleConst  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 45%] Built target TestProblemExampleConst
+make -f CMakeFiles/Test.dir/build.make CMakeFiles/Test.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/Test.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/Test.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/Test.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/Test.dir/depend.internal".
+Scanning dependencies of target Test
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/Test.dir/build.make CMakeFiles/Test.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 46%] Building CXX object CMakeFiles/Test.dir/Examples/Test.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/Test.dir/Examples/Test.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/Test.cpp
+[ 47%] Linking CXX executable ../installdir/examples/Test
+/usr/bin/cmake -E cmake_link_script CMakeFiles/Test.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/Test.dir/Examples/Test.cpp.o  -o ../installdir/examples/Test  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 47%] Built target Test
+make -f CMakeFiles/ExGrayScott2dVarParObj.dir/build.make CMakeFiles/ExGrayScott2dVarParObj.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExGrayScott2dVarParObj.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExGrayScott2dVarParObj.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExGrayScott2dVarParObj.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExGrayScott2dVarParObj.dir/depend.internal".
+Scanning dependencies of target ExGrayScott2dVarParObj
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExGrayScott2dVarParObj.dir/build.make CMakeFiles/ExGrayScott2dVarParObj.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 49%] Building CXX object CMakeFiles/ExGrayScott2dVarParObj.dir/Examples/ExGrayScott2dVarParObj.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExGrayScott2dVarParObj.dir/Examples/ExGrayScott2dVarParObj.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExGrayScott2dVarParObj.cpp
+[ 50%] Linking CXX executable ../installdir/examples/ExGrayScott2dVarParObj
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExGrayScott2dVarParObj.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExGrayScott2dVarParObj.dir/Examples/ExGrayScott2dVarParObj.cpp.o  -o ../installdir/examples/ExGrayScott2dVarParObj  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 50%] Built target ExGrayScott2dVarParObj
+make -f CMakeFiles/ExGrayScott2dConstParObj.dir/build.make CMakeFiles/ExGrayScott2dConstParObj.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExGrayScott2dConstParObj.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExGrayScott2dConstParObj.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExGrayScott2dConstParObj.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExGrayScott2dConstParObj.dir/depend.internal".
+Scanning dependencies of target ExGrayScott2dConstParObj
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExGrayScott2dConstParObj.dir/build.make CMakeFiles/ExGrayScott2dConstParObj.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 52%] Building CXX object CMakeFiles/ExGrayScott2dConstParObj.dir/Examples/ExGrayScott2dConstParObj.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExGrayScott2dConstParObj.dir/Examples/ExGrayScott2dConstParObj.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExGrayScott2dConstParObj.cpp
+[ 53%] Linking CXX executable ../installdir/examples/ExGrayScott2dConstParObj
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExGrayScott2dConstParObj.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExGrayScott2dConstParObj.dir/Examples/ExGrayScott2dConstParObj.cpp.o  -o ../installdir/examples/ExGrayScott2dConstParObj  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 53%] Built target ExGrayScott2dConstParObj
+make -f CMakeFiles/ExAllenChan2dConstSer.dir/build.make CMakeFiles/ExAllenChan2dConstSer.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dConstSer.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dConstSer.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dConstSer.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dConstSer.dir/depend.internal".
+Scanning dependencies of target ExAllenChan2dConstSer
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExAllenChan2dConstSer.dir/build.make CMakeFiles/ExAllenChan2dConstSer.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 54%] Building CXX object CMakeFiles/ExAllenChan2dConstSer.dir/Examples/ExAllenChan2dConstSer.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExAllenChan2dConstSer.dir/Examples/ExAllenChan2dConstSer.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExAllenChan2dConstSer.cpp
+[ 56%] Linking CXX executable ../installdir/examples/ExAllenChan2dConstSer
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExAllenChan2dConstSer.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExAllenChan2dConstSer.dir/Examples/ExAllenChan2dConstSer.cpp.o  -o ../installdir/examples/ExAllenChan2dConstSer  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 56%] Built target ExAllenChan2dConstSer
+make -f CMakeFiles/ExBruss2dVarParObj.dir/build.make CMakeFiles/ExBruss2dVarParObj.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBruss2dVarParObj.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBruss2dVarParObj.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBruss2dVarParObj.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBruss2dVarParObj.dir/depend.internal".
+Scanning dependencies of target ExBruss2dVarParObj
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExBruss2dVarParObj.dir/build.make CMakeFiles/ExBruss2dVarParObj.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 57%] Building CXX object CMakeFiles/ExBruss2dVarParObj.dir/Examples/ExBruss2dVarParObj.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExBruss2dVarParObj.dir/Examples/ExBruss2dVarParObj.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExBruss2dVarParObj.cpp
+[ 58%] Linking CXX executable ../installdir/examples/ExBruss2dVarParObj
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExBruss2dVarParObj.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExBruss2dVarParObj.dir/Examples/ExBruss2dVarParObj.cpp.o  -o ../installdir/examples/ExBruss2dVarParObj  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 58%] Built target ExBruss2dVarParObj
+make -f CMakeFiles/ExBurger1dNumJac.dir/build.make CMakeFiles/ExBurger1dNumJac.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dNumJac.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dNumJac.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dNumJac.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dNumJac.dir/depend.internal".
+Scanning dependencies of target ExBurger1dNumJac
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExBurger1dNumJac.dir/build.make CMakeFiles/ExBurger1dNumJac.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 60%] Building CXX object CMakeFiles/ExBurger1dNumJac.dir/Examples/ExBurger1dNumJac.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExBurger1dNumJac.dir/Examples/ExBurger1dNumJac.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExBurger1dNumJac.cpp
+[ 61%] Linking CXX executable ../installdir/examples/ExBurger1dNumJac
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExBurger1dNumJac.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExBurger1dNumJac.dir/Examples/ExBurger1dNumJac.cpp.o  -o ../installdir/examples/ExBurger1dNumJac  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 61%] Built target ExBurger1dNumJac
+make -f CMakeFiles/ExADR2dConstParObj.dir/build.make CMakeFiles/ExADR2dConstParObj.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstParObj.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstParObj.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstParObj.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstParObj.dir/depend.internal".
+Scanning dependencies of target ExADR2dConstParObj
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExADR2dConstParObj.dir/build.make CMakeFiles/ExADR2dConstParObj.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 63%] Building CXX object CMakeFiles/ExADR2dConstParObj.dir/Examples/ExADR2dConstParObj.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExADR2dConstParObj.dir/Examples/ExADR2dConstParObj.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExADR2dConstParObj.cpp
+[ 64%] Linking CXX executable ../installdir/examples/ExADR2dConstParObj
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExADR2dConstParObj.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExADR2dConstParObj.dir/Examples/ExADR2dConstParObj.cpp.o  -o ../installdir/examples/ExADR2dConstParObj  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 64%] Built target ExADR2dConstParObj
+make -f CMakeFiles/ExBurger1dVarParObj.dir/build.make CMakeFiles/ExBurger1dVarParObj.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dVarParObj.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dVarParObj.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dVarParObj.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dVarParObj.dir/depend.internal".
+Scanning dependencies of target ExBurger1dVarParObj
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExBurger1dVarParObj.dir/build.make CMakeFiles/ExBurger1dVarParObj.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 65%] Building CXX object CMakeFiles/ExBurger1dVarParObj.dir/Examples/ExBurger1dVarParObj.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExBurger1dVarParObj.dir/Examples/ExBurger1dVarParObj.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExBurger1dVarParObj.cpp
+[ 67%] Linking CXX executable ../installdir/examples/ExBurger1dVarParObj
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExBurger1dVarParObj.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExBurger1dVarParObj.dir/Examples/ExBurger1dVarParObj.cpp.o  -o ../installdir/examples/ExBurger1dVarParObj  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 67%] Built target ExBurger1dVarParObj
+make -f CMakeFiles/ExBurger1dConstSer.dir/build.make CMakeFiles/ExBurger1dConstSer.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dConstSer.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dConstSer.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dConstSer.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dConstSer.dir/depend.internal".
+Scanning dependencies of target ExBurger1dConstSer
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExBurger1dConstSer.dir/build.make CMakeFiles/ExBurger1dConstSer.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 68%] Building CXX object CMakeFiles/ExBurger1dConstSer.dir/Examples/ExBurger1dConstSer.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExBurger1dConstSer.dir/Examples/ExBurger1dConstSer.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExBurger1dConstSer.cpp
+[ 69%] Linking CXX executable ../installdir/examples/ExBurger1dConstSer
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExBurger1dConstSer.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExBurger1dConstSer.dir/Examples/ExBurger1dConstSer.cpp.o  -o ../installdir/examples/ExBurger1dConstSer  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 69%] Built target ExBurger1dConstSer
+make -f CMakeFiles/ExADR2dConstSer_KIOPS.dir/build.make CMakeFiles/ExADR2dConstSer_KIOPS.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstSer_KIOPS.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstSer_KIOPS.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstSer_KIOPS.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstSer_KIOPS.dir/depend.internal".
+Scanning dependencies of target ExADR2dConstSer_KIOPS
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExADR2dConstSer_KIOPS.dir/build.make CMakeFiles/ExADR2dConstSer_KIOPS.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 71%] Building CXX object CMakeFiles/ExADR2dConstSer_KIOPS.dir/Examples/ExADR2dConstSer_KIOPS.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExADR2dConstSer_KIOPS.dir/Examples/ExADR2dConstSer_KIOPS.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExADR2dConstSer_KIOPS.cpp
+[ 72%] Linking CXX executable ../installdir/examples/ExADR2dConstSer_KIOPS
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExADR2dConstSer_KIOPS.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExADR2dConstSer_KIOPS.dir/Examples/ExADR2dConstSer_KIOPS.cpp.o  -o ../installdir/examples/ExADR2dConstSer_KIOPS  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 72%] Built target ExADR2dConstSer_KIOPS
+make -f CMakeFiles/ExADR2dConstSer.dir/build.make CMakeFiles/ExADR2dConstSer.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstSer.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstSer.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstSer.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstSer.dir/depend.internal".
+Scanning dependencies of target ExADR2dConstSer
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExADR2dConstSer.dir/build.make CMakeFiles/ExADR2dConstSer.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 73%] Building CXX object CMakeFiles/ExADR2dConstSer.dir/Examples/ExADR2dConstSer.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExADR2dConstSer.dir/Examples/ExADR2dConstSer.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExADR2dConstSer.cpp
+[ 75%] Linking CXX executable ../installdir/examples/ExADR2dConstSer
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExADR2dConstSer.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExADR2dConstSer.dir/Examples/ExADR2dConstSer.cpp.o  -o ../installdir/examples/ExADR2dConstSer  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 75%] Built target ExADR2dConstSer
+make -f CMakeFiles/ExADR2dConstPar.dir/build.make CMakeFiles/ExADR2dConstPar.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstPar.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstPar.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstPar.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dConstPar.dir/depend.internal".
+Scanning dependencies of target ExADR2dConstPar
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExADR2dConstPar.dir/build.make CMakeFiles/ExADR2dConstPar.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 76%] Building CXX object CMakeFiles/ExADR2dConstPar.dir/Examples/ExADR2dConstPar.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExADR2dConstPar.dir/Examples/ExADR2dConstPar.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExADR2dConstPar.cpp
+[ 78%] Linking CXX executable ../installdir/examples/ExADR2dConstPar
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExADR2dConstPar.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExADR2dConstPar.dir/Examples/ExADR2dConstPar.cpp.o  -o ../installdir/examples/ExADR2dConstPar  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 78%] Built target ExADR2dConstPar
+make -f CMakeFiles/ExADR2dVarParObj.dir/build.make CMakeFiles/ExADR2dVarParObj.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dVarParObj.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dVarParObj.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dVarParObj.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExADR2dVarParObj.dir/depend.internal".
+Scanning dependencies of target ExADR2dVarParObj
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExADR2dVarParObj.dir/build.make CMakeFiles/ExADR2dVarParObj.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 79%] Building CXX object CMakeFiles/ExADR2dVarParObj.dir/Examples/ExADR2dVarParObj.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExADR2dVarParObj.dir/Examples/ExADR2dVarParObj.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExADR2dVarParObj.cpp
+[ 80%] Linking CXX executable ../installdir/examples/ExADR2dVarParObj
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExADR2dVarParObj.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExADR2dVarParObj.dir/Examples/ExADR2dVarParObj.cpp.o  -o ../installdir/examples/ExADR2dVarParObj  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 80%] Built target ExADR2dVarParObj
+make -f CMakeFiles/ExBurger1dConstPar.dir/build.make CMakeFiles/ExBurger1dConstPar.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dConstPar.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dConstPar.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dConstPar.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dConstPar.dir/depend.internal".
+Scanning dependencies of target ExBurger1dConstPar
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExBurger1dConstPar.dir/build.make CMakeFiles/ExBurger1dConstPar.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 82%] Building CXX object CMakeFiles/ExBurger1dConstPar.dir/Examples/ExBurger1dConstPar.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExBurger1dConstPar.dir/Examples/ExBurger1dConstPar.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExBurger1dConstPar.cpp
+[ 83%] Linking CXX executable ../installdir/examples/ExBurger1dConstPar
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExBurger1dConstPar.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExBurger1dConstPar.dir/Examples/ExBurger1dConstPar.cpp.o  -o ../installdir/examples/ExBurger1dConstPar  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 83%] Built target ExBurger1dConstPar
+make -f CMakeFiles/ExAllenChan2dConstParObj.dir/build.make CMakeFiles/ExAllenChan2dConstParObj.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dConstParObj.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dConstParObj.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dConstParObj.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dConstParObj.dir/depend.internal".
+Scanning dependencies of target ExAllenChan2dConstParObj
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExAllenChan2dConstParObj.dir/build.make CMakeFiles/ExAllenChan2dConstParObj.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 84%] Building CXX object CMakeFiles/ExAllenChan2dConstParObj.dir/Examples/ExAllenChan2dConstParObj.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExAllenChan2dConstParObj.dir/Examples/ExAllenChan2dConstParObj.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExAllenChan2dConstParObj.cpp
+[ 86%] Linking CXX executable ../installdir/examples/ExAllenChan2dConstParObj
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExAllenChan2dConstParObj.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExAllenChan2dConstParObj.dir/Examples/ExAllenChan2dConstParObj.cpp.o  -o ../installdir/examples/ExAllenChan2dConstParObj  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 86%] Built target ExAllenChan2dConstParObj
+make -f CMakeFiles/ExBurger1dConstParObj.dir/build.make CMakeFiles/ExBurger1dConstParObj.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dConstParObj.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dConstParObj.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dConstParObj.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBurger1dConstParObj.dir/depend.internal".
+Scanning dependencies of target ExBurger1dConstParObj
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExBurger1dConstParObj.dir/build.make CMakeFiles/ExBurger1dConstParObj.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 87%] Building CXX object CMakeFiles/ExBurger1dConstParObj.dir/Examples/ExBurger1dConstParObj.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExBurger1dConstParObj.dir/Examples/ExBurger1dConstParObj.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExBurger1dConstParObj.cpp
+[ 89%] Linking CXX executable ../installdir/examples/ExBurger1dConstParObj
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExBurger1dConstParObj.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExBurger1dConstParObj.dir/Examples/ExBurger1dConstParObj.cpp.o  -o ../installdir/examples/ExBurger1dConstParObj  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 89%] Built target ExBurger1dConstParObj
+make -f CMakeFiles/ExAllenChan2dVarParObj.dir/build.make CMakeFiles/ExAllenChan2dVarParObj.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dVarParObj.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dVarParObj.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dVarParObj.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dVarParObj.dir/depend.internal".
+Scanning dependencies of target ExAllenChan2dVarParObj
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExAllenChan2dVarParObj.dir/build.make CMakeFiles/ExAllenChan2dVarParObj.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 90%] Building CXX object CMakeFiles/ExAllenChan2dVarParObj.dir/Examples/ExAllenChan2dVarParObj.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExAllenChan2dVarParObj.dir/Examples/ExAllenChan2dVarParObj.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExAllenChan2dVarParObj.cpp
+[ 91%] Linking CXX executable ../installdir/examples/ExAllenChan2dVarParObj
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExAllenChan2dVarParObj.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExAllenChan2dVarParObj.dir/Examples/ExAllenChan2dVarParObj.cpp.o  -o ../installdir/examples/ExAllenChan2dVarParObj  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 91%] Built target ExAllenChan2dVarParObj
+make -f CMakeFiles/ExPrecissionDiagram.dir/build.make CMakeFiles/ExPrecissionDiagram.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExPrecissionDiagram.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExPrecissionDiagram.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExPrecissionDiagram.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExPrecissionDiagram.dir/depend.internal".
+Scanning dependencies of target ExPrecissionDiagram
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExPrecissionDiagram.dir/build.make CMakeFiles/ExPrecissionDiagram.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 93%] Building CXX object CMakeFiles/ExPrecissionDiagram.dir/Examples/ExPrecissionDiagram.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExPrecissionDiagram.dir/Examples/ExPrecissionDiagram.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExPrecissionDiagram.cpp
+[ 94%] Linking CXX executable ../installdir/examples/ExPrecissionDiagram
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExPrecissionDiagram.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExPrecissionDiagram.dir/Examples/ExPrecissionDiagram.cpp.o  -o ../installdir/examples/ExPrecissionDiagram  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 94%] Built target ExPrecissionDiagram
+make -f CMakeFiles/ExAllenChan2dConstPar.dir/build.make CMakeFiles/ExAllenChan2dConstPar.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dConstPar.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dConstPar.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dConstPar.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExAllenChan2dConstPar.dir/depend.internal".
+Scanning dependencies of target ExAllenChan2dConstPar
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExAllenChan2dConstPar.dir/build.make CMakeFiles/ExAllenChan2dConstPar.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 95%] Building CXX object CMakeFiles/ExAllenChan2dConstPar.dir/Examples/ExAllenChan2dConstPar.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExAllenChan2dConstPar.dir/Examples/ExAllenChan2dConstPar.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExAllenChan2dConstPar.cpp
+[ 97%] Linking CXX executable ../installdir/examples/ExAllenChan2dConstPar
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExAllenChan2dConstPar.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExAllenChan2dConstPar.dir/Examples/ExAllenChan2dConstPar.cpp.o  -o ../installdir/examples/ExAllenChan2dConstPar  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 97%] Built target ExAllenChan2dConstPar
+make -f CMakeFiles/ExBruss2dConstParObj.dir/build.make CMakeFiles/ExBruss2dConstParObj.dir/depend
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+cd /home/jstewart23/Code/C++/Epic2/epic-cpp/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBruss2dConstParObj.dir/DependInfo.cmake --color=
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBruss2dConstParObj.dir/DependInfo.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBruss2dConstParObj.dir/depend.internal".
+Dependee "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles/ExBruss2dConstParObj.dir/depend.internal".
+Scanning dependencies of target ExBruss2dConstParObj
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+make -f CMakeFiles/ExBruss2dConstParObj.dir/build.make CMakeFiles/ExBruss2dConstParObj.dir/build
+make[2]: Entering directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[ 98%] Building CXX object CMakeFiles/ExBruss2dConstParObj.dir/Examples/ExBruss2dConstParObj.cpp.o
+/usr/bin/c++   -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/Epic2/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/Epic2/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1 -o CMakeFiles/ExBruss2dConstParObj.dir/Examples/ExBruss2dConstParObj.cpp.o -c /home/jstewart23/Code/C++/Epic2/epic-cpp/Examples/ExBruss2dConstParObj.cpp
+[100%] Linking CXX executable ../installdir/examples/ExBruss2dConstParObj
+/usr/bin/cmake -E cmake_link_script CMakeFiles/ExBruss2dConstParObj.dir/link.txt --verbose=1
+/usr/bin/c++    -rdynamic -pthread CMakeFiles/ExBruss2dConstParObj.dir/Examples/ExBruss2dConstParObj.cpp.o  -o ../installdir/examples/ExBruss2dConstParObj  -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so Integrators/libepic1.0.0.a TestProblems/libtests.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so 
+make[2]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+[100%] Built target ExBruss2dConstParObj
+make[1]: Leaving directory '/home/jstewart23/Code/C++/Epic2/epic-cpp/build'
+/usr/bin/cmake -E cmake_progress_start /home/jstewart23/Code/C++/Epic2/epic-cpp/build/CMakeFiles 0
