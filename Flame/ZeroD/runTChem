@@ -1,7 +1,7 @@
-exec=./TChem_IgnitionZeroD_SourceTermJacobian.x
+exec=./TChem_FJac.x
 #inputs=$TCHEM_INSTALL_PATH/example/data/ignition-zero-d/gri3.0/
-#inputs=H2/
-inputs=gri3.0/
+inputs=H2/
+#inputs=gri3.0/
 chemfile=$inputs"chem.inp"
 thermfile=$inputs"therm.dat"
 $exec --chemfile=$chemfile --thermfile=$thermfile 
