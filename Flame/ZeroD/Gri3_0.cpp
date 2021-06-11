@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
 	//Testing Kokkos block
 	//=====================================================
 	//Kokkos::initialize();
-	/*
+	
 	Kokkos::initialize(argc, argv);
 	{
 	///
@@ -234,7 +234,7 @@ int main(int argc, char* argv[])
 
 
 
-	*/
+	
 	//===================================================
 	// Create the integrator
 	// In this case we use EpiRK5C, for other integrators just use their name.
