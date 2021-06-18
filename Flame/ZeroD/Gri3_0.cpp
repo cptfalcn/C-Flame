@@ -24,36 +24,65 @@
 #include "TChem_Util.hpp"
 #include "TChem_KineticModelData.hpp"
 #include "TChem_Impl_IgnitionZeroD_Problem.hpp" // here is where Ignition Zero D problem is implemented
+#include <omp.h>
 
-
-// Number of points in the grid
-#define NEQ 3
+#define NEQ 3 //number of equations
+//#define NSE 9 //Number of species, 9 for Hydrogen, removed, stupid and not portable
 #define EPS 1e-2
+#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<TChem::KineticModelConstData<Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace> >>
+
+//=====================
+//Prototypes & Classes
+//=====================
+//Add an additional class element to pass to epic.
+class myPb : public TCHEMPB{
+	public:
+	ordinal_type  num_equations;
+	//fucntions
+	ordinal_type	get_num_equations(void)
+	{
+	return this->num_equations;
+	}
+};
+
 N_Vector InitialConditions();
+N_Vector InitialConditionsH(int);
 int RHS(realtype, N_Vector, N_Vector, void *);
+int RHS_TCHEM(realtype, N_Vector, N_Vector, void *);
 int Jtv(N_Vector, N_Vector, realtype, N_Vector, N_Vector , void *, N_Vector);
+int Jtv_TCHEM(N_Vector , N_Vector ,realtype, N_Vector, N_Vector , void* , N_Vector );
 int CheckStep(realtype, realtype);
+void PrintFromPtr(realtype *,  int);
+void ErrorCheck(realtype *, int, string);
+//=====================
+//Namespaces
+//=====================
+
 
 using namespace std;
 
+//====================
+//Main
+//====================
 int main(int argc, char* argv[])
 {
 	//====================
 	// Declarations
 	//====================
-	static const realtype FinalTime = 10.0;
-	static const int NumBands = 3;
-	realtype StepSize=1e-2;
-	CheckStep(FinalTime, StepSize);
+	static const realtype FinalTime = 1e-4;//7e-5 seems to be the max
+	static const int NumBands = 3;//Epic stuff
+	realtype StepSize=5e-8;
+	CheckStep(FinalTime, StepSize);//Checks the number of steps
 	int ProgressDots=0; //From 0 to 100; only care about percentage
 	int StepCount = 0;
 	realtype PercentDone=0;
-	void *userData=nullptr;
+	//void *userData=nullptr; //Empty problem pointer
 	realtype TNow=0;
 	realtype TNext=0;
-	N_Vector y = N_VNew_Serial(NEQ); //The data y
-	N_VScale(1., InitialConditions(), y);
-	realtype *data = NV_DATA_S(y);
+	realtype RemainingTime=0;
+	//N_Vector y = N_VNew_Serial(NSE); //The data y
+	//N_VScale(1., InitialConditionsH(), y);
+	//realtype *data = NV_DATA_S(y);
 	bool LastStepAdjusted = 0;
 
 	//=====================================
@@ -61,9 +90,9 @@ int main(int argc, char* argv[])
 	//Reactivate at your own risk,
 	//The entire block is a mess.
 	//=====================================
-	//N_Vector Is = N_VNew_Serial(NEQ);
-	//N_Vector Jv = N_VNew_Serial(NEQ);
-	//N_Vector rhs= N_VNew_Serial(NEQ);
+	//N_Vector Is = N_VNew_Serial(NSE);
+	//N_Vector Jv = N_VNew_Serial(NSE);
+	//N_Vector rhs= N_VNew_Serial(NSE);
 	//N_Vector y0 = N_VNew_Serial(NEQ);
         //N_Vector y0 = N_VNew_Serial(NEQ);
 	//N_VScale(1., InitialConditions(), y0);
@@ -100,201 +129,159 @@ int main(int argc, char* argv[])
  	opts.set_option<std::string>("thermfile", "Therm file name e.g., therm.dat", &thermFile);
 	const bool r_parse = opts.parse(argc, argv);
 	if (r_parse)
-	return 0; // print help return
+		return 0; // print help return
 	cout<< "=================Chemistry files==========================\n";
 	cout<< chemFile <<"\t" << thermFile << endl;
 	/**/
 	//=====================================================
-	//Testing Kokkos block
+	//Testing Kokkos block: working, pruning old code
 	//=====================================================
-	//Kokkos::initialize();
-	
+
 	Kokkos::initialize(argc, argv);
-	{
-	///
-    	/// 3. Type definitions
-	///
+	/// all Kokkos varialbes are reference counted objects. they are deallocated
+        /// within this local scope.
+	{//begin local scope
+		//=====================================
+		//Kokkos Sub-declarations
+		//=====================================
+		/// scalar type and ordinal type
+		using real_type = double;
+		using ordinal_type = int;
 
-	/// scalar type and ordinal type
-	using real_type = double;
-	using ordinal_type = int;
+		/// Kokkos environments - host device type and multi dimensional arrays
+		/// note that the 2d view use row major layout while most matrix format uses column major layout.
+		/// to make the 2d view compatible with other codes, we need to transpose it.
+		using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
+		using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
+		//using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
 
-    /// Kokkos environments - host device type and multi dimensional arrays
-    /// note that the 2d view use row major layout while most matrix format uses column major layout.
-    /// to make the 2d view compatible with other codes, we need to transpose it.
-    using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
-    using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
-    using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
+	    	/// construct TChem's kinect model and read reaction mechanism
+    		TChem::KineticModelData kmd(chemFile, thermFile);
 
-    ///
-    /// 4. Construction of a kinetic model
-    ///
+	    	/// construct const (read-only) data and move the data to device.
+	    	/// for host device, it is soft copy (pointer assignmnet).
+	    	auto kmcd = kmd.createConstData<host_device_type>();
 
-    /// construct TChem's kinect model and read reaction mechanism
-    TChem::KineticModelData kmd(chemFile, thermFile);
 
-    /// construct const (read-only) data and move the data to device.
-    /// for host device, it is soft copy (pointer assignmnet).
-    auto kmcd = kmd.createConstData<host_device_type>();
+    		/// use problem object for ignition zero D problem, interface to source term and jacobian
+    		/// other available problem objects in TChem: PFR, CSTR, and CV ignition
+    		using problem_type = TChem::Impl::IgnitionZeroD_Problem<decltype(kmcd)>;
 
-    ///
-    /// 5. Problem setup
-    ///
+	    	/// state vector - Temperature, Y_0, Y_1, ... Y_{n-1}), n is # of species.
+    		const ordinal_type number_of_equations = problem_type::getNumberOfEquations(kmcd);
+		N_Vector y = N_VNew_Serial(number_of_equations); //The data y
+        	N_VScale(1., InitialConditionsH(number_of_equations), y);
+        	realtype *data = NV_DATA_S(y);
 
-    /// use problem object for ignition zero D problem providing interface to source term and jacobian
-    /// other available problem objects in TChem: PFR, CSTR, and CV ignition
-    using problem_type = TChem::Impl::IgnitionZeroD_Problem<decltype(kmcd)>;
 
-    /// state vector - Temperature, Y_0, Y_1, ... Y_{n-1}), n is # of species.
-    const ordinal_type number_of_equations = problem_type::getNumberOfEquations(kmcd);
+    		/// TChem does not allocate any workspace internally.workspace should be explicitly given from users.
+	    	/// you can create the work space using NVector, std::vector or real_type_1d_view_type (Kokkos view)
+	    	/// here we use kokkos view
+		const ordinal_type problem_workspace_size = problem_type::getWorkSpaceSize(kmcd);
+		real_type_1d_view_type work("workspace", problem_workspace_size);
+	    	/// set input vector
+		myPb problem;
+		void *pbptr= &problem;
 
-    ///
-    /// TChem does not allocate any workspace internally.
-    /// workspace should be explicitly given from users.
-    /// you can create the work space using NVector, std::vector or real_type_1d_view_type (Kokkos view)
-    /// here we use kokkos view
-    const ordinal_type problem_workspace_size = problem_type::getWorkSpaceSize(kmcd);
-    real_type_1d_view_type work("workspace", problem_workspace_size);
-	
-	 ///
-    /// 6. Input state vector
-    ///
+      		/// initialize problem
+		const real_type pressure(101325);
+      		problem._p = pressure; // pressure
+      		problem._work = work;  // problem workspace array
+     		problem._kmcd = kmcd;  // kinetic model
+		problem.num_equations=number_of_equations;
+		const int MaxKrylovIters = 500;
 
-    /// set input vector
-    const real_type pressure(101325);
+		//==============================================
+		//Create integrator
+		//==============================================
+		//RHS_TCHEM(1,y,rhs,pbptr);
+        	/**/
+		//EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS_TCHEM,
+		Epi2_KIOPS *integrator = new Epi2_KIOPS(RHS_TCHEM,
+				Jtv_TCHEM,//Turn this on and off
+				pbptr,
+				MaxKrylovIters,
+				y,
+				number_of_equations);//This line, NSE will cause issues later.
+		cout<<"=====================Integrator created====================\n";
+       		//========================
+        	// Set integrator parameters
+        	//========================
+        	const realtype KrylovTol = RCONST(1.0e-14);//1e-14
+        	int startingBasisSizes[] = {10, 10};
 
-    /// we use std vector mimicing users' interface
-    std::vector<real_type> x_std(number_of_equations, real_type(0));
-    x_std[0] = 1200; // temperature
-    x_std[1] = 0.1;  // mass fraction species 1
-    x_std[2] = 0.9;  // mass fraction species 2
-
-    /// output rhs vector and J matrix
-    std::vector<real_type> rhs_std(number_of_equations);
-    std::vector<real_type> J_std(number_of_equations * number_of_equations);
-
-    /// get points for std vectors
-    real_type * ptr_x = x_std.data();
-    real_type * ptr_rhs = rhs_std.data();
-    real_type * ptr_J = J_std.data();
-
-    ///
-    /// 7. Compute right hand side vector and Jacobian
-    ///
-    {
-      problem_type problem;
-
-      /// initialize problem
-      problem._p = pressure; // pressure
-      problem._work = work;  // problem workspace array
-      problem._kmcd = kmcd;  // kinetic model
-
-      /// create view wrapping the pointers
-      real_type_1d_view_type x(ptr_x,   number_of_equations);
-      real_type_1d_view_type f(ptr_rhs, number_of_equations);
-      real_type_2d_view_type J(ptr_J,   number_of_equations, number_of_equations);
-
-      /// create a fake team member
-      const auto member = Tines::HostSerialTeamMember();
-
-      /// compute rhs and Jacobian
-      problem.computeFunction(member, x, f);
-      problem.computeJacobian(member, x, J);
-
-      /// change the layout from row major to column major
-      for (ordinal_type j=0;j<number_of_equations;++j)
-              for (ordinal_type i=0;i<j;++i)
-                std::swap(J(i,j), J(j,i));
-    }
-	 ///
-    /// 8. Check the rhs and Jacobian
-    ///
-
-    printf("RHS std vector \n" );
-    for (ordinal_type i=0;i<number_of_equations;++i) {
-      printf("%e\n", rhs_std[i]);
-        std::cout<<"\n";
-    }
-
-    printf("Jacobian std vector \n" );
-    for (ordinal_type i=0;i<number_of_equations;++i) {
-      for (ordinal_type j=0;j<number_of_equations;++j) {
-        printf("%e ", J_std[i+j*number_of_equations] );
-      }
-      printf("\n" );
-    }
-
-    /// all Kokkos varialbes are reference counted objects. they are deallocated
-    /// within this local scope.
-  }
-
-  /// Kokkos finalize checks any memory leak that are not properly deallocated.
-  Kokkos::finalize();
+        	//=================================
+        	// Run the time integrator loop
+        	//=================================
+        	cout<<"Integrator progress:[";
+		cout.flush();
+        	while(TNext<FinalTime)
+        	{
+                	TNow= StepCount*StepSize;
+                	TNext=(StepCount+1)*StepSize;
+			RemainingTime=FinalTime-TNow;
+                	if( abs(RemainingTime-StepSize)<StepSize )
+                	{
+                	        StepSize=RemainingTime;
+                	        LastStepAdjusted=1;
+				TNext=TNow+StepSize;
+                	}
+                	//Integrate
+                	integrator->Integrate(
+                	StepSize,TNow, TNext, NumBands, y,
+                	KrylovTol, startingBasisSizes);
+                	//If the data goes negative, which is not physical, correct it.
+                	//Removing this loop will cause stalls.
+                	for (int j=0; j<number_of_equations; j++)
+                	{
+				if(data[j]<0)
+                        	        data[j]=0;
+                	}
+                	//Track the progress
+                	PercentDone=floor(TNext/FinalTime*100);
+                	for (int k=0; k<PercentDone-ProgressDots;k++)
+                	{
+                	        cout<<":";
+                	        cout.flush();
+                	}
+                	ProgressDots=PercentDone;
+                	StepCount++;
+        	}
+        	TNow=TNext;
+        	cout << "]100%\n\n";
+		delete integrator;
 
 
 
-
-	
-	//===================================================
-	// Create the integrator
-	// In this case we use EpiRK5C, for other integrators just use their name.
-    	//===================================================
-	const int MaxKrylovIters = 500;
-    	Epi2_KIOPS *integrator = new Epi2_KIOPS(RHS,
-                                      Jtv,
-                                      userData,
-                                      MaxKrylovIters,
-                                      y,
-                                      NEQ);
-
-	//========================
-	// Set integrator parameters
-	//========================
-	const realtype KrylovTol = RCONST(1.0e-14);//1e-14
-	int startingBasisSizes[] = {3, 3};
+	        //=======================================
+        	//Console Output
+        	//=======================================
+        	//Temp H2 O2 O OH H2O H HO2 H2O2
+        	cout<<"===========================Data========================\n";
+        	cout <<"Temp=" << data[0] << "\t\t H2=" << data[1] <<"\t\t O2=" << data[2]<<endl;
+        	cout << "Total Mass Fractions: " <<N_VL1NormLocal(y)-data[0]<<endl;
+        	cout << "Mass Fraction error: "  <<abs( N_VL1NormLocal(y)-data[0]-1)<<endl;
+        	cout << "Simulation ended at time: " << TNow << endl;
+        	cout << "Steps taken: " << StepCount <<endl;
+        	cout <<"===================Printing data to file==============\n";
 
 
+        	//=======================================
+        	//Data file output
+        	//=======================================
+        	ofstream myfile("TChemHydrogenData.txt", std::ios_base::app);
+        	for(int i=0; i<number_of_equations;i++)
+        	{
+        		myfile << setprecision(17) << fixed << data[i] << "\t\t";
+        	}
+        	myfile << "\n"<< StepSize << "\n";
+        	myfile.close();
+        	cout << "======================Simulation complete=============\n";
+		/**/
+  	}//end local kokkos scope.
 
-	//=================================
-    	// Run the time integrator loop
-	//=================================
-	cout<<"Integrator progress:[";
-	while(TNext<FinalTime)
-	{
-		TNow= StepCount*StepSize;
-		TNext=(StepCount+1)*StepSize;
-		if(TNext>FinalTime&&(FinalTime != TNow))
-		{
-			StepSize=FinalTime-TNow;
-			LastStepAdjusted=1;
-		}
-		//Integrate
-		integrator->Integrate(
-        	StepSize,TNow, TNext, NumBands, y,
-		KrylovTol, startingBasisSizes);
-		//If the data goes negative, which is not physical, correct it.
-		//Removing this loop will cause stalls.
-		for (int j=0; j<NEQ; j++)
-		{
-			if(data[j]<0)
-			{
-				data[j]=0;
-			}
-		}
-		//Track the progress
-		PercentDone=floor(TNext/FinalTime*100);
-		for (int k=0; k<PercentDone-ProgressDots;k++)
-		{
-			cout<<":";
-			cout.flush();
-		}
-		ProgressDots=PercentDone;
-		StepCount++;
-	}
-	TNow=TNext;
-	cout << "]100%\n\n";
-
-
+ 	/// Kokkos finalize checks any memory leak that are not properly deallocated.
+  	Kokkos::finalize();
 
 	//=====================================================
 	//Need to figure out why this  doesn't work as intended
@@ -304,37 +291,6 @@ int main(int argc, char* argv[])
     	//Print the statistics
     	//printf("Run stats:\n");
     	//integratorStats->PrintStats();
-
-
-
-	//=======================================
-	//Console Output
-	//=======================================
-	cout<<"===========================Data========================\n";
-	cout <<"y=" << data[0] << "\t\t z=" << data[1] <<"\t\t Temp=" << data[2]<<endl;
-	if (LastStepAdjusted == 1)
-	{
-		cout<<"We altered the last time step to not go over the final time\n";
-	}
-	cout << "Simulation ended at time: " << TNow << endl;
-	cout << "Steps taken: " << StepCount <<endl;
-	//cout <<"Sum of y=" <<data[0]+ data [1] + data [2]<<"\t\t";
-	//cout <<"Error in sum=" << data[0]+data[1]+data[2]-Y0[0]-Y0[1]-Y0[2]<<endl;
-	cout <<"===================Printing data to file==============\n";
-
-
-	//=======================================
-	//Data file output
-	//=======================================
-	ofstream myfile("TChemData.txt", std::ios_base::app);
-	myfile << setprecision(17) << fixed << data[0] << "\t\t" << data[1] << "\t\t";
-	myfile << data[2] << "\t\t" <<StepSize <<endl;
-	myfile.close();
-	cout << "======================Simulation complete=============\n";
-
-   	 // Clean up the integrator
-    	delete integrator;
-
 
 
 }
@@ -372,6 +328,7 @@ int CheckStep(realtype FinalTime, realtype StepSize)
         }else if (abs(round(FinalTime/StepSize))-FinalTime/StepSize <1e-6 ){
 		static const int Steps= round (FinalTime/StepSize);
 		cout << Steps << " steps has been approximated...\n";
+		//cout << "Shall we use this modified Step size?"<<FinalTime/Steps <<endl;
 		return Steps;
 	}else{
                 cout<<"Cannot perform non-integer number of steps!!\n";
@@ -402,7 +359,18 @@ N_Vector InitialConditions()
         return y0;
 }
 
-
+//====================================================
+//Hydrogen problem intial conditions
+//====================================================
+N_Vector InitialConditionsH(int number_of_equations)
+{
+         N_Vector y0 = N_VNew_Serial(number_of_equations);
+         realtype *data = NV_DATA_S(y0);
+         data[0]=1032.0; //They put 1200 for some reason
+         data[1]=.1;
+         data[2]=.9;
+         return y0;
+}
 /*
  * ===========================================================================================
  * 
@@ -432,6 +400,42 @@ int RHS(realtype t, N_Vector u, N_Vector udot, void *userData)
 //	cout << dy[0] <<"\t\t" << dy[1] << "\t\t" << dy[2] <<endl;
         return 0;
 }
+/*
+//============================================================
+//RHS that uses the TCHEM rhs functions
+//============================================================
+*/
+int RHS_TCHEM(realtype t, N_Vector u, N_Vector udot, void * pb)
+{
+	//TCHEMPB *pbPtr{ static_cast<TCHEMPB*>(pb)} ;//recast the type here.
+	myPb * pbPtr{static_cast<myPb *> (pb)};//Recast
+	ordinal_type number_of_equations=pbPtr->get_num_equations();
+	realtype *y= NV_DATA_S(u);
+	realtype *dy=NV_DATA_S(udot);
+	/// we use std vector mimicing users' interface
+	using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
+	using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
+        // output rhs vector and x via a kokkos wrapper.
+	real_type_1d_view_type x(y,	number_of_equations);
+	real_type_1d_view_type f(dy,	number_of_equations);
+        //=================================
+        // Compute right hand side vector
+        //=================================
+	auto member =  Tines::HostSerialTeamMember();
+	pbPtr->computeFunction(member, x ,f);
+	//===============================
+	//Output
+	//===============================
+	//PrintFromPtr(dy,number_of_equations);
+	//===============================
+	//Check for NaN
+	//===============================
+	ErrorCheck(y,number_of_equations, "y");
+	ErrorCheck(dy, number_of_equations, "rhs");
+	return 0;
+}
+
+
 
 /*
  * ===========================================================================================
@@ -468,17 +472,129 @@ int Jtv(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void *user
 	JV[0] = -.5*EXP* (V[0]*Y[1]+V[1]*Y[0]+V[2]*Y[0]*Y[1]*DEXP);
 	JV[1] =-JV[0]-V[1];
 	JV[2] = V[1];
-	//cout << "====================Data==================\n";
-	//cout << Y[0] << "\t\t" << Y[1] << "\t\t" << Y[2] <<endl;
-	/*
-	for (int i=0; i<NEQ; i++){
-		if (isnan(JV[i])==1){
-			cout <<"-------------BOOOOOMMM!---------\n";
-			cout <<"-----------Dumping data---------\n";
-			cout <<"Jtv[0]=" << JV[0]<< "\t\t" << "Jtv[1]=" <<JV[1] <<"\t\t Jtv[2]="<< JV[2]<<endl;
-			cout <<"y0="<<Y[0] <<"\t\ty1=" <<Y[1] << "\t\ty2=" << Y[2]<<endl;
-			exit(1);
-			}
-		}*/
         return 0;
+}
+
+/*
+//=============================================================
+||Jtv using TCHEM
+||N_Vector v: 	the v in Jv
+||N_Vector Jv:  Jv
+||realtype t:  	time, needed by KIOPS
+||N_Vector u:	the state vector
+||N_Vector fu:	rhs evaluated at u
+||void * pb:	pointer to my modified problem class
+||N_Vector tmp:	temporary vector used here to grab rows of the Jacobian
+\\=============================================================
+*/
+int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void* pb, N_Vector tmp)
+{
+	//problem_type problem;
+        myPb * pbPtr{static_cast<myPb *> (pb)};//Recast
+        ordinal_type number_of_equations=pbPtr->num_equations;//Get number of equations
+	//======================================
+	//Set the necessary vectors and pointers
+	//======================================
+	N_Vector Jac = N_VNew_Serial(number_of_equations*number_of_equations);
+        realtype *y= NV_DATA_S(u);
+        realtype *JacD= NV_DATA_S(Jac);
+	realtype *JV=NV_DATA_S(Jv);
+	realtype *TMP=NV_DATA_S(tmp);
+	//=============================================
+        //We use std vector mimicing users' interface
+	//=============================================
+        using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
+        using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
+        using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
+
+        //============================================
+	// output rhs vector and J matrix wrappers.
+	//============================================
+
+        real_type_1d_view_type x(y   ,   number_of_equations);
+	real_type_2d_view_type J(JacD,   number_of_equations, number_of_equations);
+
+        //===============================
+        /// Compute Jacobian
+	//===============================
+        auto member =  Tines::HostSerialTeamMember();
+        pbPtr->computeJacobian(member, x ,J);
+
+	//===================
+	//Compute JV
+	//===================
+	//#pragma omp parallel
+	{
+	//#pragma omp for private (tmp)
+	for (int i=0; i< number_of_equations; i++)
+	{
+		//#pragma omp for private(tmp)
+		for(int j=0; j<number_of_equations; j++)
+		{
+			TMP[j]=JacD[j+i*number_of_equations];
+		}
+		JV[i]=N_VDotProd(tmp,v);
+	}
+	}
+	/**/
+        //===============================
+        //Output
+        //===============================
+	/// change the layout from row major to column major
+	/*
+        for (ordinal_type j=0;j<number_of_equations;++j)
+		for (ordinal_type i=0;i<j;++i)
+                	std::swap(J(i,j), J(j,i));
+	*/
+	/*
+	printf("Jacobian std vector \n" );
+	for (ordinal_type i=0;i<number_of_equations;++i) {
+		for (ordinal_type j=0;j<number_of_equations;++j) 
+		{
+			printf("%e ", JacD[i+j*number_of_equations] );
+		}
+        printf("\n" );
+	}
+	*/
+	return 0;
+}
+
+
+
+
+//==============================================
+//Print from pointer
+//realtype* ptr 	object pointer
+//int num_eqs		number of equations
+//==============================================
+void PrintFromPtr(realtype * ptr, int num_eqs)
+{
+	cout<<endl;
+	for(int i=0; i<num_eqs; i++)
+	{
+		cout<<ptr[i]<<endl;
+	}
+	cout<<endl;
+}
+
+
+//=======================================================
+//RHS Error Check
+//realtype* y 		y Data ptr
+//realtype* rhs		rhs Data ptr
+//int num_eqs		number of equations in the system
+//========================================================
+
+void ErrorCheck(realtype * data, int num_eqs, string name)
+{
+	for (int i=0; i<num_eqs; i++)
+        {
+		if (isnan(data[i])==1)
+		{
+			cout<< endl << "NaN in "<< name <<" detected\n";
+			PrintFromPtr(data,num_eqs);
+                       	exit(1);
+		}
+	}
+
 }
