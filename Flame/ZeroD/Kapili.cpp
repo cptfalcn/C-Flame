@@ -38,7 +38,8 @@ int main()
 	//====================
 	static const realtype FinalTime = 10.0;
 	static const int NumBands = 3;
-	realtype StepSize=1e-1/(1*2*2*2*2*2*2*2*2*2*2*2);
+	realtype StepSize=1e-1/(1*2*2*2*2*2*2*2*2*2);
+	//realtype StepSize=1e-1/(1*2*2*2*2*2*2*2);
 	CheckStep(FinalTime, StepSize);
 	int ProgressDots=0; //From 0 to 100; only care about percentage
 	int StepCount = 0;
@@ -87,6 +88,12 @@ int main()
 	// In this case we use EpiRK5C, for other integrators just use their name.
     	//===================================================
 	const int MaxKrylovIters = 500;
+	//EpiRK5V *integrator = new EpiRK5V(RHS,//Not running have to check the calling function.
+	//EpiRK5SC_KIOPS *integrator = new EpiRK5SC_KIOPS(RHS,
+	//EpiRK4SC *integrator = new EpiRK4SC(RHS,
+	//EpiRK4SV *integrator = new EpiRK4SV(RHS,
+	//EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS,
+	//EpiRK5C *integrator = new EpiRK5C(RHS,
     	Epi2_KIOPS *integrator = new Epi2_KIOPS(RHS,
                                       Jtv,
                                       userData,
@@ -116,9 +123,8 @@ int main()
 			LastStepAdjusted=1;
 		}
 		//Integrate
-		integrator->Integrate(
-        	StepSize,TNow, TNext, NumBands, y,
-		KrylovTol, startingBasisSizes);
+		integrator->Integrate(StepSize,TNow, TNext, NumBands, y,KrylovTol, startingBasisSizes);
+		//integrator->Integrate(StepSize, StepSize, KrylovTol, KrylovTol, TNow, TNext, NumBands, startingBasisSizes, y);//EpiRKxSV
 		//If the data goes negative, which is not physical, correct it.
 		//Removing this loop will cause stalls.
 		for (int j=0; j<NEQ; j++)
@@ -243,7 +249,7 @@ N_Vector InitialConditions()
 {
         N_Vector y0 = N_VNew_Serial(NEQ);
         realtype *data = NV_DATA_S(y0);
-	data[0]=1.0;
+	data[0]=1.0-.5*EPS;
 	data[1]=.5*EPS;
 	data[2]=1.0;
         return y0;

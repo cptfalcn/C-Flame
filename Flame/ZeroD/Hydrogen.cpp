@@ -26,9 +26,6 @@
 #include "TChem_Impl_IgnitionZeroD_Problem.hpp" // here is where Ignition Zero D problem is implemented
 #include <omp.h>
 
-#define NEQ 3 //number of equations
-//#define NSE 9 //Number of species, 9 for Hydrogen, removed, stupid and not portable
-#define EPS 1e-2
 #define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<TChem::KineticModelConstData<Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace> >>
 
 //=====================
@@ -45,21 +42,17 @@ class myPb : public TCHEMPB{
 	}
 };
 
-N_Vector InitialConditions();
 N_Vector InitialConditionsH(int);
 N_Vector InitialConditionsGri(int);
-int RHS(realtype, N_Vector, N_Vector, void *);
 int RHS_TCHEM(realtype, N_Vector, N_Vector, void *);
-int Jtv(N_Vector, N_Vector, realtype, N_Vector, N_Vector , void *, N_Vector);
 int Jtv_TCHEM(N_Vector , N_Vector ,realtype, N_Vector, N_Vector , void* , N_Vector );
 int CheckStep(realtype, realtype);
 void PrintFromPtr(realtype *,  int);
 void ErrorCheck(realtype *, int, string);
+void PrintDataToFile(ofstream &, realtype *,int, realtype);
 //=====================
 //Namespaces
 //=====================
-
-
 using namespace std;
 
 //====================
@@ -70,59 +63,25 @@ int main(int argc, char* argv[])
 	//====================
 	// Declarations
 	//====================
-	static const realtype FinalTime = 1e-1;//7e-5 seems to be the max
-	static const int NumBands = 3;//Epic stuff
-	realtype StepSize=1e-7;
-	CheckStep(FinalTime, StepSize);//Checks the number of steps
+	static const realtype FinalTime = 1.0;//1e-4 seems to be the max
+	static const int NumBands = 3;//Epic stuff, default is 3.
+	realtype StepSize=1e-8;
+	int Steps=CheckStep(FinalTime, StepSize);//Checks the number of steps
 	int ProgressDots=0; //From 0 to 100; only care about percentage
 	int StepCount = 0;
 	realtype PercentDone=0;
+	bool Error=0;
 	//void *userData=nullptr; //Empty problem pointer
 	realtype TNow=0;
 	realtype TNext=0;
-	realtype RemainingTime=0;
-	//N_Vector y = N_VNew_Serial(NSE); //The data y
-	//N_VScale(1., InitialConditionsH(), y);
-	//realtype *data = NV_DATA_S(y);
-	bool LastStepAdjusted = 0;
-	ofstream myfile("TChemGRIData.txt", std::ios_base::app);
-	//=====================================
-	//This block is for testing.
-	//Reactivate at your own risk,
-	//The entire block is a mess.
-	//=====================================
-	//N_Vector Is = N_VNew_Serial(NSE);
-	//N_Vector Jv = N_VNew_Serial(NSE);
-	//N_Vector rhs= N_VNew_Serial(NSE);
-	//N_Vector y0 = N_VNew_Serial(NEQ);
-        //N_Vector y0 = N_VNew_Serial(NEQ);
-	//N_VScale(1., InitialConditions(), y0);
-        //realtype *Y0= NV_DATA_S(y0);
-	//realtype *IS = NV_DATA_S(Is);
-	//realtype *JV = NV_DATA_S(Jv);
-	//realtype *RHSy=NV_DATA_S(rhs);
-	//realtype *Y0= NV_DATA_S(y0);
-	//N_VScale(1., InitialConditions(), y0);
-	//for (int i=0; i<NEQ; i++){
-	//	IS[i]=1.0;}
-	//RHS(0, y, rhs, userData);
-	//Jtv(Is, Jv, 1, y , rhs, userData, Is);
-	//cout << "=================Initial Data===================\n";
-	//cout << "=========================y======================\n";
-	//cout << "y[0]=" << data[0] <<"\t\t y[1]=" << data[1] << "\t\t y[2]=" << data[2] << endl;
-	//cout << "======================rhs========================\n";
-	//cout << "rhs[0]=" << RHSy[0] << "\t\t rhs[1]=" << RHSy[1] << "\t\t rhs[2]="<<RHSy[2] <<endl;
-	//cout << "========================JtV=====================\n";
-	//cout <<  "Jtv[0] =" <<JV[0] <<"\t\t Jtv[1]="<< JV[1] <<"\t\t Jtv[2]=" << JV[2]  <<endl;
-	//end test
+	ofstream myfile("TChemHydrogenData.txt", std::ios_base::app);
 
 	//=====================================================
 	//Kokkos Input block: Working
 	//=====================================================
-	/**/
 	std::string chemFile("chem.inp");
  	std::string thermFile("therm.dat");
-        std::cout<<"Starting\n";
+        std::cout<<"============================Starting========================\n";
  	/// parse command line arguments --chemfile=user-chemfile.inp --thermfile=user-thermfile.dat
   	/// with --help, the code list the available options.
  	TChem::CommandLineParser opts("This example computes reaction rates with a given state vector");
@@ -131,16 +90,13 @@ int main(int argc, char* argv[])
 	const bool r_parse = opts.parse(argc, argv);
 	if (r_parse)
 		return 0; // print help return
-	cout<< "=================Chemistry files==========================\n";
-	cout<< chemFile <<"\t" << thermFile << endl;
-	/**/
+
 	//=====================================================
-	//Testing Kokkos block: working, pruning old code
+	//Kokkos block: working, pruning old code
 	//=====================================================
 
 	Kokkos::initialize(argc, argv);
-	/// all Kokkos varialbes are reference counted objects. they are deallocated
-        /// within this local scope.
+	/// all Kokkos varialbes are reference counted objects. they are deallocated within this local scope.
 	{//begin local scope
 		//=====================================
 		//Kokkos Sub-declarations
@@ -163,16 +119,19 @@ int main(int argc, char* argv[])
 	    	/// for host device, it is soft copy (pointer assignmnet).
 	    	auto kmcd = kmd.createConstData<host_device_type>();
 
-
     		/// use problem object for ignition zero D problem, interface to source term and jacobian
     		/// other available problem objects in TChem: PFR, CSTR, and CV ignition
     		using problem_type = TChem::Impl::IgnitionZeroD_Problem<decltype(kmcd)>;
 
 	    	/// state vector - Temperature, Y_0, Y_1, ... Y_{n-1}), n is # of species.
+		//Declare my variables locally
     		const ordinal_type number_of_equations = problem_type::getNumberOfEquations(kmcd);
 		N_Vector y = N_VNew_Serial(number_of_equations); //The data y
-        	N_VScale(1., InitialConditionsGri(number_of_equations), y);
+        	N_VScale(1., InitialConditionsH(number_of_equations), y);
+		N_Vector yOld= N_VNew_Serial(number_of_equations);
+		N_Vector yDiff=N_VNew_Serial(number_of_equations);
         	realtype *data = NV_DATA_S(y);
+		realtype *dataOld=NV_DATA_S(yOld);
 
 
     		/// TChem does not allocate any workspace internally.workspace should be explicitly given from users.
@@ -180,26 +139,24 @@ int main(int argc, char* argv[])
 	    	/// here we use kokkos view
 		const ordinal_type problem_workspace_size = problem_type::getWorkSpaceSize(kmcd);
 		real_type_1d_view_type work("workspace", problem_workspace_size);
-	    	/// set input vector
+	    	/// set problem
 		myPb problem;
 		void *pbptr= &problem;
 
       		/// initialize problem
-		const real_type pressure(101325);
+		const real_type pressure(101325);//Constant pressure
       		problem._p = pressure; // pressure
       		problem._work = work;  // problem workspace array
      		problem._kmcd = kmcd;  // kinetic model
 		problem.num_equations=number_of_equations;
-		const int MaxKrylovIters = 500;
+		const int MaxKrylovIters = 500;//500
 
 		//==============================================
 		//Create integrator
 		//==============================================
-		//RHS_TCHEM(1,y,rhs,pbptr);
-        	/**/
 		//EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS_TCHEM,
 		Epi2_KIOPS *integrator = new Epi2_KIOPS(RHS_TCHEM,
-				Jtv_TCHEM,//Turn this on and off
+				//Jtv_TCHEM,//Turn this on and off
 				pbptr,
 				MaxKrylovIters,
 				y,
@@ -208,44 +165,74 @@ int main(int argc, char* argv[])
        		//========================
         	// Set integrator parameters
         	//========================
-        	const realtype KrylovTol = RCONST(1.0e-14);//1e-14
-        	int startingBasisSizes[] = {10, 10};
+        	const realtype KrylovTol = RCONST(1.0e-6);//1e-14
+        	int startingBasisSizes[] = {1, number_of_equations};
 
         	//=================================
         	// Run the time integrator loop
         	//=================================
         	cout<<"Integrator progress:[";
 		cout.flush();
-        	while(TNext<FinalTime)
+		while(StepCount<Steps)
+        	//while(TNext<FinalTime)
         	{
                 	TNow= StepCount*StepSize;
                 	TNext=(StepCount+1)*StepSize;
-			RemainingTime=FinalTime-TNow;
-                	if( abs(RemainingTime-StepSize)<StepSize )
+			N_VScale(1.0,y,yOld);
+			/*
+			if((TNext+StepSize>FinalTime)&&(FinalTime != TNow))
                 	{
-                	        StepSize=RemainingTime;
-                	        LastStepAdjusted=1;
-				TNext=TNow+StepSize;
+				cout<<"Checked last step\n";
+                        	StepSize=FinalTime-TNow;
+				cout<<TNow<<endl;
+				TNext=FinalTime;
                 	}
+			*/
                 	//Integrate
-                	integrator->Integrate(StepSize,TNow, TNext, NumBands, y,
-                	KrylovTol, startingBasisSizes);
-                	//If the data goes negative, which is not physical, correct it.
-                	//Removing this loop will cause stalls.
+                	integrator->Integrate(StepSize,TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
+
+
+			//=======================================
+			//Error checking
+			//=======================================
+			if(abs( N_VL1NormLocal(y)-data[0]-1.0)>.1 || abs(data[0])>1e5 )
+			{
+				PrintDataToFile(myfile, data, number_of_equations, TNext);
+				cout<<"\n===============!!!Critical error!!!================\n";
+				if(abs( N_VL1NormLocal(y)-data[0]-1.0)>.1)
+				{
+					cout<<"Severe mass loss detected. Check TChemHydrogenData.txt for details\n";
+					myfile<<"Mass fraction error : " << abs( N_VL1NormLocal(y)-data[0]-1.0)<< endl;
+				}
+				if(abs(data[0])>1e5)
+					cout<<"Temperature instability detected. Check TChemHydrogenData.txt for details \n";
+
+				cout<<"\nFinal time step: "<< TNow;
+				cout<<"\t\t We completed " << PercentDone <<"%\n";
+				exit(EXIT_FAILURE);
+			}
+
+
+
+			//clean
                 	for (int j=0; j<number_of_equations; j++)
                 	{
-				myfile<<setprecision(17)<<fixed <<data[j] <<"\t\t";
 				if(data[j]<0)
                         	        data[j]=0;
                 	}
-			myfile << "\t\t " << TNext << "\n";
-                	//Track the progress
+
+			//=======================
+			//Track the progress
+			//=======================
                 	PercentDone=floor(TNext/FinalTime*100);
                 	for (int k=0; k<PercentDone-ProgressDots;k++)
                 	{
                 	        cout<<":";
                 	        cout.flush();
                 	}
+			//Print one of the steps if we have advanced in time
+			if(ProgressDots!=PercentDone)
+				PrintDataToFile(myfile, data, number_of_equations,TNext);
                 	ProgressDots=PercentDone;
                 	StepCount++;
         	}
@@ -262,41 +249,17 @@ int main(int argc, char* argv[])
         	cout<<"===========================Data========================\n";
         	cout <<"Temp=" << data[0] << "\t\t H2=" << data[1] <<"\t\t O2=" << data[2]<<endl;
         	cout << "Total Mass Fractions: " <<N_VL1NormLocal(y)-data[0]<<endl;
-        	cout << "Mass Fraction error: "  <<abs( N_VL1NormLocal(y)-data[0]-1)<<endl;
+        	cout << "Mass Fraction error: "  <<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
         	cout << "Simulation ended at time: " << TNow << endl;
         	cout << "Steps taken: " << StepCount <<endl;
         	cout <<"===================Printing data to file==============\n";
 
-
-        	//=======================================
-        	//Data file output
-        	//=======================================
-        	//ofstream myfile("TChemHydrogenData.txt", std::ios_base::app);
-		/*
-        	for(int i=0; i<number_of_equations;i++)
-        	{
-        		myfile << setprecision(17) << fixed << data[i] << "\t\t";
-        	}
-        	myfile << "\n"<< StepSize << "\n";
-		*/
         	myfile.close();
         	cout << "======================Simulation complete=============\n";
-		/**/
   	}//end local kokkos scope.
 
  	/// Kokkos finalize checks any memory leak that are not properly deallocated.
   	Kokkos::finalize();
-
-	//=====================================================
-	//Need to figure out why this  doesn't work as intended
-	//=====================================================
-    	//IntegratorStats *integratorStats = integrator->Integrate(
-	//StepSize,InitTime, FinalTime, NumBands, y, KrylovTol, startingBasisSizes);
-    	//Print the statistics
-    	//printf("Run stats:\n");
-    	//integratorStats->PrintStats();
-
-
 }
 
 
@@ -332,7 +295,7 @@ int CheckStep(realtype FinalTime, realtype StepSize)
         }else if (abs(round(FinalTime/StepSize))-FinalTime/StepSize <1e-6 ){
 		static const int Steps= round (FinalTime/StepSize);
 		cout << Steps << " steps has been approximated...\n";
-		//cout << "Shall we use this modified Step size?"<<FinalTime/Steps <<endl;
+		cout << "We use this modified Step size "<<fixed<<setprecision(9)<< (FinalTime/Steps) <<endl;
 		return Steps;
 	}else{
                 cout<<"Cannot perform non-integer number of steps!!\n";
@@ -353,6 +316,7 @@ int CheckStep(realtype FinalTime, realtype StepSize)
  * ===========================================================================================
  */
 
+/*
 N_Vector InitialConditions()
 {
         N_Vector y0 = N_VNew_Serial(NEQ);
@@ -362,32 +326,34 @@ N_Vector InitialConditions()
 	data[2]=1.0;
         return y0;
 }
-
+*/
 //====================================================
 //Hydrogen problem intial conditions
 //====================================================
 N_Vector InitialConditionsH(int number_of_equations)
 {
+	//Temp H2 O2 O OH H2O H HO2 H2O2
          N_Vector y0 = N_VNew_Serial(number_of_equations);
          realtype *data = NV_DATA_S(y0);
-         data[0]=1032.0; //They put 1200 for some reason
-         data[1]=.1;
-         data[2]=.9;
+         data[0]=900;//1032.0; //They put 1200 for some reason
+	/*2.7431213550e-01        7.2568786450e-01*/
+         data[1]=2.7431213550e-01;
+         data[2]=1-data[1];
          return y0;
 }
 
 
 N_Vector InitialConditionsGri(int number_of_equations)
 {
-	//T CH4 O2 N2 AR
-	//1.000000000000000000e+03  5.483858845025559731e-02 2.187578062376045740e-01 7.137587863547695255e-01 1.264481895737025810e-02
+	//1.000000000000000000e+03 1.013250000000000000e+05
+	// 5.483858845025559731e-02 2.187578062376045740e-01 7.137587863547695255e-01 1.264481895737025810e-02
 	N_Vector y0= N_VNew_Serial(number_of_equations);
 	realtype *data = NV_DATA_S(y0);
-	data[0] = 1000.0;
-	data[15] =  5.483858845025559731e-02;
-	data[5] =  2.187578062376045740e-01;
-	data[49] =  7.137587863547695255e-01;
-	data[50] =  1.264481895737025810e-02;
+	data[0] = 1000.0;//use 1000 for base
+	data[1] =  5.483858845025559731e-02;
+	data[2] =  2.187578062376045740e-01;
+	data[3] =  7.137587863547695255e-01;
+	data[4] =  1.264481895737025810e-02;
 	return y0;
 }
 
@@ -407,7 +373,7 @@ N_Vector InitialConditionsGri(int number_of_equations)
  * userData   
  * 
  * ===========================================================================================
- */
+ 
 
 int RHS(realtype t, N_Vector u, N_Vector udot, void *userData)
 {
@@ -420,6 +386,7 @@ int RHS(realtype t, N_Vector u, N_Vector udot, void *userData)
 //	cout << dy[0] <<"\t\t" << dy[1] << "\t\t" << dy[2] <<endl;
         return 0;
 }
+*/
 /*
 //============================================================
 //RHS that uses the TCHEM rhs functions
@@ -450,8 +417,8 @@ int RHS_TCHEM(realtype t, N_Vector u, N_Vector udot, void * pb)
 	//===============================
 	//Check for NaN
 	//===============================
-	ErrorCheck(y,number_of_equations, "y");
-	ErrorCheck(dy, number_of_equations, "rhs");
+	//ErrorCheck(y,number_of_equations, "y");
+	//ErrorCheck(dy, number_of_equations, "rhs");
 	return 0;
 }
 
@@ -479,7 +446,6 @@ int RHS_TCHEM(realtype t, N_Vector u, N_Vector udot, void * pb)
  * tmp
  * 
  * ===========================================================================================
- */
 
 int Jtv(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void *userData, N_Vector tmp)
 {
@@ -494,7 +460,7 @@ int Jtv(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void *user
 	JV[2] = V[1];
         return 0;
 }
-
+*/
 /*
 //=============================================================
 ||Jtv using TCHEM
@@ -555,32 +521,10 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 		for(int j=0; j<number_of_equations; j++)
 		{
 			TMP[j]=JacD[j+i*number_of_equations];
-			//if(j==number_of_equations)
-				//JV[i]=N_VDotProd(tmp,v);
 		}
 		JV[i]=N_VDotProd(tmp,v);
 	}
 	//}
-	/**/
-        //===============================
-        //Output
-        //===============================
-	/// change the layout from row major to column major
-	/*
-        for (ordinal_type j=0;j<number_of_equations;++j)
-		for (ordinal_type i=0;i<j;++i)
-                	std::swap(J(i,j), J(j,i));
-	*/
-	/*
-	printf("Jacobian std vector \n" );
-	for (ordinal_type i=0;i<number_of_equations;++i) {
-		for (ordinal_type j=0;j<number_of_equations;++j) 
-		{
-			printf("%e ", JacD[i+j*number_of_equations] );
-		}
-        printf("\n" );
-	}
-	*/
 	return 0;
 }
 
@@ -602,6 +546,26 @@ void PrintFromPtr(realtype * ptr, int num_eqs)
 	cout<<endl;
 }
 
+//===================================================
+//Print data to output file
+//myfile:	pointer to the filestream
+//data:		pointer to the data
+//number_of_equations
+//t:		time
+//===================================================
+
+
+void PrintDataToFile(ofstream & myfile, realtype * data, int number_of_equations, realtype t)
+{
+	for (int i=0; i<number_of_equations; i++)
+	{
+		myfile<<setprecision(17)<<fixed <<data[i] <<"\t\t";
+	}
+	myfile << "\t\t " << t << "\n";
+	myfile.flush();
+
+
+}
 
 //=======================================================
 //RHS Error Check
