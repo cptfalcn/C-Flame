@@ -1,14 +1,6 @@
 /*
  * ===========================================================================================
- * 
- * In this example we show how Epic package can be used with test problems which are not 
- * written using objects. 
- * 
- * -------------------------------------------------------------------------------------------
- * -------------------------------------------------------------------------------------------
- * 
- * This is serial implementation. 
- * 
+ * This is serial implementation.
  * ===========================================================================================
  */
 
@@ -24,21 +16,29 @@
 #include "TChem_Util.hpp"
 #include "TChem_KineticModelData.hpp"
 #include "TChem_Impl_IgnitionZeroD_Problem.hpp" // here is where Ignition Zero D problem is implemented
+#include "TChem_Impl_NewtonSolver.hpp"
+#include "TChem_Impl_TrBDF2.hpp"
 #include <omp.h>
 
 #define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<TChem::KineticModelConstData<Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace> >>
 
+
+
+
+
 //=====================
 //Prototypes & Classes
 //=====================
-//Add an additional class element to pass to epic.
+//Add an additional class elements to pass to epic.
 class myPb : public TCHEMPB{
 	public:
+	//members
 	ordinal_type  num_equations;
+	N_Vector Jac;
 	//fucntions
 	ordinal_type	get_num_equations(void)
 	{
-	return this->num_equations;
+		return this->num_equations;
 	}
 };
 
@@ -50,10 +50,14 @@ int CheckStep(realtype, realtype);
 void PrintFromPtr(realtype *,  int);
 void ErrorCheck(realtype *, int, string);
 void PrintDataToFile(ofstream &, realtype *,int, realtype);
+
+
 //=====================
 //Namespaces
 //=====================
 using namespace std;
+
+
 
 //====================
 //Main
@@ -61,35 +65,50 @@ using namespace std;
 int main(int argc, char* argv[])
 {
 	//====================
-	// Declarations
+	// Intial Declarations
 	//====================
-	static const realtype FinalTime = 1.0;//1e-4 seems to be the max
+	static realtype FinalTime = 0;//1.0e-4;//1e-4 seems to be the max
 	static const int NumBands = 3;//Epic stuff, default is 3.
-	realtype StepSize=1e-8;
-	int Steps=CheckStep(FinalTime, StepSize);//Checks the number of steps
+	realtype StepSize=0;
 	int ProgressDots=0; //From 0 to 100; only care about percentage
 	int StepCount = 0;
-	realtype PercentDone=0;
-	bool Error=0;
-	//void *userData=nullptr; //Empty problem pointer
+	realtype PercentDone=0;//void *userData=nullptr; //Empty problem pointer
 	realtype TNow=0;
 	realtype TNext=0;
-	ofstream myfile("TChemHydrogenData.txt", std::ios_base::app);
+	string MyFile="Default.txt";
+	static realtype KrylovTol=1e-14;
+
 
 	//=====================================================
-	//Kokkos Input block: Working
+	//Kokkos Input block
 	//=====================================================
 	std::string chemFile("chem.inp");
  	std::string thermFile("therm.dat");
-        std::cout<<"============================Starting========================\n";
  	/// parse command line arguments --chemfile=user-chemfile.inp --thermfile=user-thermfile.dat
+	/// --Stepsize=1e-8  --FinalTime=1e-2  --MyFile="Filename"  --KrylovTole=1e-14
   	/// with --help, the code list the available options.
  	TChem::CommandLineParser opts("This example computes reaction rates with a given state vector");
  	opts.set_option<std::string>("chemfile", "Chem file name e.g., chem.inp", &chemFile);
  	opts.set_option<std::string>("thermfile", "Therm file name e.g., therm.dat", &thermFile);
+	opts.set_option<realtype>("StepSize", "StepSize desired", &StepSize);//New
+	opts.set_option<realtype>("FinalTime", "The final simulation time", &FinalTime);//New
+	opts.set_option<std::string>("MyFile","Where we output data", &MyFile);//New
+	opts.set_option<realtype>("KrylovTol", "KrylovTolerance", &KrylovTol);
 	const bool r_parse = opts.parse(argc, argv);
 	if (r_parse)
 		return 0; // print help return
+
+
+	//======================================================
+	//Check inputs and output to console for review.
+	//======================================================
+	ofstream myfile(MyFile, std::ios_base::app);
+	int Steps=CheckStep(FinalTime, StepSize);//Checks the number of steps, Moved
+	cout<<"=====================Sim Parameters=======================\n";
+	cout<<setprecision(17)<<fixed;
+	cout<<"Final Time: " << FinalTime <<"\t\t Step Size: " <<StepSize;
+	cout<<"\t\t Krylov Tolerance: " <<KrylovTol<< "\t\t Writing to file: "<<MyFile << endl;
+
 
 	//=====================================================
 	//Kokkos block: working, pruning old code
@@ -149,12 +168,16 @@ int main(int argc, char* argv[])
       		problem._work = work;  // problem workspace array
      		problem._kmcd = kmcd;  // kinetic model
 		problem.num_equations=number_of_equations;
+		problem.Jac=N_VNew_Serial(number_of_equations*number_of_equations);//Make the Jacobian
 		const int MaxKrylovIters = 500;//500
+
 
 		//==============================================
 		//Create integrator
 		//==============================================
+		//TChem::Example::TestProblemTrBDF problem;
 		//EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS_TCHEM,
+		//EpiRK4SV *integrator = new EpiRK4SV(RHS_TCHEM,
 		Epi2_KIOPS *integrator = new Epi2_KIOPS(RHS_TCHEM,
 				//Jtv_TCHEM,//Turn this on and off
 				pbptr,
@@ -165,7 +188,7 @@ int main(int argc, char* argv[])
        		//========================
         	// Set integrator parameters
         	//========================
-        	const realtype KrylovTol = RCONST(1.0e-6);//1e-14
+        	//const realtype KrylovTol = RCONST(1.0e-10);//1e-14
         	int startingBasisSizes[] = {1, number_of_equations};
 
         	//=================================
@@ -178,19 +201,9 @@ int main(int argc, char* argv[])
         	{
                 	TNow= StepCount*StepSize;
                 	TNext=(StepCount+1)*StepSize;
-			N_VScale(1.0,y,yOld);
-			/*
-			if((TNext+StepSize>FinalTime)&&(FinalTime != TNow))
-                	{
-				cout<<"Checked last step\n";
-                        	StepSize=FinalTime-TNow;
-				cout<<TNow<<endl;
-				TNext=FinalTime;
-                	}
-			*/
                 	//Integrate
                 	integrator->Integrate(StepSize,TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
-
+			//integrator->Integrate(StepSize/10, StepSize, KrylovTol, KrylovTol, TNow, TNext, NumBands, startingBasisSizes, y);//EpiRKxSV
 
 			//=======================================
 			//Error checking
@@ -230,32 +243,36 @@ int main(int argc, char* argv[])
                 	        cout<<":";
                 	        cout.flush();
                 	}
-			//Print one of the steps if we have advanced in time
+
+
+			/*//Use if we want to do timeseries plots
 			if(ProgressDots!=PercentDone)
 				PrintDataToFile(myfile, data, number_of_equations,TNext);
+			*/
                 	ProgressDots=PercentDone;
                 	StepCount++;
-        	}
+
+
+        	}//End integration loop
         	TNow=TNext;
         	cout << "]100%\n\n";
 		delete integrator;
-
-
-
+		//If doing convergence studies only print the final data.
+		cout<<"====================Integration complete===============\n";
 	        //=======================================
         	//Console Output
         	//=======================================
         	//Temp H2 O2 O OH H2O H HO2 H2O2
         	cout<<"===========================Data========================\n";
         	cout <<"Temp=" << data[0] << "\t\t H2=" << data[1] <<"\t\t O2=" << data[2]<<endl;
-        	cout << "Total Mass Fractions: " <<N_VL1NormLocal(y)-data[0]<<endl;
-        	cout << "Mass Fraction error: "  <<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
-        	cout << "Simulation ended at time: " << TNow << endl;
-        	cout << "Steps taken: " << StepCount <<endl;
-        	cout <<"===================Printing data to file==============\n";
+        	cout << "Total Mass Fractions: " <<N_VL1NormLocal(y)-data[0];
+        	cout << "\t\t Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
+        	cout << "Simulation ended at time: " << TNow;
+        	cout << "\t\t Steps taken: " << StepCount <<endl;
+                PrintDataToFile(myfile,data,number_of_equations,StepSize);
 
         	myfile.close();
-        	cout << "======================Simulation complete=============\n";
+        	cout << "======================Exiting without error=============\n";
   	}//end local kokkos scope.
 
  	/// Kokkos finalize checks any memory leak that are not properly deallocated.
@@ -303,30 +320,8 @@ int CheckStep(realtype FinalTime, realtype StepSize)
         }
 }
 
-/*
- * ===========================================================================================
- * 
- * Function InitialConditions
- * 
- * Computes initial condition. 
- * 
- * Output:
- * y0   data
- * 
- * ===========================================================================================
- */
 
-/*
-N_Vector InitialConditions()
-{
-        N_Vector y0 = N_VNew_Serial(NEQ);
-        realtype *data = NV_DATA_S(y0);
-	data[0]=1.0;
-	data[1]=.5*EPS;
-	data[2]=1.0;
-        return y0;
-}
-*/
+
 //====================================================
 //Hydrogen problem intial conditions
 //====================================================
@@ -336,7 +331,7 @@ N_Vector InitialConditionsH(int number_of_equations)
          N_Vector y0 = N_VNew_Serial(number_of_equations);
          realtype *data = NV_DATA_S(y0);
          data[0]=900;//1032.0; //They put 1200 for some reason
-	/*2.7431213550e-01        7.2568786450e-01*/
+	 /*2.7431213550e-01        7.2568786450e-01*/
          data[1]=2.7431213550e-01;
          data[2]=1-data[1];
          return y0;
@@ -357,36 +352,7 @@ N_Vector InitialConditionsGri(int number_of_equations)
 	return y0;
 }
 
-/*
- * ===========================================================================================
- * 
- * Function RHS
- * 
- * If y' = f(t, y) then RHS is function f. 
- * Function RHS is written is such way that it can handle arrays or arbitrarly length. 
- * It is important that all data is in form of an array. 
- * 
- * Inputs:
- * t          time
- * u          input vector
- * udot       result
- * userData   
- * 
- * ===========================================================================================
- 
 
-int RHS(realtype t, N_Vector u, N_Vector udot, void *userData)
-{
-	realtype *y = NV_DATA_S(u);
-	realtype *dy = NV_DATA_S(udot);
-	double Omega= .5 * y[0] * y[1] * exp ( (y[2]-1.0 ) /  (EPS * y[2]  ) );
-	dy[0] = -Omega;
-	dy[1] = Omega-y[1];
-	dy[2] = y[1];
-//	cout << dy[0] <<"\t\t" << dy[1] << "\t\t" << dy[2] <<endl;
-        return 0;
-}
-*/
 /*
 //============================================================
 //RHS that uses the TCHEM rhs functions
@@ -411,10 +377,6 @@ int RHS_TCHEM(realtype t, N_Vector u, N_Vector udot, void * pb)
 	auto member =  Tines::HostSerialTeamMember();
 	pbPtr->computeFunction(member, x ,f);
 	//===============================
-	//Output
-	//===============================
-	//PrintFromPtr(dy,number_of_equations);
-	//===============================
 	//Check for NaN
 	//===============================
 	//ErrorCheck(y,number_of_equations, "y");
@@ -423,44 +385,6 @@ int RHS_TCHEM(realtype t, N_Vector u, N_Vector udot, void * pb)
 }
 
 
-
-/*
- * ===========================================================================================
- * 
- * Function Jtv
- * 
- * This function computes Jacobian matrix times some vector v. In Epirk Jacobian is never
- * stored and it is computed every time we need it and every time we compute it we acctualy
- * compute it we compute its product with some vector v. 
- * Function Jtv is written is such way that it can handle arrays or arbitrarly length. 
- * It is important that all data is in form of an array. 
- * It is used in JTimesv class. 
- * 
- * Inputs:
- * v          vector being multiplied with Jacobian Matrix
- * Jv         result
- * t          time
- * u          vector used ot compute Jacobian Matrix
- * fu         f(u), i.e., RHS of u
- * userData
- * tmp
- * 
- * ===========================================================================================
-
-int Jtv(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void *userData, N_Vector tmp)
-{
-
-	realtype *JV = NV_DATA_S(Jv);
-	realtype *Y = NV_DATA_S(u);
-	realtype *V = NV_DATA_S(v);
-        double EXP= exp ( (Y[2] - 1.0 ) / (EPS * Y[2]));
-        double DEXP=1/(EPS * Y[2]*Y[2]);
-	JV[0] = -.5*EXP* (V[0]*Y[1]+V[1]*Y[0]+V[2]*Y[0]*Y[1]*DEXP);
-	JV[1] =-JV[0]-V[1];
-	JV[2] = V[1];
-        return 0;
-}
-*/
 /*
 //=============================================================
 ||Jtv using TCHEM
@@ -481,9 +405,8 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 	//======================================
 	//Set the necessary vectors and pointers
 	//======================================
-	N_Vector Jac = N_VNew_Serial(number_of_equations*number_of_equations);
         realtype *y= NV_DATA_S(u);
-        realtype *JacD= NV_DATA_S(Jac);
+        realtype *JacD= NV_DATA_S(pbPtr->Jac);
 	realtype *JV=NV_DATA_S(Jv);
 	realtype *TMP=NV_DATA_S(tmp);
 	//=============================================
@@ -509,22 +432,19 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 	//===================
 	//Compute JV
 	//===================
-	//#pragma omp for
-
-
-	//#pragma omp parallel num_threads(16)
-	//{
-	//#pragma omp for
-	for (int i=0; i< number_of_equations; i++)
+	//#pragma omp parallel for private(TMP)
+	for (int i=0; i< number_of_equations; i++)//for each state
 	{
-		//#pragma omp for
-		for(int j=0; j<number_of_equations; j++)
+
+		//#pragma omp parallel for private(JV)
+		for(int j=0; j<number_of_equations; j++)//marches across the column
 		{
-			TMP[j]=JacD[j+i*number_of_equations];
+			TMP[j]=JacD[j+i*number_of_equations];//Stored row major
+			if (j+1==number_of_equations)
+				JV[i]=N_VDotProd(tmp,v);
 		}
-		JV[i]=N_VDotProd(tmp,v);
+		//JV[i]=N_VDotProd(tmp,v);
 	}
-	//}
 	return 0;
 }
 
@@ -551,7 +471,7 @@ void PrintFromPtr(realtype * ptr, int num_eqs)
 //myfile:	pointer to the filestream
 //data:		pointer to the data
 //number_of_equations
-//t:		time
+//t:		time/Stepsize
 //===================================================
 
 
@@ -559,11 +479,10 @@ void PrintDataToFile(ofstream & myfile, realtype * data, int number_of_equations
 {
 	for (int i=0; i<number_of_equations; i++)
 	{
-		myfile<<setprecision(17)<<fixed <<data[i] <<"\t\t";
+		myfile<<setprecision(20)<<fixed <<data[i] <<"\t\t";
 	}
 	myfile << "\t\t " << t << "\n";
 	myfile.flush();
-
 
 }
 
