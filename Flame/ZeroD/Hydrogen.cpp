@@ -19,6 +19,7 @@
 #include "TChem_Impl_NewtonSolver.hpp"
 #include "TChem_Impl_TrBDF2.hpp"
 #include <omp.h>
+#include <optional>
 
 #define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<TChem::KineticModelConstData<Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace> >>
 
@@ -50,6 +51,7 @@ int CheckStep(realtype, realtype);
 void PrintFromPtr(realtype *,  int);
 void ErrorCheck(realtype *, int, string);
 void PrintDataToFile(ofstream &, realtype *,int, realtype);
+Epi2_KIOPS* CreateEPI2Integrator(CVRhsFn, CVSpilsJacTimesVecFn, void *, int, N_Vector, const int, int);
 
 
 //=====================
@@ -77,6 +79,7 @@ int main(int argc, char* argv[])
 	realtype TNext=0;
 	string MyFile="Default.txt";
 	static realtype KrylovTol=1e-14;
+	int UseJac=1; //will we use the Jacobian or not
 
 
 	//=====================================================
@@ -86,6 +89,7 @@ int main(int argc, char* argv[])
  	std::string thermFile("therm.dat");
  	/// parse command line arguments --chemfile=user-chemfile.inp --thermfile=user-thermfile.dat
 	/// --Stepsize=1e-8  --FinalTime=1e-2  --MyFile="Filename"  --KrylovTole=1e-14
+	//  --UseJac=0
   	/// with --help, the code list the available options.
  	TChem::CommandLineParser opts("This example computes reaction rates with a given state vector");
  	opts.set_option<std::string>("chemfile", "Chem file name e.g., chem.inp", &chemFile);
@@ -94,6 +98,7 @@ int main(int argc, char* argv[])
 	opts.set_option<realtype>("FinalTime", "The final simulation time", &FinalTime);//New
 	opts.set_option<std::string>("MyFile","Where we output data", &MyFile);//New
 	opts.set_option<realtype>("KrylovTol", "KrylovTolerance", &KrylovTol);
+	opts.set_option<int>("UseJac","Will we use the Jacobian", &UseJac);
 	const bool r_parse = opts.parse(argc, argv);
 	if (r_parse)
 		return 0; // print help return
@@ -107,8 +112,8 @@ int main(int argc, char* argv[])
 	cout<<"=====================Sim Parameters=======================\n";
 	cout<<setprecision(17)<<fixed;
 	cout<<"Final Time: " << FinalTime <<"\t\t Step Size: " <<StepSize;
-	cout<<"\t\t Krylov Tolerance: " <<KrylovTol<< "\t\t Writing to file: "<<MyFile << endl;
-
+	cout<<"\t\t Krylov Tolerance: " <<KrylovTol<< "\t\t Writing to file: "<<MyFile;
+	cout<<"\t\t Jacobian used: " <<UseJac<<endl;
 
 	//=====================================================
 	//Kokkos block: working, pruning old code
@@ -175,17 +180,21 @@ int main(int argc, char* argv[])
 		//==============================================
 		//Create integrator
 		//==============================================
-		//TChem::Example::TestProblemTrBDF problem;
-		//EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS_TCHEM,
-		//EpiRK4SV *integrator = new EpiRK4SV(RHS_TCHEM,
+		Epi2_KIOPS *integrator = NULL;
+		integrator = CreateEPI2Integrator(RHS_TCHEM, Jtv_TCHEM, pbptr, MaxKrylovIters, y,
+					number_of_equations, UseJac);
+		/*
+		        //EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS_TCHEM,
+                        //EpiRK4SV *integrator = new EpiRK4SV(RHS_TCHEM,
 		Epi2_KIOPS *integrator = new Epi2_KIOPS(RHS_TCHEM,
-				//Jtv_TCHEM,//Turn this on and off
-				pbptr,
-				MaxKrylovIters,
-				y,
-				number_of_equations);//This line, NSE will cause issues later.
-		cout<<"=====================Integrator created====================\n";
-       		//========================
+                                Jtv_TCHEM,//Turn this on and off
+                                pbptr,
+                                MaxKrylovIters,
+                                y,
+                                number_of_equations);//This line, NSE will cause issues later.
+                cout<<"===================Integrator JtV created=====================\n";
+		*/
+		//========================
         	// Set integrator parameters
         	//========================
         	//const realtype KrylovTol = RCONST(1.0e-10);//1e-14
@@ -331,9 +340,19 @@ N_Vector InitialConditionsH(int number_of_equations)
          N_Vector y0 = N_VNew_Serial(number_of_equations);
          realtype *data = NV_DATA_S(y0);
          data[0]=900;//1032.0; //They put 1200 for some reason
-	 /*2.7431213550e-01        7.2568786450e-01*/
-         data[1]=2.7431213550e-01;
-         data[2]=1-data[1];
+	 /*First sample: 900   2.7431213550e-01        7.2568786450e-01*/
+	 //Second sample: 900  5.926665910131902193e-02 9.407333408986811030e-01
+	 int sample=2;
+	if(sample==1)
+	{
+         	data[1]=2.7431213550e-01;
+         	data[2]=1-data[1];
+	}
+	else if(sample==2)
+	{
+		data[1]=5.926665910131902193e-02;
+		data[2]=9.407333408986811030e-01;
+	}
          return y0;
 }
 
@@ -440,10 +459,10 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 		for(int j=0; j<number_of_equations; j++)//marches across the column
 		{
 			TMP[j]=JacD[j+i*number_of_equations];//Stored row major
-			if (j+1==number_of_equations)
-				JV[i]=N_VDotProd(tmp,v);
+			//if (j+1==number_of_equations)
+			//	JV[i]=N_VDotProd(tmp,v);
 		}
-		//JV[i]=N_VDotProd(tmp,v);
+		JV[i]=N_VDotProd(tmp,v);
 	}
 	return 0;
 }
@@ -505,4 +524,38 @@ void ErrorCheck(realtype * data, int num_eqs, string name)
 		}
 	}
 
+}
+
+
+Epi2_KIOPS* CreateEPI2Integrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, int MaxKrylovIters, N_Vector y, const int number_of_equations, int UseJac)
+{
+                switch(UseJac)
+                {
+		case 0:{
+                //EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS_TCHEM,
+                //EpiRK4SV *integrator = new EpiRK4SV(RHS_TCHEM,
+                        Epi2_KIOPS *integrator = new Epi2_KIOPS(RHS,
+                                //Jtv_TCHEM,//Turn this on and off
+                                pbptr,
+                                MaxKrylovIters,
+                                y,
+                                number_of_equations);
+
+                        cout<<"=================Integrator w/o JtV created====================\n";
+                        return integrator;
+			break;}
+                case 1:{
+                        //EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS_TCHEM,
+                        //EpiRK4SV *integrator = new EpiRK4SV(RHS_TCHEM,
+                        Epi2_KIOPS *integrator = new Epi2_KIOPS(RHS,
+                                JtV,
+                                pbptr,
+                                MaxKrylovIters,
+                                y,
+                                number_of_equations);//This line, NSE will cause issues later.
+                        cout<<"===================Integrator JtV created=====================\n";
+			return integrator;
+                        break;}
+		}
+	return 0;
 }
