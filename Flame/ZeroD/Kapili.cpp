@@ -38,7 +38,7 @@ int main()
 	//====================
 	static const realtype FinalTime = 10.0;
 	static const int NumBands = 3;
-	realtype StepSize=1e-1/(1*2*2*2*2*2*2*2*2*2);
+	realtype StepSize=1e-1/(1*2);
 	//realtype StepSize=1e-1/(1*2*2*2*2*2*2*2);
 	CheckStep(FinalTime, StepSize);
 	int ProgressDots=0; //From 0 to 100; only care about percentage
