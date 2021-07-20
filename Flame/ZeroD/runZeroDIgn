@@ -1,0 +1,65 @@
+#/usr/bin/c++  -g -O3 -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame/ZeroD/ZeroDIgn.cpp -o out.o
+
+#We now include EPI3 object file, trash.o into the production code.
+#/usr/bin/c++ out.o trash.o -O3 -DNDEBUG -lgfortran -rdynamic -DKOKKOS_DEPENDENCE -fopenmp -Wl,-rpath,/home/jstewart23/Code/C++/TChem/build/install/openblas/lib: ~/Code/C++/TChem/build/build/tchem/core/libtchem.a /home/jstewart23/Code/C++/TChem/build/install/tines/lib/libtines.a /home/jstewart23/Code/C++/TChem/build/install/gtest/lib/libgtest_main.a /home/jstewart23/Code/C++/TChem/build/install/kokkos/lib/libkokkoscontainers.a /home/jstewart23/Code/C++/TChem/build/install/kokkos/lib/libkokkoscore.a /usr/lib/x86_64-linux-gnu/libdl.so /home/jstewart23/Code/C++/TChem/build/install/openblas/lib/libopenblas.so /home/jstewart23/Code/C++/TChem/build/install/gtest/lib/libgtest.a -lpthread -rdynamic -pthread -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so /home/jstewart23/Code/C++/epic-cpp/build/Integrators/libepic1.0.0.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -o ZeroDIgn.x
+#rm out.o
+
+#Select from one of the two input files for the configuration
+inputs=H2/
+#inputs=gri3.0/
+
+#Use the default TChem names
+chemfile=$inputs"chem.inp"
+thermfile=$inputs"therm.dat"
+
+#Select an end time for the experiment, 10 for option 0 (Kapila), or something less than 1 otherwise (1e-4)
+EndT=1e-4
+
+#Select the time integration method
+Method="EPI2"
+
+#Select Krylov tolerances 
+Tol=1e-6
+
+#Set the output file name
+#OutputFile="Scrapt.txt"
+
+#Set Experiment
+Experiment=1
+
+#Set Sample
+Sam=1
+
+#Set Profiling. Add Profiling=1 if you want to see the profile.
+Prof=1
+#OutputFile="DataEPI3HydroSample1Jac.txt"
+ ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-5 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --Profiling=$Prof
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=2e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-7 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=2e-7 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-7 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+
+#OutputFile="DataEPI3HydroSample1NoJac.txt"
+
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-5 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=2e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-7 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=2e-7 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-7 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
+
+
+
+
+#Kapila experiment
+#OutputFile="DataKapilaMatched.txt"
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-1 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=1 --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-2 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=1 --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1.25e-3 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=1 --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=6.25e-4 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=1 --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=3.125e-4 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=1 --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1.5625e-4 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=1 --Method=$Method --Experiment=$Experiment
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=7.8125e-5 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=1 --Method=$Method --Experiment=$Experiment

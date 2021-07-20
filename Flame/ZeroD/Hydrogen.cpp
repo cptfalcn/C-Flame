@@ -18,14 +18,13 @@
 #include "TChem_Impl_IgnitionZeroD_Problem.hpp" // here is where Ignition Zero D problem is implemented
 #include "TChem_Impl_NewtonSolver.hpp"
 #include "TChem_Impl_TrBDF2.hpp"
-#include <omp.h>
 #include <chrono>
 #include "Epi3_KIOPS.h"
 
 
 //#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<TChem::KineticModelConstData<Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace> >>
 #define TCHEMPB TChem::Impl::IgnitionZeroD_Problem	<TChem::KineticModelConstData	<Kokkos::Device	<Kokkos::Serial, Kokkos::HostSpace>  >	>
-//Change to Serial
+//Change to Serial, this can be changed by altering the TChem master build profile to include OPENMP on or off
 
 //=====================
 //Prototypes & Classes
@@ -43,19 +42,32 @@ class myPb : public TCHEMPB{
 	}
 };
 
-
-
+//Initial conditions
+N_Vector InitialConditionsKappa(int, realtype);//number of equations and eps
 N_Vector InitialConditionsH(int,int);
-N_Vector InitialConditionsGri(int);
+N_Vector InitialConditionsGri(int);//Need to add other samples later
+
+//RHS functions
+int RHS_KAPPA(realtype , N_Vector , N_Vector, void *);
 int RHS_TCHEM(realtype, N_Vector, N_Vector, void *);
+
+//JtV functions
+int Jtv_KAPPA(N_Vector , N_Vector , realtype , N_Vector , N_Vector , void * , N_Vector);
 int Jtv_TCHEM(N_Vector , N_Vector ,realtype, N_Vector, N_Vector , void* , N_Vector );
+
+//Misc functions
 int CheckStep(realtype, realtype);
 void PrintFromPtr(realtype *,  int);
 void ErrorCheck(ofstream &, N_Vector, realtype *, int, realtype);
 void PrintDataToFile(ofstream &, realtype *,int, realtype);
+//Creating the integrators
 Epi2_KIOPS *	CreateEPI2Integrator(CVRhsFn, CVSpilsJacTimesVecFn, void *, int, N_Vector, const int, int);
 Epi3_KIOPS *	CreateEPI3Integrator(CVRhsFn, CVSpilsJacTimesVecFn, void *, int, N_Vector, const int, int);
+EpiRK4SC_KIOPS *    CreateEPIRK4SCIntegrator(CVRhsFn, CVSpilsJacTimesVecFn, void *, int, N_Vector, const int, int);
+
+//Used in Jtv
 void MatrixVectorProduct(int, N_Vector, realtype, N_Vector, realtype *);
+//More misc Functions
 void TestMatrixVectorProduct();
 realtype LocalErrorEstimate(realtype, realtype, N_Vector, N_Vector, N_Vector, void *);
 
@@ -95,6 +107,9 @@ int main(int argc, char* argv[])
 	static realtype KrylovTol=1e-14;
 	int UseJac=1; //will we use the Jacobian or not
 	int SampleNum=0;
+	int Experiment=1; //default is hydrogen, set to 0 for kapila
+	int Profiling=0;//Output my profiling data or not
+	int number_of_equations=0;
 
 	//=====================================================
 	//Kokkos Input Parser
@@ -103,7 +118,8 @@ int main(int argc, char* argv[])
  	std::string thermFile("therm.dat");
  	/// parse command line arguments --chemfile=user-chemfile.inp --thermfile=user-thermfile.dat
 	/// --Stepsize=1e-8  --FinalTime=1e-2  --MyFile="Filename"  --KrylovTole=1e-14
-	//  --UseJac=0 --SampleNum={1,2,3} etc
+	//  --UseJac=0 --SampleNum={1,2,3}, --Method="Integrator name"
+	//  --Experiment={0,1,2}
   	/// with --help, the code list the available options.
  	TChem::CommandLineParser opts("This example computes reaction rates with a given state vector");
  	opts.set_option<std::string>("chemfile", "Chem file name e.g., chem.inp", &chemFile);
@@ -115,6 +131,9 @@ int main(int argc, char* argv[])
 	opts.set_option<int>("UseJac","Will we use the Jacobian", &UseJac);
 	opts.set_option<int>("SampleNum", "Sample used", &SampleNum);
 	opts.set_option<std::string>("Method", "The time integration method", & Method);
+	opts.set_option<int>("Experiment", "Experiment chosen", &Experiment);
+	opts.set_option<int>("Profiling", "Output profiling data or not", &Profiling);
+
 	const bool r_parse = opts.parse(argc, argv);
 	if (r_parse)
 		return 0; // print help return
@@ -129,9 +148,7 @@ int main(int argc, char* argv[])
 	cout<<"=====================Sim Parameters=======================\n";
 	cout<<setprecision(17)<<fixed;
 	cout<<"Final Time: " << FinalTime <<"\t\t Step Size: " <<StepSize;
-	cout<<"\t\t Krylov Tolerance: " <<KrylovTol<< "\t\t Writing to file: "<<MyFile;
-	cout<<"\t\t Jacobian used: " <<UseJac<< "\t\t Sample number:" <<SampleNum <<"\t\t\t Integrator:" << Method << endl;
-
+	cout<<"\t\t Krylov Tolerance: " <<KrylovTol<< "\t\t Writing to file: "<<MyFile <<endl;
 	//=====================================================
 	//Kokkos block: working, pruning old code
 	//=====================================================
@@ -166,16 +183,40 @@ int main(int argc, char* argv[])
 
 	    	/// state vector - Temperature, Y_0, Y_1, ... Y_{n-1}), n is # of species.
 		//Declare my variables locally
-    		const ordinal_type number_of_equations = problem_type::getNumberOfEquations(kmcd);
+
+		//Set number of equations
+		if(Experiment==0)
+			number_of_equations=3;
+		else
+			number_of_equations=problem_type::getNumberOfEquations(kmcd);
+
+		//Declare the state variable locally
 		N_Vector y = N_VNew_Serial(number_of_equations); //The data y
 		//Adding another N_Vector declaration here creates a bug.  Reason unknown.
-        	N_VScale(1., InitialConditionsH(number_of_equations,SampleNum), y);
-        	realtype *data = NV_DATA_S(y);
+
+		//Set Initial conditions
+		switch(Experiment)
+		{
+		case 0:
+			N_VScale(1., InitialConditionsKappa(number_of_equations,1e-2),y);
+			break;
+		case 1:
+        		N_VScale(1., InitialConditionsH(number_of_equations,SampleNum), y);
+        		break;
+		case 2:
+			N_VScale(1., InitialConditionsGri(number_of_equations), y);
+			break;
+		}
+
+		//set the pointer to the state
+		realtype *data = NV_DATA_S(y);
 
 
     		/// TChem does not allocate any workspace internally.workspace should be explicitly given from users.
 	    	/// you can create the work space using NVector, std::vector or real_type_1d_view_type (Kokkos view)
 	    	/// here we use kokkos view
+		//Set up an ignition problem and the workspace.
+		//Note: Kapila (Experiment 0) can run this, but it will be unused
 		const ordinal_type problem_workspace_size = problem_type::getWorkSpaceSize(kmcd);
 		real_type_1d_view_type work("workspace", problem_workspace_size);
 	    	/// set problem
@@ -189,6 +230,8 @@ int main(int argc, char* argv[])
 		problem._fac= fac;
       		problem._work = work;  // problem workspace array
      		problem._kmcd = kmcd;  // kinetic model
+
+
 		problem.num_equations=number_of_equations;
 		problem.Jac=N_VNew_Serial(number_of_equations*number_of_equations);//Make the Jacobian
 		const int MaxKrylovIters = 500;//500
@@ -199,13 +242,31 @@ int main(int argc, char* argv[])
 		//==============================================
 		Epi2_KIOPS *integrator = NULL;
 		Epi3_KIOPS *integrator2 = NULL;
+		EpiRK4SC_KIOPS *integrator3 = NULL;
 
-		if(Method=="EPI2")
-			integrator = CreateEPI2Integrator(RHS_TCHEM, Jtv_TCHEM, pbptr, MaxKrylovIters, y,
-					number_of_equations, UseJac);
-		else if(Method=="EPI3")
-		integrator2 = CreateEPI3Integrator(RHS_TCHEM, Jtv_TCHEM, pbptr, MaxKrylovIters, y,
-                                        number_of_equations, UseJac);
+		//Parse the experiment cases
+		if(Experiment!=0)
+		{
+			if(Method=="EPI2")
+				integrator = CreateEPI2Integrator(RHS_TCHEM, Jtv_TCHEM, pbptr,
+					MaxKrylovIters, y,number_of_equations, UseJac);
+			else if(Method=="EPI3")
+				integrator2 = CreateEPI3Integrator(RHS_TCHEM, Jtv_TCHEM, pbptr,
+					MaxKrylovIters, y, number_of_equations, UseJac);
+			else if(Method=="EPIRK4")
+				integrator3 = CreateEPIRK4SCIntegrator(RHS_TCHEM, Jtv_TCHEM, pbptr,
+					 MaxKrylovIters, y, number_of_equations, UseJac);
+		}else{
+                        if(Method=="EPI2")
+                                integrator = CreateEPI2Integrator(RHS_KAPPA, Jtv_KAPPA, pbptr,
+                                        MaxKrylovIters, y,number_of_equations, UseJac);
+                        else if(Method=="EPI3")
+                                integrator2 = CreateEPI3Integrator(RHS_KAPPA, Jtv_KAPPA, pbptr,
+                                        MaxKrylovIters, y, number_of_equations, UseJac);
+                        else if(Method=="EPIRK4")
+                                integrator3 = CreateEPIRK4SCIntegrator(RHS_KAPPA, Jtv_KAPPA, pbptr,
+                                         MaxKrylovIters, y, number_of_equations, UseJac);
+                }
 
 
 		//========================
@@ -213,12 +274,10 @@ int main(int argc, char* argv[])
         	//========================
         	int startingBasisSizes[] = {3, 3};
 
-		//Start the clock
-		//auto Begin=std::chrono::high_resolution_clock::now();
         	//=================================
         	// Run the time integrator loop
         	//=================================
-        	cout<<"Integrator progress:[";
+        	cout<<"\t\tIntegrator progress:\n[";
 		cout.flush();
 		auto Begin=std::chrono::high_resolution_clock::now();
 		while(StepCount<Steps)
@@ -227,6 +286,7 @@ int main(int argc, char* argv[])
                 	TNow= StepCount*StepSize;
                 	TNext=(StepCount+1)*StepSize;
 			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
+
 			if(	Method=="EPI2")
 			{
                 		integrator->Integrate(StepSize, TNow, TNext, NumBands, y,
@@ -235,7 +295,13 @@ int main(int argc, char* argv[])
 			{
 				integrator2->Integrate(StepSize, TNow, TNext, NumBands, y,
 						KrylovTol, startingBasisSizes);
+			}else if(Method =="EPIRK4")
+			{
+				integrator3->Integrate(StepSize, TNow, TNext, NumBands, y,
+                                                 KrylovTol, startingBasisSizes);
 			}
+
+			//Clock the time spent in the integrator
 			auto Stop=std::chrono::high_resolution_clock::now();
                         auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
 			KTime+=Pass.count()/1e9;
@@ -243,7 +309,7 @@ int main(int argc, char* argv[])
 			//=======================================
 			//Error checking
 			//=======================================
-
+			if(Experiment!=0)
 			ErrorCheck(myfile, y, data, number_of_equations, TNext);
 
 			//clean
@@ -278,34 +344,47 @@ int main(int argc, char* argv[])
         	cout << "]100%\n\n";
 		delete integrator;
 		delete integrator2;
+		delete integrator3;
 		cout<<"====================Integration complete===============\n";
 	        //=======================================
         	//Console Output
         	//=======================================
-        	//Temp H2 O2 O OH H2O H HO2 H2O2
-        	cout << "===========================Data========================\n";
-        	cout << "Temp=" << data[0] << "\t\t H2=" << data[1] <<"\t\t O2=" << data[2]<<endl;
-        	cout << "Total Mass Fractions: " <<N_VL1NormLocal(y)-data[0];
-        	cout << "\t\t Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
-        	cout << "Simulation ended at time: " << TNow << "\t\t Steps taken: " << StepCount <<endl;
-		cout << "=======================Performance data================\n";
-		cout << "Integration loop CPU time: "<<IntTime<< " seconds" <<endl;
-		cout << "Time Integrator CPU time: "<<KTime<<" seconds\n";
-		cout << "Time integrator percentage of loop: " << KTime/IntTime*100 << "%\n";
-		if (UseJac==1)
+		if(Experiment!=0)
 		{
-			cout << "\tJacobian Calls: " << JacCnt;
-			cout << "\t\tJacobian Time: " << JacTime << " seconds\n";
-			cout << "\t\t" << JacTime*100/KTime<<"%\n";
-			cout << "\t\tJac Time cost: " <<JacTime/JacCnt << " seconds\n";
-			cout << "\tMatVec Time: " << MatVecTime << " seconds\n";
-			cout << "\t\t" << MatVecTime*100/KTime <<"%\n\n";
+ 		//Temp H2 O2 O OH H2O H HO2 H2O2
+        		cout << "===========================Data========================\n";
+        		cout << "Temp=" << data[0] << "\t\t H2=" << data[1] <<"\t\t O2=" << data[2]<<endl;
+        		cout << "Total Mass Fractions: " <<N_VL1NormLocal(y)-data[0];
+        		cout << "\t\t Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
+		}else
+			cout << "y=" << data[0] << "\t\t z=" << data[1] <<"\t\t Temp=" <<data[2] <<endl;
+
+		//general output
+        	cout << "Simulation ended at time: " << TNow << "\t\t Steps taken: " << StepCount <<endl;
+
+		if (Profiling ==1){
+			cout << "=======================Performance data================\n";
+			cout << "Integration loop CPU time: "<<IntTime<< " seconds" <<endl;
+			cout << "Time Integrator CPU time: "<<KTime<<" seconds\n";
+			cout << "Time integrator percentage of loop: " << KTime/IntTime*100 << "%\n";
+			if (UseJac==1)
+			{
+				cout << "\tJacobian Calls: " << JacCnt;
+				cout << "\t\tJacobian Time: " << JacTime << " seconds\n";
+				cout << "\t\t" << JacTime*100/KTime<<"%\n";
+				cout << "\t\tJac Time cost: " <<JacTime/JacCnt << " seconds\n";
+				cout << "\tMatVec Time: " << MatVecTime << " seconds\n";
+				cout << "\t\t" << MatVecTime*100/KTime <<"%\n\n";
+			}
+			cout << "\tRHS Function calls: " << RHSCnt << "\t\tRHS time: ";
+			cout << RHSTime <<" seconds\n";
+			cout << "\t\t" << RHSTime/KTime*100<< "%\n";
+			cout << "\t\tRHS Time cost: " << RHSTime/RHSCnt << " seconds\n\n";
+			if(UseJac==1)
+				cout << "\tRelative cost ration Jac/RHS: ";
+				cout << JacTime/RHSTime/JacCnt*RHSCnt << endl;
+
 		}
-		cout << "\tRHS Function calls: " << RHSCnt << "\t\tRHS time: " << RHSTime <<" seconds\n";
-		cout << "\t\t" << RHSTime/KTime*100<< "%\n";
-		cout << "\t\tRHS Time cost: " << RHSTime/RHSCnt << " seconds\n\n";
-		if(UseJac==1){
-			cout << "\tRelative cost ration Jac/RHS: " << JacTime/RHSTime/JacCnt*RHSCnt << endl;}
 		cout << "=====================Printing data to file=================\n";
                 PrintDataToFile(myfile,data,number_of_equations,StepSize);//Only print here for conv studies
 		myfile << "\t\t" << IntTime <<endl;
@@ -358,6 +437,21 @@ int CheckStep(realtype FinalTime, realtype StepSize)
         }
 }
 
+	//======================================================
+	//Initial condition functions
+	//======================================================
+//====================================================
+//Kapila problem
+//====================================================
+N_Vector InitialConditionsKappa(int number_of_equations, realtype EPS)
+{
+        N_Vector y0 = N_VNew_Serial(number_of_equations);
+        realtype *data = NV_DATA_S(y0);
+        data[0]=1.0-.5*EPS;
+        data[1]=.5*EPS;
+        data[2]=1.0;
+        return y0;
+}
 
 
 //====================================================
@@ -421,6 +515,42 @@ N_Vector InitialConditionsGri(int number_of_equations)
 	data[3] =  7.137587863547695255e-01;
 	data[4] =  1.264481895737025810e-02;
 	return y0;
+}
+
+
+	//====================================================
+	//RHS functions
+	//====================================================
+
+/*
+ * ===========================================================================================
+ *
+ * Function RHS
+ *
+ * If y' = f(t, y) then RHS is function f.
+ * Function RHS is written is such way that it can handle arrays or arbitrarly length.
+ * It is important that all data is in form of an array.
+ *
+ * Inputs:
+ * t          time
+ * u          input vector
+ * udot       result
+ * userData
+ *
+ * ===========================================================================================
+ */
+
+int RHS_KAPPA(realtype t, N_Vector u, N_Vector udot, void *userData)
+{
+	realtype EPS=1e-2;
+        realtype *y = NV_DATA_S(u);
+        realtype *dy = NV_DATA_S(udot);
+        double Omega= .5 * y[0] * y[1] * exp ( (y[2]-1.0 ) /  (EPS * y[2]  ) );
+        dy[0] = -Omega;
+        dy[1] = Omega-y[1];
+        dy[2] = y[1];
+//      cout << dy[0] <<"\t\t" << dy[1] << "\t\t" << dy[2] <<endl;
+        return 0;
 }
 
 
@@ -491,6 +621,46 @@ void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N
                 JV[i]=N_VDotProd(tmp,x);
         }
 }
+
+
+
+/*
+ * ===========================================================================================
+ *
+ * Function Jtv
+ *
+ * This function computes Jacobian matrix times some vector v. In Epirk Jacobian is never
+ * stored and it is computed every time we need it and every time we compute it we acctualy
+ * compute it we compute its product with some vector v.
+ * Function Jtv is written is such way that it can handle arrays or arbitrarly length.
+ * It is important that all data is in form of an array.
+ * It is used in JTimesv class.
+ *
+ * Inputs:
+ * v          vector being multiplied with Jacobian Matrix
+ * Jv         result
+ * t          time
+ * u          vector used ot compute Jacobian Matrix
+ * fu         f(u), i.e., RHS of u
+ * userData
+ * tmp
+ * ===========================================================================================
+ */
+
+int Jtv_KAPPA(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void *userData, N_Vector tmp)
+{
+	realtype EPS=1e-2;
+        realtype *JV = NV_DATA_S(Jv);
+        realtype *Y = NV_DATA_S(u);
+        realtype *V = NV_DATA_S(v);
+        double EXP= exp ( (Y[2] - 1.0 ) / (EPS * Y[2]));
+        double DEXP=1/(EPS * Y[2]*Y[2]);
+        JV[0] = -.5*EXP* (V[0]*Y[1]+V[1]*Y[0]+V[2]*Y[0]*Y[1]*DEXP);
+        JV[1] =-JV[0]-V[1];
+        JV[2] = V[1];
+        return 0;
+}
+
 
 /*
 //=============================================================
@@ -614,6 +784,15 @@ void ErrorCheck(ofstream & myfile, N_Vector y, realtype * data, int number_of_eq
 }
 
 
+
+		//===================================================
+		//	========  ==	==   ========	.====.
+		//	   ||     ||\   ||	||     //    \\
+		//	   ||     || \  ||	||     \\_____
+		//	   ||     ||  \ ||	||     _     \\
+		//	========  ||   \||	||     \\____//
+		//===================================================
+
 //===================================================================
 //Create a pointer to an EPI2_KIOPS integrator
 //RHS
@@ -623,7 +802,8 @@ void ErrorCheck(ofstream & myfile, N_Vector y, realtype * data, int number_of_eq
 //number_of_equations
 //UseJac			boolean if we use the Jacobian or not
 //===================================================================
-Epi2_KIOPS* CreateEPI2Integrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, int MaxKrylovIters, N_Vector y, const int number_of_equations, int UseJac)
+Epi2_KIOPS* CreateEPI2Integrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, int MaxKrylovIters,
+				N_Vector y, const int number_of_equations, int UseJac)
 {
                 switch(UseJac)
                 {
@@ -698,6 +878,48 @@ Epi3_KIOPS* CreateEPI3Integrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * p
         return 0;
 }
 
+
+//===================================================================
+//Create a pointer to an EPIRK4SC_KIOPS integrator
+//RHS
+//JtV
+//MaxKrylovIters                Max Krylov Iterations
+//y                             the reference template vector
+//number_of_equations
+//UseJac                        boolean if we use the Jacobian or not
+//===================================================================
+EpiRK4SC_KIOPS * CreateEPIRK4SCIntegrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, int MaxKrylovIters, N_Vector y, const int number_of_equations, int UseJac)
+{
+                switch(UseJac)
+                {
+                case 0:{
+                //EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS_TCHEM,
+                //EpiRK4SV *integrator = new EpiRK4SV(RHS_TCHEM,
+                        EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS,
+                                pbptr,
+                                MaxKrylovIters,
+                                y,
+                                number_of_equations);
+
+                        cout<<"=================EPIRK4SC_K w/o JtV created====================\n";
+                        return integrator;
+                        break;}
+                case 1:{
+                        EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS,
+                                JtV,
+                                pbptr,
+                                MaxKrylovIters,
+                                y,
+                                number_of_equations);//This line, NSE will cause issues later.
+                        cout<<"===================EPIRK4SC_K JtV created=====================\n";
+                        return integrator;
+                        break;}
+                default:
+                        cout<<"===============EPIRK4SC_K Jacobian  Option Invalid============\n";
+                        exit(EXIT_FAILURE);
+                }
+        return 0;
+}
 
 
 
