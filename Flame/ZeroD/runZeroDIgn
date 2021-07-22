@@ -16,7 +16,7 @@ thermfile=$inputs"therm.dat"
 EndT=1e-4
 
 #Select the time integration method
-Method="EPI2"
+Method="EPI3"
 
 #Select Krylov tolerances 
 Tol=1e-6
@@ -28,12 +28,23 @@ Tol=1e-6
 Experiment=1
 
 #Set Sample
-Sam=1
+Sam=3
 
 #Set Profiling. Add Profiling=1 if you want to see the profile.
 Prof=1
-#OutputFile="DataEPI3HydroSample1Jac.txt"
- ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-5 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --Profiling=$Prof
+
+OutPutFile="Scrap.txt"
+
+  ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method="EPI3" --Experiment=$Experiment --Profiling=$Prof
+  ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method="EPI2" --Experiment=$Experiment --Profiling=$Prof
+  ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method="EPI3" --Experiment=$Experiment --Profiling=$Prof
+  ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method="EPI2" --Experiment=$Experiment --Profiling=$Prof
+  ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method="EPIRK4" --Experiment=$Experiment --Profiling=$Prof
+  ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method="EPIRK4" --Experiment=$Experiment --Profiling=$Prof
+
+#Convergence experiments
+#OutputFile="DataEPI3HydroSample3Jac.txt"
+# ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-5 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment 
 # ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
 # ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=2e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
 # ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
@@ -41,7 +52,8 @@ Prof=1
 # ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=2e-7 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
 # ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-7 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
 
-#OutputFile="DataEPI3HydroSample1NoJac.txt"
+
+#OutputFile="DataEPI3HydroSample3NoJac.txt"
 
 # ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-5 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
 # ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
@@ -50,8 +62,6 @@ Prof=1
 # ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-7 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
 # ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=2e-7 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
 # ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-7 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
-
-
 
 
 #Kapila experiment
