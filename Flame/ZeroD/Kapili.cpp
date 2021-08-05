@@ -89,8 +89,7 @@ int main()
     	//===================================================
 	const int MaxKrylovIters = 500;
 	//EpiRK5V *integrator = new EpiRK5V(RHS,//Not running have to check the calling function.
-	//EpiRK5SC_KIOPS *integrator = new EpiRK5SC_KIOPS(RHS,
-	//EpiRK4SC *integrator = new EpiRK4SC(RHS,
+	EpiRK4SC *integrator = new EpiRK4SC(RHS,
 	//EpiRK4SV *integrator = new EpiRK4SV(RHS,
 	//EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS,
 	//EpiRK5C *integrator = new EpiRK5C(RHS,
