@@ -11,9 +11,9 @@
 
 using namespace std;
 
-void DStaggered (realtype *, realtype * , realtype , int);
-void DStaggeredDown (realtype *, realtype *, realtype, int);
-void DDCentered	(realtype *, realtype * , realtype , int);
-void DCentered	(realtype *, realtype * , realtype , int);
-void MatVec	(int, realtype *, N_Vector, N_Vector, realtype *);
-void PrintVec(int, realtype *, string);
+void DStaggerUp 	(realtype *, realtype * , realtype , int);
+void DStaggerDown 	(realtype *, realtype *, realtype, int);
+void DDCentered		(realtype *, realtype * , realtype , int);
+void DCentered		(realtype *, realtype * , realtype , int);
+void MatVec		(int, realtype *, N_Vector, N_Vector, realtype *);
+void PrintVec		(int, realtype *, string);

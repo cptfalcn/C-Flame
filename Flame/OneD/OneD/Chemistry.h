@@ -32,4 +32,7 @@ int CHEM_RHS_TCHEM(realtype , N_Vector , N_Vector, void *);
 int CHEM_COMP_JAC(N_Vector u, void* pb);
 int CHEM_COMP_JAC_CVODE(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector, N_Vector, N_Vector);
 int CHEM_JTV(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+int RHS_KAPPA(realtype , N_Vector , N_Vector, void *);
+int Jtv_KAPPA(N_Vector , N_Vector , realtype , N_Vector , N_Vector , void * , N_Vector);
 void MatrixVectorProduct(int, realtype *, N_Vector, N_Vector, realtype *);
+//void PrintExpData(realtype *, int, realtype);

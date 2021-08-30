@@ -25,6 +25,14 @@ int CHEM_RHS_TCHEM(realtype t, N_Vector u, N_Vector udot, void * pb)
         return 0;
 }
 
+        //===============================================================
+        //   _____   ___     ____   ___    _____   _____    ___   __   _
+        //  |__ __| /   \   / ___) / _ \  |     \ |__ __|  /   \ |  \ | |
+        //  _ | |  | (x) | | /    / / \ \ |  x  /   | |   | (x) ||   \| |
+        // / (| |  |  n  | | \___ \ \_/ / |  x  \  _| |   |  n  || |\   |
+        // \____/  |_| |_|  \____) \___/  |_____/ |_____| |_| |_||_| \__|
+        //===============================================================
+
 
 int CHEM_COMP_JAC(N_Vector u, void* pb)
 {
@@ -122,11 +130,40 @@ int CHEM_COMP_JAC_CVODE(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
 	for (int i = 0 ; i < number_of_equations; i ++)
 	{
 		for (int j = 0 ; j < number_of_equations; j++)
-			ADATA[i+(number_of_equations-1)*j] = JacD[j+i*(number_of_equations-1)];
+			//ADATA[i+(number_of_equations-1)*j] = JacD[j+i*(number_of_equations-1)];//Original
+			ADATA[i+(number_of_equations-1)*j] = JacD[j+i*(number_of_equations-1)];//Original
 	}
 
 	return 0;
 }
+
+int RHS_KAPPA(realtype t, N_Vector u, N_Vector udot, void *userData)
+{
+        realtype EPS=1e-2;
+        realtype *y = NV_DATA_S(u);
+        realtype *dy = NV_DATA_S(udot);
+        double Omega= .5 * y[0] * y[1] * exp ( (y[2]-1.0 ) /  (EPS * y[2]  ) );
+        dy[0] = -Omega;
+        dy[1] = Omega-y[1];
+        dy[2] = y[1];
+//      cout << dy[0] <<"\t\t" << dy[1] << "\t\t" << dy[2] <<endl;
+        return 0;
+}
+
+int Jtv_KAPPA(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void *userData, N_Vector tmp)
+{
+        realtype EPS=1e-2;
+        realtype *JV = NV_DATA_S(Jv);
+        realtype *Y = NV_DATA_S(u);
+        realtype *V = NV_DATA_S(v);
+        double EXP= exp ( (Y[2] - 1.0 ) / (EPS * Y[2]));
+        double DEXP=1/(EPS * Y[2]*Y[2]);
+        JV[0] = -.5*EXP* (V[0]*Y[1]+V[1]*Y[0]+V[2]*Y[0]*Y[1]*DEXP);
+        JV[1] =-JV[0]-V[1];
+        JV[2] = V[1];
+        return 0;
+}
+
 
 /*
 //Matrix Vector Product
@@ -149,3 +186,4 @@ void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N
                 JV[i]=N_VDotProd(tmp,x);
         }
 }
+

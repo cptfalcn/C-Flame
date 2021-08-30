@@ -5,24 +5,32 @@
 #define BAR "===================="
 using namespace std;
 
+//========================================================
+//Schematic understanding
+//  \ or /	Velocity ghosts
+//  G  		Scalar Ghosts
+//  |  		Velocity point
+//  x		Scalar point
+//========================================================
+
 
 //================================================================
-//Velocity staggered Derivative onto Scalars
+//Staggered Scalars onto Velocity
 //================================================================
-void DStaggered(realtype * OUT, realtype * DATA, realtype DELTA, int SIZE)
+void DStaggerUp(realtype * OUT, realtype * DATA, realtype DELTA, int SIZE)
 {
 	//Data is one size greater than the other grid
 	// \ G | x | x | x | x | x | G /
 	// Here we calculate the from x's to  |'s
 	//Memory leaks in here fixed
-	for (int i = 1 ; i < SIZE -1 ; i++)
-		OUT[i-1] = ( DATA[i] - DATA[i-1] ) / (DELTA);
+	for (int i = 0 ; i < SIZE ; i++)
+		OUT[i] = ( DATA[i+1] - DATA[i] ) / (DELTA);
 }
 
 //=================================================================
-//Scalars staggered derivative onto Velocity
+//Set the Velocity onto the staggered scalar grid.
 //=================================================================
-void DStaggeredDown(realtype * OUT, realtype * DATA, realtype DELTA, int SIZE)
+void DStaggerDown(realtype * OUT, realtype * DATA, realtype DELTA, int SIZE)
 {
 	//Data is one size greater than the other grid
 	// \ G | x | x | x | x | x | G /
@@ -40,7 +48,6 @@ void DDCentered(realtype * OUT, realtype * DATA, realtype DELTA, int SIZE)
 	for (int i =1; i < SIZE -1 ; i++)
 		OUT[i-1] =(DATA[i+1]-2*DATA[i]+DATA[i-1]) / (DELTA*DELTA);
 }
-
 
 //==================================================================
 //Second order first derivative calculations.
