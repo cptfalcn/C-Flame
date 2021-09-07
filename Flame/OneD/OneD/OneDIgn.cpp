@@ -152,10 +152,9 @@ int main(int argc, char* argv[])
 		//Adding another N_Vector declaration here creates a bug.  Reason unknown.
 
 		//Based on the experiment and dimension, the size of y will change.
-		//For ZeroD, this start at number_of_equations
 		N_Vector y = N_VNew_Serial(number_of_equations);//The data vector y
 		N_VScale(0.0 , y, y);//Zero out the vector.
-		realtype *data = NV_DATA_S(y);
+		realtype *data = NV_DATA_S(y);//Set the State data pointer
 
 		//Set Initial conditions based on experiment# & output to terminal
 		switch(Experiment)
@@ -204,31 +203,29 @@ int main(int argc, char* argv[])
 		//CVODE
 		//==============
                 void * cvode_mem;
-		cvode_mem=CreateCVODE(CHEM_RHS_TCHEM, CHEM_JTV, pbptr,
+		SUNMatrix A = SUNDenseMatrix(number_of_equations, number_of_equations);
+		SUNLinearSolver LS = SUNLinSol_Dense(y, A);
+		cvode_mem=CreateCVODE(CHEM_RHS_TCHEM, CHEM_JTV, pbptr, A, LS,
 				number_of_equations, y, 1e-8, 1e-8, StepSize, UseJac);
 
 		//================================
 		//Set other integrators
 		//================================
-
 		Epi2_KIOPS *integrator = NULL;
 		Epi3_KIOPS *integrator2 = NULL;
 		EpiRK4SC_KIOPS *integrator3 = NULL;
 		IntegratorStats *integratorStats = NULL;
-		void * IntPtr = NULL;
 
 		//Parse the experiment cases
 		if(Experiment!=0)//If using TChem problems
 		{
 			if(Method=="EPI2")
 			{
-				//Epi2_KIOPS * integrator{static_cast<Epi2_KIOPS *> (IntPtr)};//Recast
 				integrator = CreateEPI2Integrator(CHEM_RHS_TCHEM, CHEM_JTV, pbptr,
 					MaxKrylovIters, y,number_of_equations, UseJac);
 			}
 			else if(Method=="EPI3")
 			{
-				//Epi3_KIOPS * INT{static_cast<Epi3_KIOPS *> (IntPtr)};//Recast
 				integrator2 = CreateEPI3Integrator(CHEM_RHS_TCHEM, CHEM_JTV, pbptr,
 					MaxKrylovIters, y, number_of_equations, UseJac);
 			}
@@ -241,7 +238,7 @@ int main(int argc, char* argv[])
 				if(UseJac==0)
 				cout << BAR << "\tCVODE W/o Jac\t" << BAR << endl;
 				else
-				cout << BAR << "\tCVODE W Jac\t" << BAR << endl;
+				cout << BAR << "\tCVODE W Jac  \t" << BAR << endl;
 
 		}else if(Experiment==0){
                         if(Method=="EPI2")
@@ -273,26 +270,10 @@ int main(int argc, char* argv[])
                 	TNext=(StepCount+1)*StepSize;
 			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
 			//CHEMComputeJac counted in integrator time
-			if(UseJac==1)
-				CHEM_COMP_JAC(y,pbptr);
-
-			if(	Method=="EPI2")
-			{
-                		integratorStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y,
-						KrylovTol, startingBasisSizes);
-			}else if(Method == "EPI3")
-			{
-				integratorStats = integrator2->Integrate(StepSize, TNow, TNext, NumBands, y,
-						KrylovTol, startingBasisSizes);
-			}else if(Method =="EPIRK4")
-			{
-				integratorStats = integrator3->Integrate(StepSize, TNow, TNext, NumBands, y,
-                                                 KrylovTol, startingBasisSizes);
-			}else if(Method =="CVODE")
-			{
-				CVode(cvode_mem, TNow, y, &TNext, CV_NORMAL);
-			}
-
+			//Integrate
+			integratorStats = Integrate(UseJac, StepSize, TNow, TNext, NumBands, y, KrylovTol,
+						startingBasisSizes, pbptr, cvode_mem, Method, integrator,
+						integrator2, integrator3, integratorStats);
 			//Clock the time spent in the integrator
 			auto Stop=std::chrono::high_resolution_clock::now();
                         auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
@@ -331,7 +312,7 @@ int main(int argc, char* argv[])
         	TNow=TNext;
         	cout << "]100%\n\n";
 		//Delete all integrators
-		delete integrator;
+		//delete integrator;
 		delete integrator2;
 		delete integrator3;
 		cout << BAR << "\tIntegration complete\t" << BAR <<endl;
@@ -360,6 +341,12 @@ int main(int argc, char* argv[])
                 PrintDataToFile(myfile,data,number_of_equations,StepSize);//Only print here for conv studies
 		myfile << "\t\t" << KTime <<endl;//Print the integrator time
         	myfile.close();
+		//Do clean up.
+		delete integrator;
+		N_VDestroy_Serial(y);
+		N_VDestroy_Serial(problem.Jac);
+		SUNMatDestroy(A);
+		SUNLinSolFree(LS);
                 CVodeFree(&cvode_mem);
   	}//end local kokkos scope.
 

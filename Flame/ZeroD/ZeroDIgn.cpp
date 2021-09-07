@@ -50,7 +50,7 @@ void PrintBanner();
 //Initial conditions
 N_Vector InitialConditionsKappa(int, realtype);//number of equations and eps
 N_Vector InitialConditionsH(int,int);
-N_Vector InitialConditionsGri(int);//Need to add other samples later
+N_Vector InitialConditionsGri(int, int);//Need to add other samples later
 
 //RHS functions
 int RHS_KAPPA(realtype , N_Vector , N_Vector, void *);
@@ -72,6 +72,7 @@ Epi3_KIOPS *	CreateEPI3Integrator(CVRhsFn, CVSpilsJacTimesVecFn, void *, int, N_
 EpiRK4SC_KIOPS *    CreateEPIRK4SCIntegrator(CVRhsFn, CVSpilsJacTimesVecFn, void *, int, N_Vector, const int, int);
 
 //Used in Jtv
+int ComputeJac(N_Vector, void*);
 void MatrixVectorProduct(int, N_Vector, realtype, N_Vector, realtype *);
 //More misc Functions
 void TestMatrixVectorProduct();
@@ -205,7 +206,7 @@ int main(int argc, char* argv[])
         		N_VScale(1., InitialConditionsH(number_of_equations,SampleNum), y);
         		break;
 		case 2:
-			N_VScale(1., InitialConditionsGri(number_of_equations), y);
+			N_VScale(1., InitialConditionsGri(number_of_equations,SampleNum), y);
 			break;
 		}
 
@@ -244,6 +245,7 @@ int main(int argc, char* argv[])
 		Epi2_KIOPS *integrator = NULL;
 		Epi3_KIOPS *integrator2 = NULL;
 		EpiRK4SC_KIOPS *integrator3 = NULL;
+		IntegratorStats *integratorStats = NULL;
 
 		//Parse the experiment cases
 		if(Experiment!=0)
@@ -286,19 +288,20 @@ int main(int argc, char* argv[])
         	{
                 	TNow= StepCount*StepSize;
                 	TNext=(StepCount+1)*StepSize;
+			ComputeJac(y, pbptr);//Set the Jacobian for this step
 			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
 
 			if(	Method=="EPI2")
 			{
-                		integrator->Integrate(StepSize, TNow, TNext, NumBands, y,
+                		integratorStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y,
 						KrylovTol, startingBasisSizes);
 			}else if(Method == "EPI3")
 			{
-				integrator2->Integrate(StepSize, TNow, TNext, NumBands, y,
+				integratorStats = integrator2->Integrate(StepSize, TNow, TNext, NumBands, y,
 						KrylovTol, startingBasisSizes);
 			}else if(Method =="EPIRK4")
 			{
-				integrator3->Integrate(StepSize, TNow, TNext, NumBands, y,
+				integratorStats = integrator3->Integrate(StepSize, TNow, TNext, NumBands, y,
                                                  KrylovTol, startingBasisSizes);
 			}
 
@@ -334,9 +337,9 @@ int main(int argc, char* argv[])
 
 			/*//Use if we want to do timeseries plots
 			if(ProgressDots!=PercentDone)
-				PrintDataToFile(myfile, data, number_of_equations,TNext);
-			*/
-                	ProgressDots=PercentDone;
+				PrintDataToFile(myfile, data, number_of_equations,TNext);*/
+
+			ProgressDots=PercentDone;
                 	StepCount++;
 
         	}//End integration loop
@@ -353,7 +356,7 @@ int main(int argc, char* argv[])
 	        //=======================================
         	//Console Output
         	//=======================================
-		if(Experiment!=0)
+		if(Experiment==1)
 		{
 		//Hydrogen layout, should also be valid for GRI 3.0
  		//Temp H2 O2 O OH H2O H HO2 H2O2
@@ -361,8 +364,13 @@ int main(int argc, char* argv[])
         		cout << "Total Mass Fractions: " <<N_VL1NormLocal(y)-data[0];
         		cout << "\t\t Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
 
-		}else
+		}else if(Experiment==0)
 			cout << "y=" << data[0] << "\t\t z=" << data[1] <<"\t\t Temp=" <<data[2] <<endl;
+		else{//Gri
+			cout << "Temp=" << data[0] << "\t\t CH4=" << data[14] <<"\t\t O2=" << data[4]<<endl;
+                        cout << "Total Mass Fractions: " <<N_VL1NormLocal(y)-data[0];
+                        cout << "\t\t Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
+		}
 
 		//General Simulation paramater output to console
 		cout<< BAR << "\tSim Parameters\t\t" << BAR << endl;
@@ -371,16 +379,16 @@ int main(int argc, char* argv[])
 		cout <<"Step Size: " <<StepSize << "\t\tNumber of Steps: "<<StepCount<<endl;
         	cout<<"Krylov Tolerance: " <<KrylovTol<<  endl;
 
-		//Case agnostic output
-        	//cout << "Simulation ended at time: " << TNow <<endl;
-
+		//Profiling output
 		if (Profiling ==1){//Invalid for experiment 0
+			ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
 			cout << BAR << "\tPerformance data\t" << BAR << endl;
 			cout << "Integrator CPU time: "<<KTime<<" seconds\n";
 			if (UseJac==1)
 			{
 				cout << "\t" << BAR << "Jacobian\t" << BAR << endl;
 				cout << "\tJacobian Calls: " << JacCnt;
+				ProFile << JacCnt << "\t" << JacTime << "\t";
 				cout << "\t\tJacobian Time: " << JacTime << " seconds\n";
 				cout << "\t\t" << JacTime*100/KTime<<"%\n";
 
@@ -388,16 +396,23 @@ int main(int argc, char* argv[])
 				cout << "\tMatVec Time: " << MatVecTime << " seconds\n";
 				cout << "\t\t" << MatVecTime*100/KTime <<"%\n\n";
 			}
+			ProFile << RHSCnt << "\t" << RHSTime;
 			cout << "\t" << BAR << "RHS\t\t" << BAR << endl;
 			cout << "\tRHS Function calls: " << RHSCnt << "\t\tRHS time: ";
 			cout << RHSTime <<" seconds\n";
 			cout << "\t\t" << RHSTime/KTime*100<< "%\n";
 			cout << "\t\tAveraged RHS Time cost: " << RHSTime/RHSCnt << " seconds\n\n";
 			if(UseJac==1)
+			{
 				cout << "\tRelative cost ration Jac/RHS: ";
 				cout << (JacTime/JacCnt)/(RHSTime/RHSCnt) << endl;
+			}
+			//integratorStats->PrintStats();
+			ProFile << "\t " << Experiment << "\t" << SampleNum << "\t";
+			ProFile << FinalTime << "\t" << StepSize << endl;
+			ProFile.close();
 
-		}
+		}//End Profiling
 		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
 		//Print data to ouput file and close
                 PrintDataToFile(myfile,data,number_of_equations,StepSize);//Only print here for conv studies
@@ -518,23 +533,35 @@ N_Vector InitialConditionsH(int number_of_equations, int SampleNum)
 //=======================================================
 //Gri Initial Conditions
 //=======================================================
-N_Vector InitialConditionsGri(int number_of_equations)
+N_Vector InitialConditionsGri(int number_of_equations, int SampleNum)
 {
 	//1.000000000000000000e+03 1.013250000000000000e+05
 	// 5.483858845025559731e-02 2.187578062376045740e-01 7.137587863547695255e-01 1.264481895737025810e-02
 	N_Vector y0= N_VNew_Serial(number_of_equations);
 	realtype *data = NV_DATA_S(y0);
 	data[0] = 1000.0;//use 1000 for base
-	data[1] =  5.483858845025559731e-02;
-	data[2] =  2.187578062376045740e-01;
-	data[3] =  7.137587863547695255e-01;
-	data[4] =  1.264481895737025810e-02;
+	switch(SampleNum)
+	{
+	case 1:
+		data[0] = 1000.0;//use 1000 for base
+		data[14] =  5.483858845025559731e-02;//CH4
+		data[4]  =  2.187578062376045740e-01;//O2
+		data[48] =  7.137587863547695255e-01;//N2
+ 		data[49] =  1.264481895737025810e-02;//AR
+		cout << BAR <<"GRI Experiment Sample 1\t" << BAR <<endl;
+		break;
+	}
 	return y0;
 }
 
 
 	//====================================================
-	//RHS functions
+	//  ___    _   _   ___
+	// |   \  | | | | /   \
+	// | |) ) | |_| | \ \\/
+	// |   <  |  _  |  \ \
+	// | |\	\ | | | | /\\ \
+	// |_| \_\|_| |_| \___/
 	//====================================================
 
 /*
@@ -602,7 +629,6 @@ int RHS_TCHEM(realtype t, N_Vector u, N_Vector udot, void * pb)
 /============================================================
 //Estimate the local error for adaptive step sizes
 //At each step we need to estimate the LTE
-//Attempt to use a smaller step as a reference
 //===========================================================
 */
 
@@ -635,6 +661,51 @@ void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N
                 }
                 JV[i]=N_VDotProd(tmp,x);
         }
+}
+
+
+
+	//===============================================================//
+	//   _____   ___     ____   ___    _____   _____    ___   __   _
+	//  |__ __| /   \   / ___) / _ \  |     \ |__ __|  /   \ |  \ | |
+	//  _ | |  | (x) | | /    / / \ \ |  x  /   | |   | (x) ||   \| |
+ 	// / (| |  |  n  | | \___ \ \_/ / |  x  \  _| |   |  n  || |\   |
+	// \____/  |_| |_|  \____) \___/  |_____/ |_____| |_| |_||_| \__|
+	//===============================================================//
+
+int ComputeJac(N_Vector u, void* pb)
+{
+        //problem_type problem;
+        myPb * pbPtr{static_cast<myPb *> (pb)};//Recast
+        ordinal_type number_of_equations=pbPtr->num_equations;//Get number of equations
+        //======================================
+        //Set the necessary vectors and pointers
+        //======================================
+        realtype *y= NV_DATA_S(u);
+        realtype *JacD= NV_DATA_S(pbPtr->Jac);
+        //=============================================
+        //We use std vector mimicing users' interface
+        //=============================================
+        using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
+        using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
+        using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
+
+        //============================================
+        // output rhs vector and J matrix wrappers.
+        //============================================
+
+        real_type_1d_view_type x(y   ,   number_of_equations);
+        real_type_2d_view_type J(JacD,   number_of_equations, number_of_equations);
+
+        //===============================
+        /// Compute Jacobian
+        //===============================
+        auto member =  Tines::HostSerialTeamMember();
+        g_timer.reset();
+        pbPtr->computeJacobian(member, x ,J);
+        JacTime+=g_timer.seconds();
+        JacCnt++;
+	return 0;
 }
 
 
@@ -710,17 +781,15 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 	//=============================================
         //We use std vector mimicing users' interface
 	//=============================================
+	/*
         using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
         using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
         using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
-
         //============================================
 	// output rhs vector and J matrix wrappers.
 	//============================================
-
         real_type_1d_view_type x(y   ,   number_of_equations);
 	real_type_2d_view_type J(JacD,   number_of_equations, number_of_equations);
-
         //===============================
         /// Compute Jacobian
 	//===============================
@@ -729,6 +798,7 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
         pbPtr->computeJacobian(member, x ,J);
 	JacTime+=g_timer.seconds();
 	JacCnt++;
+	*/
 	//===================
 	//Compute JV
 	//===================
