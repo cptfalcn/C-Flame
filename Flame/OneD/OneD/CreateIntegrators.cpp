@@ -106,6 +106,7 @@ EpiRK4SC_KIOPS * CreateEPIRK4SCIntegrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV,
 
 //=======================
 //Create CVODE BDF Direct
+//This is depreciated and no longer works.
 //=======================
 void * CreateCVODE(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, SUNMatrix A, SUNLinearSolver LS,
 			int num_eqs, N_Vector State, realtype relTol, realtype absTol, realtype StepSize,
@@ -167,7 +168,7 @@ void * CreateCVODEKrylov(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, SU
         retVal = CVodeSetMaxStep(cvode_mem, StepSize);
         //retVal = CVodeSetMinStep(cvode_mem, StepSize);
         //Set tolerances
-        retVal = CVodeSVtolerances(cvode_mem, 1e-8, AbsTol);
+        retVal = CVodeSVtolerances(cvode_mem, relTol, AbsTol);
         //Set linear solver
         retVal = CVodeSetLinearSolver(cvode_mem, LS, A);
 	retVal = CVodeSetNonlinearSolver(cvode_mem, NLS);

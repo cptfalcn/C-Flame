@@ -280,8 +280,6 @@ int main(int argc, char* argv[])
 					cout << BAR << "\tCVODE W Jac  \t" << BAR << endl;
 			}else if(Method=="CVODEKry")
                         {
-                                //cvode_mem=CreateCVODE(CHEM_RHS_TCHEM, CHEM_JTV, pbptr, A, LS2,
-                                        //number_of_equations, y, relTol, absTol, StepSize, UseJac);
 				cvode_mem=CreateCVODEKrylov(CHEM_RHS_TCHEM, CHEM_JTV, pbptr, A, LS2, NLS,
 					number_of_equations, y, relTol, absTol, StepSize, UseJac);
                                 if(UseJac==0)
@@ -407,18 +405,14 @@ int main(int argc, char* argv[])
 		//General Simulation paramater output to console
 		cout << BAR << "\tSim Parameters\t\t" << BAR << endl;
 		PrintExpParam(FinalTime, TNow, StepSize, StepCount, KrylovTol, absTol, relTol, KTime);
-		//Profiling output
 		if (Profiling ==1){//Invalid for experiment 0
-			//ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
 			cout << BAR << "\tPerformance data\t" << BAR << endl;
 			integratorStats->PrintStats();
-			//ProFile.close();
-
 		}//End Profiling
 
 		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
 		//Print data to ouput file and close
-                PrintDataToFile(myfile,data,number_of_equations,StepSize);//Only print here for conv studies
+                PrintDataToFile(myfile,data,number_of_equations,StepSize);//Print here for conv studies
 		myfile << "\t\t" << KTime <<endl;//Print the integrator time
         	myfile.close();
 		//==========================
