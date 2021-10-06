@@ -1,0 +1,103 @@
+#compile helper functions
+./BuildHelpers
+
+#Compile the Test functions
+echo =========================================Compiling tests=============================================
+/usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/TestDerivatives.cpp -o TestD.o
+
+/usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/TestInitialConditions.cpp -o TestIC.o
+echo =========================================Test Compiled===============================================
+
+echo =========================================Linking Tests===============================================
+#Link Test and InitialConditions into TestD.x
+/usr/bin/c++ TestIC.o Flow.o InitConditions.o Derivatives.o -pg -O0 -DNDEBUG -lgfortran -rdynamic -fopenmp -Wl,-rpath,  /usr/lib/x86_64-linux-gnu/libdl.so -lpthread -rdynamic -pthread -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -lopenblas  /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -o TestIC.x
+
+#Link Test and Derivatives into TestD.x
+/usr/bin/c++ TestD.o Flow.o Derivatives.o -pg -O0 -DNDEBUG -lgfortran -rdynamic -fopenmp -Wl,-rpath,  /usr/lib/x86_64-linux-gnu/libdl.so -lpthread -rdynamic -pthread -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -lopenblas  /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -o TestD.x
+
+echo ==========================================Tests Linked ==============================================
+
+
+#Does the following
+echo ==========================================Compiling main cpp=========================================
+#Compile OneDIgn.o
+/usr/bin/c++  -g -pg -O3 -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame/OneD/ZeroDIgn.cpp -o out.o
+echo ============================================Linking==================================================
+#Link all the helpers into OneDIgn.o
+/usr/bin/c++ Integrators.o out.o trash.o Print.o Derivatives.o InitConditions.o Chemistry.o -pg -O0 -DNDEBUG -lgfortran -rdynamic -DKOKKOS_DEPENDENCE -fopenmp -Wl,-rpath,/home/jstewart23/Code/C++/TChem/build/install/openblas/lib: ~/Code/C++/TChem/build/build/tchem/core/libtchem.a /home/jstewart23/Code/C++/TChem/build/install/tines/lib/libtines.a /home/jstewart23/Code/C++/TChem/build/install/gtest/lib/libgtest_main.a /home/jstewart23/Code/C++/TChem/build/install/kokkos/lib/libkokkoscontainers.a /home/jstewart23/Code/C++/TChem/build/install/kokkos/lib/libkokkoscore.a /usr/lib/x86_64-linux-gnu/libdl.so /home/jstewart23/Code/C++/TChem/build/install/openblas/lib/libopenblas.so /home/jstewart23/Code/C++/TChem/build/install/gtest/lib/libgtest.a -lpthread -rdynamic -pthread -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so /home/jstewart23/Code/C++/epic-cpp/build/Integrators/libepic1.0.0.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -o ZeroDIgn.x
+#echo =======================================Removing intermediary objects=================================
+
+#Clean up
+rm TestD.o
+rm TestIC.o
+
+<<TestD
+#Check if my arrays are correctly indexed
+echo ================================Testing Derivatives via Valgrind =====================================
+valgrind --leak-check=yes ./TestD.x
+TestD
+
+<<TestInit
+echo =========================Testing Initial Cons=======================
+valgrind --leak-check=full ./TestIC.x
+TestInit
+
+#<<TestBattery
+echo ==============================Running Battery of tests================================================
+inputs=H2/
+chemfile=$inputs"chem.inp"
+thermfile=$inputs"therm.dat"
+EndT=1e-4 #usually 1e-4 for all other experiments
+#Method="EPIRK4"
+Sam=1
+Experiment=1
+#Run tests to verify it is working
+OutputFile="Scratch.txt" 
+Delx=1e-2
+relTol=1e-5
+absTol=1e-10
+
+#valgrind --leak-check=yes ./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-3 --FinalTime=10 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI3" --Profiling=0 --Experiment=0
+
+#<<Tests
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-4 --FinalTime=1e-2 --MyFile="Debug.txt" --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=1 --relTol=$relTol --absTol=$absTol
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-3 --FinalTime=10 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=0 --relTol=$relTol --absTol=$absTol
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=1 --relTol=$relTol --absTol=$absTol
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI3" --Profiling=0 --Experiment=1 --relTol=$relTol --absTol=$absTol
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPIRK4" --Profiling=0 --Experiment=1 --relTol=$relTol --absTol=$absTol
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=0 --SampleNum=1 --Method="CVODE" --Profiling=0 --Experiment=1 --relTol=$relTol --absTol=$absTol
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="CVODE" --Profiling=0 --Experiment=1 --relTol=$relTol --absTol=$absTol
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="CVODEKry" --Profiling=0 --Experiment=1 --relTol=$relTol --absTol=$absTol
+
+#./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-8 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=2
+#Tests
+#<<IgnTest
+inputs=gri3.0/
+chemfile=$inputs"chem.inp"
+thermfile=$inputs"therm.dat"
+OutputFile="GriScratch.txt"
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-8 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=2 --relTol=$relTol --absTol=$absTol
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-8 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=2 --relTol=$relTol --absTol=$absTol
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="CVODE" --Profiling=0 --Experiment=2 --relTol=$relTol --absTol=$absTol
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="CVODEKry" --Profiling=0 --Experiment=2 --relTol=$relTol --absTol=$absTol
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="CVODEBiCGS" --Profiling=0 --Experiment=2 --relTol=$relTol --absTol=$absTol
+
+#./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="CVODE" --Profiling=0 --Experiment=2
+
+#IgnTest
+echo -e "\n\n\n";
+echo =======================================Test Battery Complete==========================================
+#TestBattery
+echo ====================================Good news, ZeroDIgn.x built successfully!!=========================

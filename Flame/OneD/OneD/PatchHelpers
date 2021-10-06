@@ -1,23 +1,8 @@
 #compile helper functions
-echo ========================================Building helpers=============================================
-/usr/bin/c++ -I ~/Code/C++/epic-cpp/Integrators/AdaptiveKrylov/ -I ~/Code/C++/epic-cpp/Integrators/EpiRK -c ~/Code/C++/epic-cpp/Integrators/EpiRK/Epi3_KIOPS.cpp -o trash.o
-
-/usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/Derivatives.cpp -o Derivatives.o
-
-/usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/InitialConditions.cpp -o InitConditions.o
-
-/usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/Flow.cpp -o Flow.o
-
-/usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/Print.cpp -o Print.o
-
-/usr/bin/c++  -g -pg -O0 -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame/OneD/Chemistry.cpp -o Chemistry.o
-
-/usr/bin/c++  -g -pg -O0 -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame/OneD/CreateIntegrators.cpp -o Integrators.o
-
-echo =========================================Helpers built===============================================
-#Finish compiling helper functions
+./BuildHelpers
 
 
+<<TestFunctions
 #Compile the Test functions
 echo =========================================Compiling tests=============================================
 /usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/TestDerivatives.cpp -o TestD.o
@@ -33,19 +18,21 @@ echo =========================================Linking Tests=====================
 /usr/bin/c++ TestD.o Flow.o Derivatives.o -pg -O0 -DNDEBUG -lgfortran -rdynamic -fopenmp -Wl,-rpath,  /usr/lib/x86_64-linux-gnu/libdl.so -lpthread -rdynamic -pthread -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -lopenblas  /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -o TestD.x
 
 echo ==========================================Tests Linked ==============================================
+TestFunctions
 
-echo ==========================================Compiling main cpp=========================================
+./BuildOneD
+#Does the following
+#echo ==========================================Compiling main cpp=========================================
 #Compile OneDIgn.o
-/usr/bin/c++  -g -pg -O3 -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame/OneD/OneDIgn.cpp -o out.o
-echo ============================================Linking==================================================
+#/usr/bin/c++  -g -pg -O3 -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame/OneD/OneDIgn.cpp -o out.o
+#echo ============================================Linking==================================================
 #Link all the helpers into OneDIgn.o
-/usr/bin/c++ Integrators.o out.o trash.o Print.o Derivatives.o InitConditions.o Chemistry.o -pg -O0 -DNDEBUG -lgfortran -rdynamic -DKOKKOS_DEPENDENCE -fopenmp -Wl,-rpath,/home/jstewart23/Code/C++/TChem/build/install/openblas/lib: ~/Code/C++/TChem/build/build/tchem/core/libtchem.a /home/jstewart23/Code/C++/TChem/build/install/tines/lib/libtines.a /home/jstewart23/Code/C++/TChem/build/install/gtest/lib/libgtest_main.a /home/jstewart23/Code/C++/TChem/build/install/kokkos/lib/libkokkoscontainers.a /home/jstewart23/Code/C++/TChem/build/install/kokkos/lib/libkokkoscore.a /usr/lib/x86_64-linux-gnu/libdl.so /home/jstewart23/Code/C++/TChem/build/install/openblas/lib/libopenblas.so /home/jstewart23/Code/C++/TChem/build/install/gtest/lib/libgtest.a -lpthread -rdynamic -pthread -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so /home/jstewart23/Code/C++/epic-cpp/build/Integrators/libepic1.0.0.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -o OneDIgn.x
-echo =======================================Removing intermediary objects=================================
+#/usr/bin/c++ Integrators.o out.o trash.o Print.o Derivatives.o InitConditions.o Chemistry.o -pg -O0 -DNDEBUG -lgfortran -rdynamic -DKOKKOS_DEPENDENCE -fopenmp -Wl,-rpath,/home/jstewart23/Code/C++/TChem/build/install/openblas/lib: ~/Code/C++/TChem/build/build/tchem/core/libtchem.a /home/jstewart23/Code/C++/TChem/build/install/tines/lib/libtines.a /home/jstewart23/Code/C++/TChem/build/install/gtest/lib/libgtest_main.a /home/jstewart23/Code/C++/TChem/build/install/kokkos/lib/libkokkoscontainers.a /home/jstewart23/Code/C++/TChem/build/install/kokkos/lib/libkokkoscore.a /usr/lib/x86_64-linux-gnu/libdl.so /home/jstewart23/Code/C++/TChem/build/install/openblas/lib/libopenblas.so /home/jstewart23/Code/C++/TChem/build/install/gtest/lib/libgtest.a -lpthread -rdynamic -pthread -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so /home/jstewart23/Code/C++/epic-cpp/build/Integrators/libepic1.0.0.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -o OneDIgn.x
+#echo =======================================Removing intermediary objects=================================
 
 #Clean up
-rm TestD.o
-rm TestIC.o
-rm out.o
+#rm TestD.o
+#rm TestIC.o
 
 <<TestD
 #Check if my arrays are correctly indexed
@@ -69,11 +56,12 @@ Sam=1
 Experiment=1
 #Run tests to verify it is working
 OutputFile="Scratch.txt" 
+Delx=1e-2
 
 #valgrind --leak-check=yes ./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-3 --FinalTime=10 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI3" --Profiling=0 --Experiment=0
 
 #<<Tests
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-4 --FinalTime=1e-2 --MyFile="Debug.txt" --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=1
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-4 --FinalTime=1e-2 --MyFile="Debug.txt" --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=1 --Delx=$Delx
 
 ./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-3 --FinalTime=10 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=0
 
@@ -87,8 +75,11 @@ OutputFile="Scratch.txt"
 
 ./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="CVODE" --Profiling=0 --Experiment=1
 
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="CVODEKry" --Profiling=0 --Experiment=1
+
 #./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-8 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=2
 #Tests
+
 #<<IgnTest
 inputs=gri3.0/
 chemfile=$inputs"chem.inp"
@@ -97,11 +88,11 @@ OutputFile="GriScratch.txt"
 
 ./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-8 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=2
 
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-8 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=2
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-8 --UseJac=1 --SampleNum=1 --Method="EPI3" --Profiling=0 --Experiment=2
 
 ./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=0 --SampleNum=1 --Method="CVODE" --Profiling=0 --Experiment=2
 
-#./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="CVODE" --Profiling=0 --Experiment=2
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-8 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="CVODEKry" --Profiling=0 --Experiment=2
 
 #IgnTest
 echo -e "\n\n\n";

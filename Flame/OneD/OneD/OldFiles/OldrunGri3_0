@@ -1,0 +1,13 @@
+/usr/bin/g++  -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -isystem /home/jstewart23/Code/C++/TChem/build/install/gtest/include  -O3 -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame/ZeroD/Gri3_0.cpp -o out.o
+# -I/home/jstewart23/Code/C++/TChem/build/install/openblas/include -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -I/home/jstewart23/Code/C++/epic-cpp/TestProblems  -pthread -Wall --std=c++0x -m64 -g -DSUNDIALS=1 -DBLAS_UNDERSCORE=1
+#-c /home/jstewart23/Code/C++/Flame/ZeroD/Gri3_0.cpp -o out.o
+
+/usr/bin/c++ out.o -rdynamic -pthread -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so /home/jstewart23/Code/C++/epic-cpp/build/Integrators/libepic1.0.0.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -o Gri3_0.x
+#rm out.o
+
+
+inputs=H2/
+#inputs=gri3.0/
+chemfile=$inputs"chem.inp"
+thermfile=$inputs"therm.dat"
+./Gri3_0.x --chemfile=$chemfile --thermfile=$thermfile

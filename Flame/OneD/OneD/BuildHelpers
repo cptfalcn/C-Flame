@@ -1,0 +1,17 @@
+#compile helper functions
+echo ========================================Building helpers=============================================
+/usr/bin/c++ -I ~/Code/C++/epic-cpp/Integrators/AdaptiveKrylov/ -I ~/Code/C++/epic-cpp/Integrators/EpiRK -c ~/Code/C++/epic-cpp/Integrators/EpiRK/Epi3_KIOPS.cpp -o trash.o
+
+/usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/Derivatives.cpp -o Derivatives.o
+
+/usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/InitialConditions.cpp -o InitConditions.o
+
+/usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/Flow.cpp -o Flow.o
+
+/usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/Print.cpp -o Print.o
+
+/usr/bin/c++  -g -pg -O0 -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame/OneD/Chemistry.cpp -o Chemistry.o
+
+/usr/bin/c++  -g -pg -O0 -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame/OneD/CreateIntegrators.cpp -o Integrators.o
+
+echo =========================================Helpers built===============================================

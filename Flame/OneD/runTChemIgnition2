@@ -1,0 +1,15 @@
+TCHEM_INSTALL_PATH=~/Code/C++/TChem/build/install/tchem
+exec=$TCHEM_INSTALL_PATH/example/TChem_IgnitionZeroD.x #might need ...SA.x
+#inputs=$TCHEM_INSTALL_PATH/example/data/ignition-zero-d/gri3.0/
+inputs=~/Code/C++/Flame/ZeroD/H2/
+save=1 #1 originally
+dtmin=1e-8
+dtmax=1e-2
+tend=1e-2
+max_time_iterations=10 #260 was base
+max_newton_iterations=20
+atol_newton=1e-12
+rtol_newton=1e-6
+tol_time=1e-6
+$exec --thermfile=$inputs"therm.dat" --chemfile=$inputs"chem.inp" --inputFile=/home/jstewart23/Code/C++/TChem/build/install/tchem/example/data/ignition-zero-d/"input.dat"  --tol-time=$tol_time --atol-newton=$atol_newton --rtol-newton=$rtol_newton --dtmin=$dtmin --max-newton-iterations=$max_newton_iterations --output_frequency=$save --dtmax=$dtmax --tend=$tend --max-time-iterations=$max_time_iterations
+#$exec --thermfile=$inputs"therm.dat" --chemfile=$inputs"chem.inp" --inputFile=$inputs/"sample.dat" --tol-time=$tol_time --atol-newton=$atol_newton --rtol-newton=$rtol_newton --dtmin=$dtmin --max-newton-iterations=$max_newton_iterations --output_frequency=$save --dtmax=$dtmax --tend=$tend --max-time-iterations=$max_time_iterations

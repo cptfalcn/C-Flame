@@ -1,0 +1,25 @@
+echo ========================================== Making ModifiedTChemIng.x ======================================
+/usr/bin/c++  -g -pg -O0 -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame/OneD/ModifiedTChemIgn.cpp -o ModifiedTChemIgnition.o
+
+/usr/bin/c++  trash.o Print.o Derivatives.o InitConditions.o ModifiedTChemIgnition.o -pg -O0 -DNDEBUG -lgfortran -rdynamic -DKOKKOS_DEPENDENCE -fopenmp -Wl,-rpath,/home/jstewart23/Code/C++/TChem/build/install/openblas/lib: ~/Code/C++/TChem/build/build/tchem/core/libtchem.a /home/jstewart23/Code/C++/TChem/build/install/tines/lib/libtines.a /home/jstewart23/Code/C++/TChem/build/install/gtest/lib/libgtest_main.a /home/jstewart23/Code/C++/TChem/build/install/kokkos/lib/libkokkoscontainers.a /home/jstewart23/Code/C++/TChem/build/install/kokkos/lib/libkokkoscore.a /usr/lib/x86_64-linux-gnu/libdl.so /home/jstewart23/Code/C++/TChem/build/install/openblas/lib/libopenblas.so /home/jstewart23/Code/C++/TChem/build/install/gtest/lib/libgtest.a -lpthread -rdynamic -pthread -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so /home/jstewart23/Code/C++/epic-cpp/build/Integrators/libepic1.0.0.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -o ModifiedTChemIgn.x
+echo ========================================== Running a Test ================================================
+echo ""
+#inputs=$TCHEM_INSTALL_PATH/example/data/ignition-zero-d/gri3.0/
+inputs=~/Code/C++/Flame/OneD/H2/
+#inputs=~/Code/C++/Flame/OneD/gri3.0/
+save=1 #1 originally
+dtmin=5e-7
+dtmax=5e-7
+tend=1e0 #usually 1e-4
+max_time_iterations=20 #260 was base
+max_newton_iterations=20
+atol_newton=1e-12
+rtol_newton=1e-8
+tol_time=1e-8
+
+
+./ModifiedTChemIgn.x --inputsPath=$inputs --tol-time=$tol_time --atol-newton=$atol_newton --rtol-newton=$rtol_newton --dtmin=$dtmin --max-newton-iterations=$max_newton_iterations --output_frequency=$save --dtmax=$dtmax --tend=$tend --max-time-iterations=$max_time_iterations
+
+#./ModifiedTChemIgn.x --inputsPath=$inputs --num_time_iterations_per_interval=1 --tol-time=$tol_time --atol-newton=$atol_newton --rtol-newton=$rtol_newton --dtmin=1e-7 --max-newton-iterations=$max_newton_iterations --output_frequency=$save --dtmax=1e-7 --tend=$tend --max-time-iterations=100
+
+#./ModifiedTChemIgn.x --inputsPath=$inputs --num_time_iterations_per_interval=1 --tol-time=$tol_time --atol-newton=$atol_newton --rtol-newton=$rtol_newton --dtmin=1e-6 --max-newton-iterations=$max_newton_iterations --output_frequency=$save --dtmax=1e-6 --tend=$tend --max-time-iterations=10

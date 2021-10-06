@@ -1,0 +1,29 @@
+#Run a convergence study
+#inputs=H2/
+inputs=gri3.0/
+chemfile=$inputs"chem.inp"
+thermfile=$inputs"therm.dat"
+EndT=1e-4 #usually 1e-4 for all other experiments
+#Method="EPIRK4"
+Sam=2
+Experiment=2
+
+ConFile="DataEPI3GriSample2JacTol1e10.txt"
+#ConFile="DataEPI2HydroSample1NoJacV4.txt"
+Method="EPI3"
+Tol=1e-10
+relTol=1e-4
+absTol=1e-8
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-4 --FinalTime=$EndT --MyFile=$ConFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --relTol=$relTol --absTol=$absTol
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-5 --FinalTime=$EndT --MyFile=$ConFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --relTol=$relTol --absTol=$absTol
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-5 --FinalTime=$EndT --MyFile=$ConFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --relTol=$relTol --absTol=$absTol
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-6 --FinalTime=$EndT --MyFile=$ConFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --relTol=$relTol --absTol=$absTol
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=4e-6 --FinalTime=$EndT --MyFile=$ConFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --relTol=$relTol --absTol=$absTol
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=2e-6 --FinalTime=$EndT --MyFile=$ConFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --relTol=$relTol --absTol=$absTol
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$ConFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --relTol=$relTol --absTol=$absTol
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-7 --FinalTime=$EndT --MyFile=$ConFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --relTol=$relTol --absTol=$absTol
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=2e-7 --FinalTime=$EndT --MyFile=$ConFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --relTol=$relTol --absTol=$absTol
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-7 --FinalTime=$EndT --MyFile=$ConFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --relTol=$relTol --absTol=$absTol
+
+# ./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-8 --FinalTime=$EndT --MyFile=$ConFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method="CVODE" --Experiment=$Experiment
