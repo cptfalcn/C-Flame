@@ -8,11 +8,11 @@ EndT=1e-2 #usually 1e-4 for all other experiments
 Sam=2
 Experiment=2
 
-ConFile="DataEPI3GriSample2V3JacTol1e10.txt"
+ConFile="Test.txt"
 #ConFile="DataEPI2HydroSample1NoJacV4.txt"
 Method="EPI3"
 Tol=1e-10
-relTol=1e-4
+relTol=1e-8
 absTol=1e-8
 
 ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-3 --FinalTime=$EndT --MyFile=$ConFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment --relTol=$relTol --absTol=$absTol

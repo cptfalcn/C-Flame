@@ -56,26 +56,22 @@ Sam=1
 Experiment=1
 #Run tests to verify it is working
 OutputFile="Scratch.txt" 
-Delx=1e-2
+Delx=1e-1
 
 #valgrind --leak-check=yes ./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-3 --FinalTime=10 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI3" --Profiling=0 --Experiment=0
 
 #<<Tests
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-4 --FinalTime=1e-2 --MyFile="Debug.txt" --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=1 --Delx=$Delx
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile="Debug.txt" --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=1 --Delx=$Delx
 
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-3 --FinalTime=10 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=0
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-3 --FinalTime=10 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=0 --Delx=0
 
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=1
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=1 --Delx=0
 
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI3" --Profiling=0 --Experiment=1
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI3" --Profiling=0 --Experiment=1 --Delx=0
 
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPIRK4" --Profiling=0 --Experiment=1
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPIRK4" --Profiling=0 --Experiment=1 --Delx=0
 
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=0 --SampleNum=1 --Method="CVODE" --Profiling=0 --Experiment=1
-
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="CVODE" --Profiling=0 --Experiment=1
-
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="CVODEKry" --Profiling=0 --Experiment=1
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="CVODEKry" --Profiling=0 --Experiment=1 --Delx=0
 
 #./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-8 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=2
 #Tests
@@ -86,13 +82,11 @@ chemfile=$inputs"chem.inp"
 thermfile=$inputs"therm.dat"
 OutputFile="GriScratch.txt"
 
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-8 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=2
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-8 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=2 --Delx=0
 
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-8 --UseJac=1 --SampleNum=1 --Method="EPI3" --Profiling=0 --Experiment=2
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-8 --UseJac=1 --SampleNum=1 --Method="EPI3" --Profiling=0 --Experiment=2 --Delx=0
 
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=0 --SampleNum=1 --Method="CVODE" --Profiling=0 --Experiment=2
-
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-8 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="CVODEKry" --Profiling=0 --Experiment=2
+./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-8 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="CVODEKry" --Profiling=0 --Experiment=2 --Delx=0
 
 #IgnTest
 echo -e "\n\n\n";

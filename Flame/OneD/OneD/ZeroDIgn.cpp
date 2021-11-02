@@ -246,33 +246,16 @@ int main(int argc, char* argv[])
 			{
 				integrator3 = CreateEPIRK4SCIntegrator(CHEM_RHS_TCHEM, CHEM_JTV, pbptr,
 					 MaxKrylovIters, y, number_of_equations, UseJac);
-			}
-			else if(Method=="CVODE")
-			{
-				cvode_mem=CreateCVODE(CHEM_RHS_TCHEM, CHEM_JTV, pbptr, A, LS,
-                                	number_of_equations, y, relTol, absTol, StepSize, UseJac);
-				if(UseJac==0)
-				cout << BAR << "\tCVODE W/o Jac\t" << BAR << endl;
-				else
-				cout << BAR << "\tCVODE W Jac  \t" << BAR << endl;
 			}else if(Method=="CVODEKry")
 			{
-				cvode_mem=CreateCVODE(CHEM_RHS_TCHEM, CHEM_JTV, pbptr, A, LS2,
-                                        number_of_equations, y, relTol, absTol, StepSize, UseJac);
-				//cvode_mem= CreateCVODEKrylov(CHEM_RHS_TCHEM, CHEM_JTV, pbptr, A, LS2,
-                                        //NLS, number_of_equations, y, 1e-8, 1e-8, StepSize, UseJac);
+				//cvode_mem=CreateCVODE(CHEM_RHS_TCHEM, CHEM_JTV, pbptr, A, LS2,
+                                //        number_of_equations, y, relTol, absTol, StepSize, UseJac);
+				cvode_mem= CreateCVODEKrylov(CHEM_RHS_TCHEM, CHEM_JTV, pbptr, A, LS2,
+                                        NLS, number_of_equations, y, 1e-8, 1e-8, StepSize, UseJac);
                                 if(UseJac==0)
                                 cout << BAR << "\tCVODE Kry W/o Jac\t" << BAR << endl;
                                 else
                                 cout << BAR << "\tCVODE Kry W Jac  \t" << BAR << endl;
-			}else if(Method =="CVODEBiCGS")
-			{
-				cvode_mem=CreateCVODE(CHEM_RHS_TCHEM, CHEM_JTV, pbptr, A, LS3,
-                                        number_of_equations, y, relTol, absTol, StepSize, UseJac);
-				if(UseJac==0)
-                                cout << BAR << "\tCVODE BiCGS W/o Jac\t" << BAR << endl;
-                                else
-                                cout << BAR << "\tCVODE BiCGS W Jac  \t" << BAR << endl;
 			}
 		}else if(Experiment==0){
                         if(Method=="EPI2")
@@ -353,15 +336,7 @@ int main(int argc, char* argv[])
         	//=======================================
 		PrintExpData(data, Experiment, N_VL1NormLocal(y));
 		//General Simulation paramater output to console
-		cout << BAR << "\tSim Parameters\t\t" << BAR << endl;
-		PrintExpParam(FinalTime, TNow, StepSize, StepCount, KrylovTol, absTol, relTol, KTime);
-		/*
-        	cout << "Exact Final Time: " << FinalTime << "\t\tSimulation Final Time: " <<TNow<<endl;
-		cout << "Step Size: " <<StepSize << "\t\tNumber of Steps: "<<StepCount<<endl;
-        	cout << "Krylov Tolerance: " <<KrylovTol<<  endl;
-		cout << "Absolute tolerance: " << absTol << "\t\tRelative tolerance: " << relTol << endl;
-		cout << "Time integration time: " << KTime <<endl;
-		*/
+		PrintExpParam(FinalTime, TNow, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
 		//Profiling output
 		if (Profiling ==1){//Invalid for experiment 0
 			//ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
@@ -370,11 +345,9 @@ int main(int argc, char* argv[])
 			//ProFile.close();
 
 		}//End Profiling
-
-		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
 		//Print data to ouput file and close
-                PrintDataToFile(myfile,data,number_of_equations,StepSize);//Only print here for conv studies
-		myfile << "\t\t" << KTime <<endl;//Print the integrator time
+                PrintDataToFile(myfile,data,number_of_equations,StepSize, BAR, MyFile, KTime);//Only print here for conv studies
+		//myfile << "\t\t" << KTime <<endl;//Print the integrator time
         	myfile.close();
 		//==========================
 		//Time to take out the trash
@@ -382,7 +355,8 @@ int main(int argc, char* argv[])
 		delete integrator;
 		N_VDestroy_Serial(y);
 		N_VDestroy_Serial(problem.Jac);
-		SUNMatDestroy(A);
+		if (Experiment !=0)
+			SUNMatDestroy(A);
 		SUNLinSolFree(LS);
 		SUNLinSolFree(LS2);
 		SUNNonlinSolFree(NLS);
@@ -443,7 +417,7 @@ void ErrorCheck(ofstream & myfile, N_Vector y, realtype * data, int number_of_eq
 	realtype MassError=abs( N_VL1NormLocal(y)-data[0]-1.0);
 	if(MassError>.1 || abs(data[0])>1e5 )
 	{
-		PrintDataToFile(myfile, data, number_of_equations, TNext);
+		//PrintDataToFile(myfile, data, number_of_equations, TNext);
                 cout<<"\n===============!!!Critical error!!!================\n";
                 if(MassError>.1)
                 {

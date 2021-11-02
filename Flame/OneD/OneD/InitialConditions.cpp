@@ -177,3 +177,31 @@ void IntConGri30(realtype * data, int SampleNum)
 		break;
         }
 }
+
+
+void SetIntCons(int Experiment, int Sample, realtype* data)
+{
+	switch(Experiment)
+	{
+		case 0:
+			IntConKappa(data, 1e-2);
+			break;
+		case 1:
+                	IntConHydro(data, Sample);
+                        break;
+             	case 2:
+                	IntConGri30(data, Sample);
+                        break;
+    	}
+}
+
+
+void SetSuperInitCons(realtype * data, realtype * StateData, int numEqs, int numPts)
+{
+	for( int i = 0 ; i < numEqs ; i ++ )
+	{
+		for (int j = 0 ; j < numPts; j ++)
+			StateData[j + i * numPts] = data[i];
+	}
+}
+

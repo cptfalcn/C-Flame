@@ -31,7 +31,7 @@ class myPb : public TCHEMPB{
         //members
         ordinal_type  num_equations;
         N_Vector Jac;
-	realtype *JacArr;
+	//realtype *JacArr;
 };
 
 class myPb2{
@@ -40,10 +40,12 @@ class myPb2{
 	ordinal_type  num_equations;
 	int NumGridPts;
 	N_Vector Jac;
+	SUNMatrix Mat;
 	myPb2(ordinal_type, real_type_1d_view_type, WORK,int);
 	~myPb2();//destructor
 	void PrintGuts(void);
 	void PrintJac();
+	N_Vector Velocity;
 };
 
 //End class stuff
@@ -51,13 +53,33 @@ class myPb2{
 int CHEM_RHS_TCHEM(realtype , N_Vector , N_Vector, void *);
 int CHEM_COMP_JAC(N_Vector u, void* pb);
 int CHEM_COMP_JAC_CVODE(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector, N_Vector, N_Vector);
+int CHEM_JAC_VOID(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector, N_Vector, N_Vector);
 int CHEM_JTV(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 int RHS_KAPPA(realtype , N_Vector , N_Vector, void *);
 int Jtv_KAPPA(N_Vector , N_Vector , realtype , N_Vector , N_Vector , void * , N_Vector);
 void MatrixVectorProduct(int, realtype *, N_Vector, N_Vector, realtype *);
 
 //One-D versions
-int SUPER_CHEM_RHS_TCHEM(realtype, N_Vector, N_Vector, void *);
-int SUPER_CHEM_JAC_TCHEM(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector, N_Vector, N_Vector);
-int SUPER_CHEM_JTV(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+	//RHS Functions
+	int SUPER_CHEM_RHS_TCHEM	(realtype, N_Vector, N_Vector, void *);
+	int SUPER_RHS_DIFF		(realtype, N_Vector, N_Vector, void *);
+	int SUPER_RHS_ADV		(realtype, N_Vector, N_Vector, void *);
+
+	//Jacobian function
+	int SUPER_CHEM_JAC_TCHEM	(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector,
+					N_Vector, N_Vector);
+
+	//JtV functions
+	int SUPER_CHEM_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+
+//One-D helpers
+int CleverMatVec(int, int, int, realtype*, realtype *, realtype *);
+int SUPER_2_VEC(int, realtype *, realtype *, int, int);
+int VEC_2_SUPER(int, realtype *, realtype *, int , int);
+int Jac_2_SuperJac(int, realtype*, realtype*, int, int);
+int SuperJac_2_Jac(int, realtype *, realtype*, int, int);
+int Clean(int, realtype *);
+//Debugging
+realtype CompareJacobians(void *, void *, N_Vector, N_Vector, N_Vector, N_Vector, SUNMatrix);
+
 #endif

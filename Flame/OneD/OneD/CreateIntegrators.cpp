@@ -104,51 +104,57 @@ EpiRK4SC_KIOPS * CreateEPIRK4SCIntegrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV,
         return 0;
 }
 
-//=======================
-//Create CVODE BDF Direct
-//This is depreciated and no longer works.
-//=======================
-void * CreateCVODE(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, SUNMatrix A, SUNLinearSolver LS,
-			int num_eqs, N_Vector State, realtype relTol, realtype absTol, realtype StepSize,
-			int UseJac)
-{
-	void * cvode_mem;
-	int retVal = 0;
-	realtype tret = 0;
-	N_Vector AbsTol= N_VNew_Serial(num_eqs);
- 	for ( int i = 0 ; i < num_eqs ; i++)
-		NV_Ith_S(AbsTol,i)=absTol;
+//======================================================
+//General Cvode with general RHS and Jacobian functions.
+//======================================================
 
-	cvode_mem = CVodeCreate (CV_BDF);
-	//Set intial state
-	retVal = CVodeInit(cvode_mem, RHS, 0, State);
-	//Give CVODE the user problem
-	retVal = CVodeSetUserData(cvode_mem, pbptr);
-	//Set intial stepsize guess
-	retVal = CVodeSetInitStep(cvode_mem, StepSize);//Modify this line
-	//Set max stepsize
-	retVal = CVodeSetMaxStep(cvode_mem, StepSize);
-	//Set tolerances
-	retVal = CVodeSVtolerances(cvode_mem, 1e-8, AbsTol);
-	//Set linear solver
-	retVal = CVodeSetLinearSolver(cvode_mem, LS, A);
-	retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
-	if (UseJac==1)
-   	{
-        	retVal = CVodeSetJacFn(cvode_mem, CHEM_COMP_JAC_CVODE);//likely bugged AF
-       		retVal = CVodeSetMaxNumSteps(cvode_mem, max(500,num_eqs*num_eqs*num_eqs));
-      	}
-	N_VDestroy_Serial(AbsTol);
-	return cvode_mem;
+
+void * CreateCVODE(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, CVLsJacFn JAC,  void * pbptr, SUNMatrix A,
+                        SUNLinearSolver LS, SUNNonlinearSolver NLS , int num_eqs, N_Vector State,
+                        realtype relTol, realtype absTol, realtype StepSize, int UseJac)
+{
+        void * cvode_mem;
+        int retVal = 0;
+        realtype tret=0;
+        N_Vector AbsTol= N_VNew_Serial(num_eqs);
+        for ( int i = 0 ; i < num_eqs ; i++)
+                NV_Ith_S(AbsTol,i)=absTol;
+
+        cvode_mem = CVodeCreate (CV_BDF);
+        //Give CVODE the user problem
+        retVal = CVodeSetUserData(cvode_mem, pbptr);
+        //Set intial state
+        retVal = CVodeInit(cvode_mem, RHS, 0, State);
+        //Set intial stepsize guess
+        retVal = CVodeSetInitStep(cvode_mem, StepSize);
+        //Set max stepsize
+        retVal = CVodeSetMaxStep(cvode_mem, StepSize);
+  	retVal = CVodeSetMinStep(cvode_mem, StepSize/1e4);
+        //Set tolerances
+        retVal = CVodeSVtolerances(cvode_mem, relTol, AbsTol);
+        //Set linear solver
+        retVal = CVodeSetLinearSolver(cvode_mem, LS, A);
+        retVal = CVodeSetNonlinearSolver(cvode_mem, NLS);
+        retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
+        if (UseJac==1)
+        {
+                retVal = CVodeSetJacFn(cvode_mem, JAC);//Updated Version
+                retVal = CVodeSetMaxNumSteps(cvode_mem, max(500,num_eqs*num_eqs*num_eqs));
+        }
+        N_VDestroy_Serial(AbsTol);
+        return cvode_mem;
 }
+
+
+
 
 //=======================
 //Create CVODE BDF Krylov
 //=======================
 
-void * CreateCVODEKrylov(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, SUNMatrix A, SUNLinearSolver LS,
-                        SUNNonlinearSolver NLS , int num_eqs, N_Vector State, realtype relTol,
-			realtype absTol, realtype StepSize, int UseJac)
+void * CreateCVODEKrylov(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, SUNMatrix A,
+			SUNLinearSolver LS, SUNNonlinearSolver NLS , int num_eqs, N_Vector State,
+			realtype relTol, realtype absTol, realtype StepSize, int UseJac)
 {
         void * cvode_mem;
         int retVal = 0;
@@ -172,11 +178,11 @@ void * CreateCVODEKrylov(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, SU
         //Set linear solver
         retVal = CVodeSetLinearSolver(cvode_mem, LS, A);
 	retVal = CVodeSetNonlinearSolver(cvode_mem, NLS);
-	retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);//Edit in and out
+	retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
         if (UseJac==1)
         {
-                //retVal = CVodeSetJacFn(cvode_mem, CHEM_COMP_JAC);
-		retVal = CVodeSetJacFn(cvode_mem, CHEM_COMP_JAC_CVODE);//likely bugged AF
+		retVal = CVodeSetJacFn(cvode_mem, SUPER_CHEM_JAC_TCHEM);//Updated Version
+		//retVal = CVodeSetJacFn(cvode_mem, CHEM_COMP_JAC_CVODE);//Uses the new problem class
                 retVal = CVodeSetMaxNumSteps(cvode_mem, max(500,num_eqs*num_eqs*num_eqs));
         }
         N_VDestroy_Serial(AbsTol);
@@ -192,7 +198,7 @@ IntegratorStats* Integrate(int UseJac, realtype StepSize, realtype TNow, realtyp
 				Epi3_KIOPS * integrator2, EpiRK4SC_KIOPS * integrator3,
 				IntegratorStats *  IntStats)
 {
-	if(UseJac==1 && Method != "CVODE" && Method != "CVODEKry" && Method !="CVODEBiCGS")
+	if(UseJac==1 && Method != "CVODEKry")
 		CHEM_COMP_JAC(y,pbptr);
 	if(Method=="EPI2")
 	{
@@ -206,7 +212,7 @@ IntegratorStats* Integrate(int UseJac, realtype StepSize, realtype TNow, realtyp
         {
 		IntStats = integrator3->Integrate(StepSize, TNow, TNext, NumBands, y,
 				KrylovTol, startingBasisSizes);
-     	}else if(Method =="CVODE"||Method=="CVODEKry"||Method=="CVODEBiCGS")
+     	}else if(Method=="CVODEKry")
 	{
 		CVode(cvode_mem, TNow, y, &TNext, CV_NORMAL);
 		//CVode(cvode_mem, TNow, y, &TNext, CV_ONE_STEP);
@@ -214,32 +220,74 @@ IntegratorStats* Integrate(int UseJac, realtype StepSize, realtype TNow, realtyp
 	return IntStats;
 }
 
-void *		SelectIntegrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, int MaxKrylovIters,
-                                	N_Vector y, const int num_eqs, int UseJac, string Method,
-					SUNMatrix A, SUNLinearSolver LS, realtype absTol,
-					realtype relTol, realtype StepSize)
+//=======================================================
+//  ___  _  _  ___  ___  ___
+// / __/| || || _ \|  _|| _ \
+// \__ \| || ||  _/|  _||   <
+// /___/ \__/ |_|  |___||_|_|
+//
+//========================================================
+//Create the void integrator
+//=====================================
+void *		SelectIntegrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, CVLsJacFn Jac, void * pbptr,
+				void * integrator, int MaxKrylovIters, N_Vector y, const int num_eqs,
+				int UseJac, string Method, SUNMatrix A, SUNLinearSolver LS,
+				SUNNonlinearSolver NLS, realtype absTol, realtype relTol, realtype StepSize)
 {
-		unique_ptr<Epi2_KIOPS> DUMMY;
+		realtype TNext= 1e-6;
+		int startingBasisSizes[] ={3,3};
+		IntegratorStats * IntStats = NULL;
 		if(Method=="EPI2")
 		{
-		unique_ptr<Epi2_KIOPS> EPI2_PTR;
-		EPI2_PTR.reset( CreateEPI2Integrator(RHS, JtV, pbptr, MaxKrylovIters, y, num_eqs, UseJac));
-		return reinterpret_cast<void *> (EPI2_PTR.get() );
+		integrator = reinterpret_cast<void *>
+				(CreateEPI2Integrator(RHS, JtV, pbptr, MaxKrylovIters, y, num_eqs, UseJac));
 		}
 		else if(Method == "EPI3")
 		{
-		unique_ptr<Epi3_KIOPS> EPI3_PTR;
-		EPI3_PTR.reset( CreateEPI3Integrator(RHS, JtV, pbptr, MaxKrylovIters, y, num_eqs, UseJac));
-		return reinterpret_cast<void *> (EPI3_PTR.get() );
+		integrator = reinterpret_cast<void *>
+				( CreateEPI3Integrator(RHS, JtV, pbptr, MaxKrylovIters, y, num_eqs, UseJac));
 		}
 		else if(Method == "EPIRK4")
 		{
-		unique_ptr<EpiRK4SC_KIOPS> EPIRK4_PTR;
-		EPIRK4_PTR.reset( CreateEPIRK4SCIntegrator(RHS, JtV, pbptr, MaxKrylovIters, y, num_eqs,
-					UseJac));
-                return reinterpret_cast<void *> (EPIRK4_PTR.get() );
+		integrator = reinterpret_cast<void *>
+			( CreateEPIRK4SCIntegrator(RHS, JtV, pbptr, MaxKrylovIters, y, num_eqs, UseJac));
 		}else//create CVODE
 		{
-		return CreateCVODE(RHS, JtV, pbptr, A, LS, num_eqs, y, relTol, absTol, StepSize, UseJac);
+			integrator = CreateCVODE(RHS, JtV, Jac, pbptr, A, LS, NLS , num_eqs, y,
+						relTol, absTol, StepSize, UseJac);
+			//integrator = CreateCVODEKrylov(RHS, JtV, pbptr, A, LS, NLS,
+			//			num_eqs,y,relTol, absTol, StepSize, UseJac);
 		}
+		return integrator;
+}
+
+IntegratorStats * IntegrateWrapper(int UseJac, realtype StepSize, realtype TNow, realtype TNext,
+				int NumBands, N_Vector y, realtype KrylovTol, int startingBasisSizes[],
+				void * pbptr, void * ProtoInt, void * cvode_mem,string Method,
+				IntegratorStats *  IntStats, CVLsJacFn JacFn)
+{
+	N_Vector StateDot = N_VClone(y);
+	int Length = N_VGetLength(y);
+	myPb2 * pbPtr{static_cast<myPb2 *> (pbptr)};
+	realtype * STATEDATA = NV_DATA_S(y);
+	if(UseJac==1 && Method != "CVODEKry")
+		JacFn(TNow, y, StateDot, pbPtr->Mat, pbPtr, StateDot, StateDot, StateDot);
+        if(Method=="EPI2")
+        {
+		Epi2_KIOPS * integrator{static_cast<Epi2_KIOPS *> (ProtoInt)};
+               	IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol,	startingBasisSizes);
+        }else if(Method == "EPI3")
+        {
+		Epi3_KIOPS * integrator{static_cast<Epi3_KIOPS *> (ProtoInt)};
+               	IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
+        }else if(Method =="EPIRK4")
+        {
+		EpiRK4SC_KIOPS * integrator{static_cast<EpiRK4SC_KIOPS *> (ProtoInt)};
+               	IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
+        }else if(Method=="CVODEKry")
+        {
+               	CVode(cvode_mem, TNow, y, &TNext, CV_NORMAL);
+               	//CVode(cvode_mem, TNow, y, &TNext, CV_ONE_STEP);
+        }
+	return  IntStats;
 }

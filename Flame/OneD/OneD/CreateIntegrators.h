@@ -9,8 +9,9 @@ Epi3_KIOPS *    	CreateEPI3Integrator(CVRhsFn, CVSpilsJacTimesVecFn, void *, int
 				 const int, int);
 EpiRK4SC_KIOPS* 	CreateEPIRK4SCIntegrator(CVRhsFn, CVSpilsJacTimesVecFn, void *, int, N_Vector,
 				 const int, int);
-void * 			CreateCVODE(CVRhsFn, CVSpilsJacTimesVecFn, void *, SUNMatrix, SUNLinearSolver,
-				int, N_Vector, realtype, realtype, realtype, int);
+void * 			CreateCVODE(CVRhsFn, CVSpilsJacTimesVecFn, CVLsJacFn, void *, SUNMatrix,
+				SUNLinearSolver, SUNNonlinearSolver, int, N_Vector, realtype, realtype,
+				realtype, int);
 
 void *			CreateCVODEKrylov(CVRhsFn, CVSpilsJacTimesVecFn, void *, SUNMatrix, SUNLinearSolver,
                                 SUNNonlinearSolver, int, N_Vector, realtype, realtype, realtype, int);
@@ -19,6 +20,11 @@ IntegratorStats *	Integrate(int, realtype, realtype, realtype, int, N_Vector, re
 				int [], void *, void *, string, Epi2_KIOPS *, Epi3_KIOPS *,
 				EpiRK4SC_KIOPS *, IntegratorStats *);
 
-void * 			SelectIntegrator(CVRhsFn, CVSpilsJacTimesVecFn, void *,
+//OneD stuff, outdated and being replaced.
+
+void *  		SelectIntegrator(CVRhsFn, CVSpilsJacTimesVecFn, CVLsJacFn, void *, void *,
 				int, N_Vector, const int, int, string, SUNMatrix, SUNLinearSolver,
-				realtype, realtype, realtype);
+				SUNNonlinearSolver, realtype, realtype, realtype);
+
+IntegratorStats * 	IntegrateWrapper(int, realtype, realtype, realtype, int, N_Vector, realtype, int [],
+						void * , void *, void *, string, IntegratorStats *, CVLsJacFn);
