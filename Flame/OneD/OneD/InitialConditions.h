@@ -14,3 +14,8 @@ void	IntConHydro(realtype *, int);
 void	IntConGri30(realtype *, int);
 void 	SetSuperInitCons(realtype *, realtype *, int, int);
 
+//Testing
+void	TestingInitCons(int, int, int, int, realtype, realtype *, realtype *);
+void	SinWave(realtype *, int, int, realtype);
+void	SinWave2(realtype*, int, int, realtype);
+void	Constant(realtype, int);

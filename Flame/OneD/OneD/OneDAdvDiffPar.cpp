@@ -8,6 +8,7 @@
 #include <math.h>
 #include <mpi.h>
 #include "Epic.h"
+#include "EpiP2_KIOPS.h"
 #include <cvode/cvode.h>
 #include <sunmatrix/sunmatrix_dense.h> /* access to dense SUNMatrix  */
 #include <sunlinsol/sunlinsol_dense.h> /* access to dense SUNLinearSolver  */
@@ -82,37 +83,51 @@ int main(int argc, char *argv[])
 
     // Declaration of start and finish time
     	static const realtype InitTime = 0.0;
-    	static const realtype FinalTime = .1;//.01
+    	static const realtype FinalTime = .01;//.01
     	static const int NumBands = 3;
 
     	EPICState *problemState = new EPICState;
+	EPICState *problemState2= new EPICState;
     	IntegratorStats * integratorStats = NULL;
     	Initialize(comm, problemState, 1, 100);//grids and num interior pts, makes delx easy!!
+	Initialize(comm, problemState2, 1, 100);
 	realtype * UDATA= NV_DATA_P(problemState->u);
+	realtype * UDATA2= NV_DATA_P(problemState2->u);
 	//Print2File(UDATA, problemState, "AdvDiffIC.txt");
 
     // Create the integrator. In this case we use EpiRK5C, for other integrators just use their name.
     	const int MaxKryIts = 500;
-    	Epi2_KIOPS * integrator = new Epi2_KIOPS(RHS2,	JtV2,
+    	Epi2_KIOPS * integrator = new Epi2_KIOPS(RHS,	Jtv,
 					problemState->userData, MaxKryIts,
 					problemState->u,	NEQ);
+	EpiP2_KIOPS * integrator2 = new EpiP2_KIOPS(RHS, Jtv,
+					problemState->userData, MaxKryIts,
+					problemState2->u,	NEQ);
     // Set run parameters.
-    	const realtype StepSize = RCONST(1e-5);
+    	const realtype StepSize = RCONST(1e-5);//Originall 1e-5
     	const realtype KrylovTol = RCONST(1.0e-8);//wtf was it set 1e-17?
     	int startingBasisSizes[] = {10, 10};
     // Run the integrator
 	/**/
     	integratorStats = integrator->Integrate(StepSize,	InitTime,	FinalTime,	NumBands,
 						problemState->u,	KrylovTol,	startingBasisSizes);
+			  integrator2->Integrate(StepSize*50,       InitTime,       FinalTime,      NumBands,
+                                                problemState2->u,        KrylovTol,      startingBasisSizes);
 	/**/
     // Print the statistics
-	//PrintStats(myProcessor, integratorStats);
+	PrintStats(myProcessor, integratorStats);
     // Clean up the integrator
    	delete integrator;
     //Print to file
-	PrintMPIReportIn(numProcessors, myProcessor);
-	Print2File(UDATA, problemState, "AdvDiffDataDebug.txt");
-	Print2Console(UDATA, problemState, "\n\tPost Integration f(x)");
+	//PrintMPIReportIn(numProcessors, myProcessor);
+	//Print2File(UDATA, problemState, "AdvDiffDataDebug.txt");
+	Print2Console(UDATA, problemState, "\n\tPost Integration f(x) V1");
+	//Print2Console(UDATA2, problemState2,  "\n\tPost Integration f(x) V2");
+	//std :: cout << "L2 error norm" << std :: endl;
+	N_VLinearSum(1.0, problemState->u, -1.0, problemState2->u, problemState->userData->scratch1);
+	std :: cout << std :: endl;
+	std ::cout << "L2 error norm: " << sqrt(N_VDotProd(problemState->userData->scratch1,
+							problemState->userData->scratch1)) << std :: endl;
     // Cleanup
     	Cleanup(problemState);
     	MPI_Finalize();
@@ -194,14 +209,14 @@ void InitialConditions(N_Vector u, int myStartLocation, EPICState * bin)
         for (int i = 0; i < myLength; i++)
         {
 		myIndex = (myStartLocation + i ) % (bin->userData->numPts + 2 );
-		cout << myIndex << "\t\t";
+		//cout << myIndex << "\t\t";
 		x = ( myIndex -1 ) * h + h/2;
 		//cout << x << endl;
-                realtype temp1 = cos(2 * M_PI * x);
+                realtype temp1 = cos(2 * M_PI * x)+1;
                 //realtype temp2 = pow(1-x, 3.0/2.0);
                 data[i] = temp1;
         }
-	Print2Console(data, bin, "Pre-Integration f(x)");
+	//Print2Console(data, bin, "Pre-Integration f(x)");
 
 }
 
@@ -284,7 +299,7 @@ void SortSerialVector(N_Vector source, N_Vector target)
  * 
  * ===========================================================================================
  */
-/*
+/**/
 void Lu(N_Vector u, N_Vector result, UserData *userData, realtype leftNeighbor, realtype rightNeighbor)
 {
         int myProcessor = userData->myProcessor;
@@ -325,7 +340,7 @@ void Lu(N_Vector u, N_Vector result, UserData *userData, realtype leftNeighbor, 
                 resultData[localLength - 1] = c * (uData[localLength - 2] - 2*uData[localLength - 1] + rightNeighbor);
         }
 }
-*/
+/**/
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -352,7 +367,7 @@ void Lu(N_Vector u, N_Vector result, UserData *userData, realtype leftNeighbor, 
  * 
  * ===========================================================================================
  */
-/*
+/**/
 void Mu(realtype c, N_Vector u, N_Vector result, UserData *userData, realtype leftNeighbor, realtype rightNeighbor)
 {
         int myProcessor = userData->myProcessor;
@@ -390,7 +405,7 @@ void Mu(realtype c, N_Vector u, N_Vector result, UserData *userData, realtype le
         }
 }
 
-*/
+/**/
 //------------------------------------------
 //
 //Discretizes :  -  v u'
@@ -514,7 +529,7 @@ void Diff(N_Vector u, N_Vector result, UserData *userData, realtype leftNeighbor
  *
  * ===========================================================================================
  */
-/*
+/**/
 int RHS(realtype t, N_Vector u, N_Vector udot, void *userData)
 {
         UserData *data = static_cast<UserData *>(userData);
@@ -566,7 +581,7 @@ int RHS(realtype t, N_Vector u, N_Vector udot, void *userData)
 
         return 0;
 }
-*/
+/**/
 //============================================
 //My Version of the Righthand side
 //Remember the boundaries are cooked into this version
@@ -653,7 +668,7 @@ int RHS2(realtype t, N_Vector u, N_Vector udot, void *userData)
  * 
  * ===========================================================================================
  */
-/*
+/**/
 int Jtv(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void *userData, N_Vector tmp)
 {
         UserData *data = static_cast<UserData *>(userData);
@@ -712,7 +727,7 @@ int Jtv(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void *user
 
         return 0;
 }
-*/
+/**/
 int JtV2(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void *userData, N_Vector tmp)
 {
         UserData *data = static_cast<UserData *>(userData);

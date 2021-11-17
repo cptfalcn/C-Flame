@@ -175,6 +175,12 @@ void IntConGri30(realtype * data, int SampleNum)
 		data[53] =          	0.0;
 		cout << BAR << "Gri Sample 1: Post Ign" << BAR << endl;
 		break;
+	case 4: //Aditya's case, runs at three ATM
+		data[0] 	=  800;//Temp
+                data[14]	=  0.0392661; //CH4
+                data[4] 	=  0.2237715;//O2
+                data[48]	=  0.736962400000000; //N2
+		break;
         }
 }
 
@@ -205,3 +211,58 @@ void SetSuperInitCons(realtype * data, realtype * StateData, int numEqs, int num
 	}
 }
 
+
+void SinWave(realtype * data, int numPts, int myLength, realtype h)
+{//Bugged, solve later
+	realtype x = 0;
+        int myIndex;
+	realtype temp1 = 0;
+        for (int i = 0; i < myLength; i++)
+        {
+                myIndex = i % numPts;
+                //cout << myIndex << "\t\t";
+                x =  myIndex*h + h/2;
+                //cout << x << endl;
+                temp1 = cos(2 * M_PI * x)+1;
+		//cout << temp1 << endl;
+                //realtype temp2 = pow(1-x, 3.0/2.0);
+                data[i] = temp1;
+        }
+}
+
+void SinWave2(realtype * data, int numPts, int myLength, realtype h)
+{
+        realtype x = 0;
+        int myIndex;
+        realtype temp1 = 0;
+        for (int i = 0; i < myLength; i++)
+        {
+                myIndex = i % numPts;
+                //cout << myIndex << "\t\t";
+                x =  myIndex*h + h/2;
+                //cout << x << endl;
+                temp1 = sin(2 * M_PI * x)+1;
+                //cout << temp1 << endl;
+                //realtype temp2 = pow(1-x, 3.0/2.0);
+                data[i] = temp1;
+        }
+}
+
+void Constant(realtype * data, int vecLength)
+{
+	for(int i = 0; i < vecLength ; i ++)
+		data[i] = 1;
+}
+
+void TestingInitCons(int SampleNum, int numPts, int numEqs, int vecLength, realtype Delx,
+			realtype * data, realtype * StateData)
+{
+	if(SampleNum == 10)
+	{
+		SinWave(StateData, numPts, vecLength, Delx);
+		for(int i = 0 ; i < numEqs; i++)
+			data[i] = StateData[0];
+	}
+	if(SampleNum == 11)
+		Constant(data, vecLength);
+}

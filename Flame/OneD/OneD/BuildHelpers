@@ -2,6 +2,8 @@
 echo ========================================Building helpers=============================================
 /usr/bin/c++ -I ~/Code/C++/epic-cpp/Integrators/AdaptiveKrylov/ -I ~/Code/C++/epic-cpp/Integrators/EpiRK -c ~/Code/C++/epic-cpp/Integrators/EpiRK/Epi3_KIOPS.cpp -o trash.o
 
+/usr/bin/c++ -I ~/Code/C++/epic-cpp/Integrators/AdaptiveKrylov/ -I ~/Code/C++/epic-cpp/Integrators/EpiRK -c ~/Code/C++/epic-cpp/Integrators/EpiRK/EpiP2_KIOPS.cpp -o EpiP2.o
+
 /usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/Derivatives.cpp -o Derivatives.o
 
 /usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame/OneD/InitialConditions.cpp -o InitConditions.o

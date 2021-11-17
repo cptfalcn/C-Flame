@@ -129,16 +129,18 @@ void * CreateCVODE(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, CVLsJacFn JAC,  void *
         retVal = CVodeSetInitStep(cvode_mem, StepSize);
         //Set max stepsize
         retVal = CVodeSetMaxStep(cvode_mem, StepSize);
+	//Set min stepsize
   	retVal = CVodeSetMinStep(cvode_mem, StepSize/1e4);
         //Set tolerances
         retVal = CVodeSVtolerances(cvode_mem, relTol, AbsTol);
         //Set linear solver
-        retVal = CVodeSetLinearSolver(cvode_mem, LS, A);
+        retVal = CVodeSetLinearSolver(cvode_mem, LS, A);//A might be null, try that
         retVal = CVodeSetNonlinearSolver(cvode_mem, NLS);
-        retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
+        //retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
         if (UseJac==1)
         {
-                retVal = CVodeSetJacFn(cvode_mem, JAC);//Updated Version
+		retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
+                retVal = CVodeSetJacFn(cvode_mem, JAC);//Updated Version, check this try removing it.
                 retVal = CVodeSetMaxNumSteps(cvode_mem, max(500,num_eqs*num_eqs*num_eqs));
         }
         N_VDestroy_Serial(AbsTol);
@@ -182,7 +184,7 @@ void * CreateCVODEKrylov(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, SU
         if (UseJac==1)
         {
 		retVal = CVodeSetJacFn(cvode_mem, SUPER_CHEM_JAC_TCHEM);//Updated Version
-		//retVal = CVodeSetJacFn(cvode_mem, CHEM_COMP_JAC_CVODE);//Uses the new problem class
+		//retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
                 retVal = CVodeSetMaxNumSteps(cvode_mem, max(500,num_eqs*num_eqs*num_eqs));
         }
         N_VDestroy_Serial(AbsTol);

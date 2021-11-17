@@ -126,19 +126,19 @@ int main(int argc, char* argv[])
 	//======================================================
 	ofstream myfile(MyFile, std::ios_base::app);
 	int Steps=CheckStep(FinalTime, StepSize);//Checks the number of steps
-	//realtype StopTime = FinalTime;
 	//=====================================================
 	//Kokkos block: working, pruning old code
 	//=====================================================
 	Kokkos::initialize(argc, argv);
 	//ALL Kokkos varialbes are reference counted objects.  They are deallocated within this local scope.
-	{//begin local scope
-		//=====================================
-		//Kokkos Sub-declarations
-		//=====================================
-		// Kokkos environments - host device type and multi dimensional arrays
-		// note: The 2d view uses row major layout.  Most matrix format uses column major layout.
-		// to make the 2d view compatible with other codes, we need to transpose it.
+	//{//begin local scope
+	//=====================================
+	//Kokkos Sub-declarations
+	//=====================================
+	// Kokkos environments - host device type and multi dimensional arrays
+	// note: The 2d view uses row major layout.  Most matrix format uses column major layout.
+	// to make the 2d view compatible with other codes, we need to transpose it.
+	{
 		using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 		using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
 		//using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
@@ -164,33 +164,34 @@ int main(int argc, char* argv[])
 		if(Delx==0)
 			NumScalarPoints = 1 ;
 		else
-			NumScalarPoints= round(1/Delx) + 2 ;//+3 for Velocity
+			NumScalarPoints= round(1/Delx);//Only interior pts. usually +2 +3 for Velocity
 
 		int vecLength = number_of_equations * NumScalarPoints;
 		int jacLength = vecLength*vecLength;
 		int Block = number_of_equations * number_of_equations;
-
 		//==================================================
 		//Prep/Set initial conditions, inherited from Zero-D
 		//==================================================
-		N_Vector State = N_VNew_Serial(vecLength);
-		N_Vector StateDot= N_VNew_Serial(vecLength);
-		N_Vector y = N_VNew_Serial(number_of_equations);//The data vector y
-		N_Vector yDot = N_VNew_Serial(number_of_equations);
-		N_VScale(0.0 , y, y);//Zero out the vector.
+		N_Vector State 		= N_VNew_Serial(vecLength);
+		N_Vector StateDot	= N_VNew_Serial(vecLength);
+		N_Vector y 		= N_VNew_Serial(number_of_equations);	//intial conditions
+		N_VScale(0.0 , y, y);						//Zero out the vector.
 		N_VScale(0.0, State, State);
-		realtype *data = NV_DATA_S(y);//Set the State data pointer
-		realtype *StateData = NV_DATA_S(State);
+		N_VScale(0.0, StateDot, StateDot);
+		realtype *data 		= NV_DATA_S(y);				//Set the State data pointer
+		realtype *StateData 	= NV_DATA_S(State);
+		//realtype *yDotData	= NV_DATA_S(yDot);
 
 		//Set Initial conditions based on experiment# & output to terminal
 		SetIntCons(Experiment, SampleNum, data);
 
 		//Set state based off intial conditions
 		SetSuperInitCons(data, StateData, number_of_equations, NumScalarPoints);
-
-		//=========================================================================
+		TestingInitCons(SampleNum, NumScalarPoints, number_of_equations, vecLength, Delx,
+					data, StateData);
+		//===================================================
 		//Set TChem
-		//=========================================================================
+		//===================================================
     		//TChem does not allocate any workspace internally.  Workspace should be explicitly given
 		//from users.  You can create the work space using NVector,  std::vector or
 		//real_type_1d_view_type (Kokkos view). Here we use kokkos view. Set up an ignition
@@ -200,13 +201,8 @@ int main(int argc, char* argv[])
 		real_type_1d_view_type work("workspace", problem_workspace_size);
 
 	    	//set problem
-		myPb problem;//Defined in Chemistry.h  Including leads to Kapila segfault
-		myPb2 problem2(number_of_equations, work, kmcd, NumScalarPoints);//Construct new Problem.
-		//problem2.PrintGuts();//Try a print
-		void *pbptr= &problem;
-		void *UserData = &problem2;
-
-		/**/
+		//myPb problem;//Defined in Chemistry.h  Including leads to Kapila segfault
+		/*
       		// initialize problem
 		const real_type pressure(101325);//Constant pressure
 		real_type_1d_view_type fac("fac", number_of_equations);//originally 2*
@@ -216,18 +212,23 @@ int main(int argc, char* argv[])
      		problem._kmcd = kmcd;  	// kinetic model
 		problem.num_equations=number_of_equations;
 		problem.Jac=N_VNew_Serial(number_of_equations*number_of_equations);//Make the Jacobian
-		/**/
+		*/
+		myPb2 problem2(number_of_equations, work, kmcd, NumScalarPoints, y, Delx);//Construct new Problem.
+		problem2.SetGhost(y);
+		problem2.ScaleP(Experiment, SampleNum);
+		problem2.SetVels(NumScalarPoints+1, 0);
+		void *UserData = &problem2;
 		int MaxKrylovIters = max(Block, 500);//500 is the base
+
 		//==============================================
 		//Create integrators
-		//==============================================
+		//------------------
 		//CVODE
 		//==============
                 void * cvode_mem;
 		SUNMatrix A			= SUNDenseMatrix(vecLength, vecLength);
 		SUNLinearSolver SUPERLS 	= SUNLinSol_SPGMR(State, PREC_NONE, 0);
 		SUNNonlinearSolver SUPERNLS 	= SUNNonlinSol_Newton(State);
-
 		//================================
 		//Set other integrators
 		//================================
@@ -235,26 +236,22 @@ int main(int argc, char* argv[])
 		Epi3_KIOPS 	*Epi3			= NULL;
 		EpiRK4SC_KIOPS	*EpiRK4			= NULL;
 		IntegratorStats *integratorStats 	= NULL;
-		//==============================================================
 		//Parse the experiment cases and make the integrators
-		//==============================================================
 		if(Experiment!=0)//If using TChem problems
-		{
-			Epi2 	= 	new Epi2_KIOPS(SUPER_CHEM_RHS_TCHEM, SUPER_CHEM_JTV, UserData,
+		{//Epi2    =       new Epi2_KIOPS(SUPER_CHEM_RHS_TCHEM, SUPER_CHEM_JTV, UserData, MaxKrylovIters, State, number_of_equations * NumScalarPoints);//old version
+			Epi2 	= 	new Epi2_KIOPS(SUPER_RHS, SUPER_JTV, UserData,
 					MaxKrylovIters, State, number_of_equations * NumScalarPoints);
 
-			Epi3 	=	new Epi3_KIOPS(SUPER_CHEM_RHS_TCHEM, SUPER_CHEM_JTV, UserData,
+			Epi3 	=	new Epi3_KIOPS(SUPER_RHS, SUPER_JTV, UserData,
 					MaxKrylovIters, State, number_of_equations * NumScalarPoints);
 
-			EpiRK4  =       new EpiRK4SC_KIOPS(SUPER_CHEM_RHS_TCHEM, SUPER_CHEM_JTV, UserData,
+			EpiRK4  =       new EpiRK4SC_KIOPS(SUPER_RHS, SUPER_JTV, UserData,
                                         MaxKrylovIters, State, vecLength);
 
 			cvode_mem=	CreateCVODE(SUPER_CHEM_RHS_TCHEM, SUPER_CHEM_JTV,
 					SUPER_CHEM_JAC_TCHEM, UserData, A, SUPERLS, SUPERNLS,
-					number_of_equations, State, relTol, absTol, StepSize, 1);
-			//Cvode and  EpiRK4 are bugged if I use the  jtv super versions
-			//Ported the zero-D version to one-D and that "fixed" the problem
-			//CompareJacobians(pbptr, UserData, y, State, yDot, StateDot, problem2.Mat);
+					vecLength, State, relTol, absTol, StepSize, 1);
+			//Cvode is bugged if I use the  jtv super versions
 		}else if(Experiment==0)
 		{//bug fixed, forgot to clean the data
 			Epi2 	=	new Epi2_KIOPS(RHS_KAPPA, Jtv_KAPPA, UserData, MaxKrylovIters,
@@ -264,18 +261,8 @@ int main(int argc, char* argv[])
 							State, vecLength);
                 }
 		PrintMethod(Method, BAR);
-		//=================================
-		//Debug Block
-		//=================================
-		if(Method == "CVODEOS")
-		{
-			cout << BAR << "Testing" << BAR << endl;
-			CompareJacobians(pbptr, UserData, y, State, yDot, StateDot, problem2.Mat);
-			SUPER_CHEM_JAC_TCHEM(TNow, State, StateDot, A, UserData, StateDot, StateDot, StateDot);
-                        integratorStats =Epi2->Integrate(StepSize, 0, 1e-6, NumBands,
-                                         State, KrylovTol, startingBasisSizes);
-			CompareJacobians(pbptr, UserData, y, State, yDot, StateDot, problem2.Mat);
-		}
+		if(problem2.NumGridPts>1)
+			problem2.RunTests(State);
         	//=================================
         	// Run the time integrator loop
         	//=================================
@@ -317,7 +304,7 @@ int main(int argc, char* argv[])
 					integratorStats =EpiRK4->Integrate(StepSize, TNow, TNext, NumBands,
 						State, KrylovTol, startingBasisSizes);
 				if(Method == "CVODEKry")
-					CVode(cvode_mem, TNow, State, &TNext, CV_ONE_STEP);//CV_NORMAL/CV_ONE_STEP
+					CVode(cvode_mem, TNow, State, &TNext, CV_NORMAL);//CV_NORMAL/CV_ONE_STEP
 
 				auto Stop=std::chrono::high_resolution_clock::now();
                         	auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
@@ -325,12 +312,14 @@ int main(int argc, char* argv[])
 				//=======================================
 				//Error checking
 				//=======================================
-				if(Experiment!=0) //Error checking invalid for Experiment 0.
+				if(Experiment!=0 && SampleNum!=10) //Error checking invalid for Experiment 0.
 					ErrorCheck(myfile, State, StateData, number_of_equations,
 							NumScalarPoints, TNext);//Needs editing
 				//clean
 				Clean(vecLength, StateData);
-
+				//Update Velocity
+				//if(Experiment != 0)
+				//	problem2.UpdateOneDVel(State);
 				//=======================
 				//Track the progress
 				//=======================
@@ -357,25 +346,25 @@ int main(int argc, char* argv[])
 		PrintExpParam(FinalTime, TNow, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
 		PrintProfiling(integratorStats, Profiling, BAR);
 		PrintDataToFile(myfile, StateData, vecLength, absTol, BAR, MyFile, KTime);//change  4th
+		if(Experiment!=0 && problem2.NumGridPts > 1)
+			PrintDataToFile(myfile, N_VGetArrayPointer(problem2.Vel), problem2.NumGridPts+1,
+					0, BAR, MyFile, 0);
         	myfile.close();
 		//==========================
 		//Time to take out the trash
 		//==========================
-		//cout << BAR << "Deleting objects" << BAR << endl;
 		delete Epi2;
 		delete Epi3;
 		delete EpiRK4;
-		//cout << BAR << "Deleted Integrators" << endl;
 		N_VDestroy_Serial(y);
+		//N_VDestroy_Serial(yDot);
 		N_VDestroy_Serial(State);
 		N_VDestroy_Serial(StateDot);
 
 		SUNMatDestroy(A);
 		SUNLinSolFree(SUPERLS);
 		SUNNonlinSolFree(SUPERNLS);
-		//cout << BAR << "Deleted Solvers" << endl;
                 CVodeFree(&cvode_mem);
-		//cout << BAR << "Deleted CVODE memory" << endl;
   	}//end local kokkos scope.
 
  	/// Kokkos finalize checks any memory leak that are not properly deallocated.
@@ -459,6 +448,7 @@ void PrintBanner()
 	cout << "\t================================================\n";
 
 }
+
 static int check_flag(void *flagvalue, const string funcname, int opt)
 {
  	 // Check if the function returned a NULL pointer
