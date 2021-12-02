@@ -58,12 +58,29 @@ void PrintDataToFile(ofstream & myfile, realtype * data, int number_of_equations
 void PrintExpParam(realtype FinalTime, realtype TNow, realtype StepSize, realtype StepCount,
 			realtype KrylovTol, realtype AbsTol, realtype RelTol, realtype KTime, string BAR)
 {
-	cout << BAR << "\tSim Parameters\t\t" << BAR << endl;
-	cout << "Exact Final Time: " << FinalTime << "\t\tSimulation Final Time: " <<TNow<<endl;
-	cout << "Step Size: " << StepSize << "\t\tNumber of Steps: "<<StepCount;
-	cout << "\t\tKrylov Tolerance: " <<KrylovTol<<  endl;
-	cout << "Absolute tolerance: " << AbsTol << "\tRelative tolerance: " << RelTol;
-	cout << "\tIntegration time: " << KTime <<endl;
+	//cout << BAR << "\tSim Parameters\t\t" << BAR << endl;
+	//cout << "Exact Final Time: " << FinalTime << endl;
+	cout << "Simulation Final Time: " << TNow;
+	//cout << "Step Size: " << StepSize << "\t\tNumber of Steps: "<<StepCount;
+	//cout << "\t\tKrylov Tolerance: " <<KrylovTol<<  endl;
+	//cout << "Absolute tolerance: " << AbsTol << "\tRelative tolerance: " << RelTol;
+	cout << "\t\tIntegration time: " << KTime <<endl;
+}
+
+void PrintPreRun(realtype StepSize, realtype Delx, int Steps, realtype KryTol, realtype AbsTol,
+			realtype RelTol, string Method, int num_pts, string Bar)
+{
+        cout << "Delt: " << StepSize << "\t\tNumber of Steps: "<<Steps;
+	cout << "\t\tFinal Time: " << StepSize*Steps << endl << "Delx: " << Delx << "\t\t";
+	cout << "Grid Points: " << num_pts;
+	if(Delx!=0)
+		cout << "\t\t\tX = [0, " << num_pts*Delx << "]";
+	cout << endl;
+	if(Method == "CVODEKry")
+		cout << "Absolute tolerance: " << AbsTol << "\tRelative tolerance: " << RelTol<<endl;
+	else
+        	cout << "Krylov Tolerance: " <<KryTol << endl;
+	PrintMethod(Method, Bar);
 }
 
 //================================
@@ -71,7 +88,7 @@ void PrintExpParam(realtype FinalTime, realtype TNow, realtype StepSize, realtyp
 //================================
 void PrintSuperVector(realtype * data, int Experiment, int num_pts, string BAR)
 {
-	cout << BAR << "Printing SuperVector" << BAR << endl;
+	//cout << BAR << "Printing SuperVector" << BAR << endl;
 	for(int i = 0; i < num_pts; i++)
 	{
 		if(Experiment==0)
@@ -93,9 +110,9 @@ void PrintSuperVector(realtype * data, int Experiment, int num_pts, string BAR)
 	}
 }
 
-void PrintProfiling(IntegratorStats* integratorStats, int Profiling, string Bar)
+void PrintProfiling(IntegratorStats* integratorStats, int Profiling, string Method, string Bar)
 {
-	if (Profiling ==1)
+	if (Profiling ==1 && Method!="CVODEKry")
 	{
 		cout << Bar << "\tPerformance data\t" << Bar << endl;
          	integratorStats->PrintStats();

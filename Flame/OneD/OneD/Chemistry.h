@@ -37,8 +37,8 @@ class myPb : public TCHEMPB{
 class myPb2{
 	public:
 	TCHEMPB pb;
-	ordinal_type  num_equations;
-	int 		TubeLength;
+	ordinal_type	num_equations;
+	realtype	TubeLength;
 	int 		NumGridPts;
 	int 		vecLength;
 	realtype 	delx;
@@ -58,11 +58,21 @@ class myPb2{
 	void VelIntegrate(realtype *, N_Vector, realtype, realtype);
 	void RunTests(N_Vector State);
 	void SetLeftDiff(N_Vector State);
-	N_Vector 	Vel;
-	N_Vector 	SmallScrap;
-	N_Vector 	VelAve;
+	void GhostChem(realtype t, N_Vector y, N_Vector ydot, void * pb);
+	void SetGhostPVel(N_Vector y, int Experiment, int SampleNum, realtype VelVal);
+	void SetAdvDiffReacPow(realtype, realtype, realtype, realtype, bool);
+	N_Vector	Vel;
+	N_Vector	VelScrap;
+	N_Vector	SmallScrap;
+	N_Vector	VelAve;
 	realtype	PMultiplier;
 	realtype	LeftDiff;
+	N_Vector	SmallChem;
+	realtype	Adv;
+	realtype	Diff;
+	realtype	React;
+	realtype	Power;
+	bool		VelUp;
 };
 
 //End class stuff
@@ -84,6 +94,7 @@ void MatrixVectorProduct(int, realtype *, N_Vector, N_Vector, realtype *);
 	int SUPER_RHS_DIFF_NL		(realtype, N_Vector, N_Vector, void *);
 	int SUPER_RHS_ADV		(realtype, N_Vector, N_Vector, void *);
 	int SUPER_RHS_ADV_VEL		(realtype, N_Vector, N_Vector, void *);
+	int SUPER_RHS_HEATING		(realtype, N_Vector, N_Vector, void *);
 
 	//Jacobian function
 	int SUPER_CHEM_JAC_TCHEM	(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector,
@@ -96,11 +107,12 @@ void MatrixVectorProduct(int, realtype *, N_Vector, N_Vector, realtype *);
 	int SUPER_ADV_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 	int SUPER_ADV_VEL_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 	int SUPER_DIFF_NL_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+
 //One-D helpers
 int CleverMatVec(int, int, int, realtype*, realtype *, realtype *);
 int SUPER_2_VEC(int, realtype *, realtype *, int, int);
 int VEC_2_SUPER(int, realtype *, realtype *, int , int);
-//int Jac_2_SuperJac(int, realtype*, realtype*, int, int);//Bugged
+
 int SuperJac_2_Jac(int, realtype *, realtype*, int, int);
 int Clean(int, realtype *);
 int RescaleTemp(realtype, realtype *, int);

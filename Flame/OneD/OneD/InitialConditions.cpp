@@ -180,6 +180,7 @@ void IntConGri30(realtype * data, int SampleNum)
                 data[14]	=  0.0392661; //CH4
                 data[4] 	=  0.2237715;//O2
                 data[48]	=  0.736962400000000; //N2
+		cout << BAR << "Gri Sample: Hi Pressure" << BAR << endl;
 		break;
         }
 }

@@ -56,7 +56,7 @@ Sam=1
 Experiment=1
 #Run tests to verify it is working
 OutputFile="Scratch.txt" 
-Delx=1e-1
+Delx=1e-1  #1e-1 originally
 
 #valgrind --leak-check=yes ./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-3 --FinalTime=10 --MyFile="Debug.txt" --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI3" --Profiling=0 --Experiment=0
 

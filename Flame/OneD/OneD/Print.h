@@ -12,6 +12,8 @@ void PrintFromPtr(realtype *, int);
 void PrintDataToFile(ofstream &, realtype *, int, realtype, string, string, realtype);
 void PrintExpParam(realtype, realtype, realtype, realtype, realtype, realtype, realtype, realtype, string);
 void PrintSuperVector(realtype *, int ,int, string);
-void PrintProfiling(IntegratorStats *, int, string);
+void PrintProfiling(IntegratorStats *, int, string, string);
 void PrintMethod(string, string);
+void PrintPreRun(realtype StepSize, realtype Delx, int Steps, realtype KryTol, realtype AbsTol,
+			realtype RelTol, string Method, int num_pts, string Bar);
 
