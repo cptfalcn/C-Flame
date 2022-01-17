@@ -42,7 +42,7 @@ void PrintFromPtr(realtype * ptr, int num_eqs)
 void PrintDataToFile(ofstream & myfile, realtype * data, int number_of_equations, realtype t, string BAR,
 			string MyFile, realtype KTime)
 {
-	cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
+	//cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
         for (int i=0; i<number_of_equations; i++)
         {
                 myfile<<setprecision(20)<<fixed <<data[i] <<"\t\t";
@@ -110,12 +110,43 @@ void PrintSuperVector(realtype * data, int Experiment, int num_pts, string BAR)
 	}
 }
 
-void PrintProfiling(IntegratorStats* integratorStats, int Profiling, string Method, string Bar)
+void PrintProfiling(IntegratorStats* integratorStats, int Profiling, string Method, string Bar, void* cvode_mem)
 {
 	if (Profiling ==1 && Method!="CVODEKry")
 	{
 		cout << Bar << "\tPerformance data\t" << Bar << endl;
          	integratorStats->PrintStats();
+	}else if(Profiling==1 && Method=="CVODEKry")
+	{
+		long int steps 		= 0;
+		long int fEval 		= 0;
+		long int linSetups 	= 0;
+		long int errTestFails	= 0;
+		int lastOrd		= 0;
+		int nextOrd		= 0;
+		realtype realHInit	= 0;
+		realtype hLast		= 0;
+		realtype hCurr		= 0;
+		realtype tCurr		= 0;
+		long int nonLinIters	= 0;
+		long int Projections	= 0;
+		CVodeGetNumSteps(cvode_mem, &steps);
+		CVodeGetIntegratorStats(cvode_mem, &steps, &fEval, &linSetups, &errTestFails, &lastOrd,
+					&nextOrd, &realHInit, &hLast, &hCurr, &tCurr);
+		CVodeGetNumNonlinSolvIters(cvode_mem, &nonLinIters);
+		///CVodeGetNumProjEvals(cvode_mem, &Projections);
+		cout << Bar << "\tPerformance data \t" << Bar << endl;
+		//cout << "Sorry, no data available right now" << endl;
+		cout << "CVODE steps:" << steps << "\t\t\n";
+		cout << "Number of linear up steps: " << linSetups << "\n";
+		cout << "Last order: " << lastOrd << endl;
+		cout << "Next order: " << nextOrd << endl;
+		cout << "Real initial h: " << realHInit << endl;
+		cout << "Last h: " << hLast << endl;
+		cout << "Current h: " << hCurr << endl;
+		cout << "Current t: " << tCurr << endl;
+		cout << "NonLineraIters: "<< nonLinIters << endl;
+		//cout << "Projections: " << Projections << endl;
 	}
 }
 

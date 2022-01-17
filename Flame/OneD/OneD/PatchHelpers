@@ -63,7 +63,7 @@ Delx=1e-1  #1e-1 originally
 #<<Tests
 ./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile="Debug.txt" --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=1 --Delx=$Delx
 
-./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-3 --FinalTime=10 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=0 --Delx=0
+#./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-3 --FinalTime=10 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=0 --Delx=0
 
 ./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=1 --Delx=0
 

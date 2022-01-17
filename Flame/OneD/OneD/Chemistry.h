@@ -61,6 +61,7 @@ class myPb2{
 	void GhostChem(realtype t, N_Vector y, N_Vector ydot, void * pb);
 	void SetGhostPVel(N_Vector y, int Experiment, int SampleNum, realtype VelVal);
 	void SetAdvDiffReacPow(realtype, realtype, realtype, realtype, bool);
+	void TempGradient(N_Vector State, N_Vector Gradient);
 	N_Vector	Vel;
 	N_Vector	VelScrap;
 	N_Vector	SmallScrap;
@@ -73,6 +74,9 @@ class myPb2{
 	realtype	React;
 	realtype	Power;
 	bool		VelUp;
+	int		FlameFrontLocation;
+	realtype	HeatingRightGhost;
+	int 		HeatingOn;
 };
 
 //End class stuff

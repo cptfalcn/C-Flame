@@ -78,7 +78,7 @@ absTol=1e-10
 
 #./OneDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-8 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=2
 #Tests
-#<<IgnTest
+<<IgnTest
 inputs=gri3.0/
 chemfile=$inputs"chem.inp"
 thermfile=$inputs"therm.dat"
@@ -90,7 +90,7 @@ OutputFile="GriScratch.txt"
 
 ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=1e-4 --MyFile=$OutputFile --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="CVODEKry" --Profiling=0 --Experiment=2 --relTol=$relTol --absTol=$absTol
 
-#IgnTest
+IgnTest
 echo -e "\n\n\n";
 echo =======================================Test Battery Complete==========================================
 #TestBattery

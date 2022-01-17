@@ -115,7 +115,7 @@ void * CreateCVODE(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, CVLsJacFn JAC,  void *
 {
         void * cvode_mem;
         int retVal = 0;
-        realtype tret=0;
+        //realtype tret=0;
         N_Vector AbsTol= N_VNew_Serial(num_eqs);
         for ( int i = 0 ; i < num_eqs ; i++)
                 NV_Ith_S(AbsTol,i)=absTol;
@@ -130,18 +130,19 @@ void * CreateCVODE(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, CVLsJacFn JAC,  void *
         //Set max stepsize
         retVal = CVodeSetMaxStep(cvode_mem, StepSize);
 	//Set min stepsize
-  	retVal = CVodeSetMinStep(cvode_mem, StepSize/1e4);
+  	//retVal = CVodeSetMinStep(cvode_mem, StepSize/1e-4);
         //Set tolerances
         retVal = CVodeSVtolerances(cvode_mem, relTol, AbsTol);
         //Set linear solver
         retVal = CVodeSetLinearSolver(cvode_mem, LS, A);//A might be null, try that
         retVal = CVodeSetNonlinearSolver(cvode_mem, NLS);
-        //retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
         if (UseJac==1)
         {
 		retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
-                retVal = CVodeSetJacFn(cvode_mem, JAC);//Updated Version, check this try removing it.
-                retVal = CVodeSetMaxNumSteps(cvode_mem, max(500,num_eqs*num_eqs*num_eqs));
+		retVal = CVodeSetLSetupFrequency(cvode_mem, 1); //Remove because also stupid.
+		retVal = CVodeSetJacEvalFrequency(cvode_mem, 1);//Remove becuase this is stupid.
+                retVal = CVodeSetJacFn(cvode_mem, JAC);		//Error if removed .
+                retVal = CVodeSetMaxNumSteps(cvode_mem, 500);
         }
         N_VDestroy_Serial(AbsTol);
         return cvode_mem;

@@ -36,6 +36,7 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 	this->SmallScrap= N_VNew_Serial(GridPts);
 	this->VelScrap	= N_VNew_Serial(GridPts+1);
 	this->SmallChem	= N_VNew_Serial(num_eqs);
+	this->HeatingOn = 1;
 }
 
 void myPb2::SetAdvDiffReacPow(realtype adv, realtype diff, realtype reac, realtype pow, bool up)
@@ -116,47 +117,109 @@ void myPb2::SetVelAve()
 	for(int i = 0 ; i < this->NumGridPts-1; i++)
 		VelAveData[i]   = (VelData[i] + VelData[i+1])/2;
 }
+//===========================
+//Get TempGradient
+//===========================
+//Note here we step up to the Velocity grid.
+void myPb2::TempGradient(N_Vector State, N_Vector Gradient)
+{
+	//Declare
+	realtype * SD		= N_VGetArrayPointer(State);
+	realtype * GD		= N_VGetArrayPointer(this->Ghost);
+	realtype * GradD	= N_VGetArrayPointer(Gradient);
+	int	MaxPos		= 0;
+	N_VScale(0.0, Gradient, Gradient);				//Zero out
+	//Loop
+	GradD[0]=(SD[0]-GD[0])/this->delx;				// Boundary
+	for( int i =1 ; i < this->NumGridPts-1; i ++)			// Treat boundary separately
+	{
+		GradD[i]= (SD[i]-SD[i-1])/this->delx;			// (T[i]-T[i-1])/Delx
+		if(GradD[i]>GradD[MaxPos])
+			MaxPos=i;
+	}
+	this->FlameFrontLocation=MaxPos;
+}
 
 //===================================================
 //Called by the main function in the integration loop
 //===================================================
+//Still debugging
+//===================================================
 void myPb2::UpdateOneDVel(N_Vector State)
 {//This might be bugged.  Need further investigation.
-
-	N_Vector VTemp 		= N_VClone(this->VelAve);
-	N_VScale(0.0, VTemp, VTemp);
+	//Declare and clean
+	N_Vector VTemp 		= N_VClone(this->VelAve);		//Scalar size
+	N_Vector TempGrad	= N_VClone(this->Vel);			//Velocity size.
+	N_VScale(0.0, VTemp, VTemp);					//Clean
+	N_VScale(0.0, Tmp, Tmp);					//Clean
 	realtype * SD		= N_VGetArrayPointer(State);
 	realtype * VTempData	= N_VGetArrayPointer(VTemp);
-	realtype * TmpData	= N_VGetArrayPointer(Tmp);
+	realtype * TmpD		= N_VGetArrayPointer(Tmp);
 	realtype * SCP		= N_VGetArrayPointer(this->SmallChem);
 	realtype * GD		= N_VGetArrayPointer(this->Ghost);
+	realtype * TG		= N_VGetArrayPointer(TempGrad);
 	realtype LeftTemp	= 0;
 	realtype RightTemp	= 0;
+	//realtype x		= 0;
+	int End 		= this->NumGridPts-1;			//The final vector entry
+
 	//See Dr. Bisetti's book, chapter 17 for full details.
+	//Begin Chem term
 	this->GhostChem(0, this->Ghost, this->SmallChem, this);		//Set left boundary Chem term
 	SUPER_CHEM_RHS_TCHEM(0, State, this->Tmp, this);		//Set post integration Chem term
 	//The grids are different sizes so we need to manually move the data.
+	//calculate Omega/(T rho c_p)
 	for(int i = 0 ; i < this->NumGridPts; i ++)			//Put the temp int VTemp
-		VTempData[i]	= TmpData[i]/SD[i];			//Divide by temperature
+		VTempData[i]	= TmpD[i]/SD[i];			//Divide by temperature
 
-	RightTemp = TmpData[this->NumGridPts-1];			//Set right boundary 0 N conditions
+	LeftTemp  = SCP[0]/GD[0];//May need to be zero			//Set left boundary data, fixed point
+	RightTemp = VTempData[End];					//Set right boundary 0 N conditions
+	N_VScale(0.0, this->Tmp, this->Tmp);				//Zero out the Tmp Vector
 
+	//Start Diff Term
+	/*
 	SUPER_RHS_DIFF(0, State, this->Tmp, this);			//Set regular State Diffuision
+	N_VScale(this->Diff, this->Tmp, this->Tmp);			//Scale by Diff term
+									//Different sized grids, loop
 	for(int i = 0 ; i < this->NumGridPts; i ++)			//Place Temp Diff into VTemp
 		VTempData[i]	+= TmpData[i];				//Only use regular diffusion.
-									//0 Diffusion boundary condition
-	LeftTemp =SCP[0]/SD[0]+(SD[0] - GD[0])/(this->delx*this->delx);	//Set Left Boundary condtion.
+	//Empty Right boundary						//0 Diffusion boundary condition
+	LeftTemp += this->Diff * (SD[0] - GD[0])/(pow(this->delx,2));	//Set Left Boundary condtion.
+	*/
+	//New Derivative and flame front position.
+	//Set grad(T)(x)
+	this->TempGradient(State, TempGrad);
+	N_VScale(this->Diff, TempGrad, TempGrad);
 
-	this->VelIntegrate(VTempData, State, LeftTemp, RightTemp);	//Integrate the velocity, 2nd order.
-									//This was tested independently.
-	N_VDestroy(VTemp);						//Clean up Temp N_Vectors.
+	//Start Heat source term
+	/**/
+	//This will turn on/off depending on Temperature max value or time.
+	SUPER_RHS_HEATING(0, State, this->Tmp, this);			//Calculate heating
+	N_VScale(this->Power, this->Tmp, this->Tmp);			//Scale appropriately
+	this->HeatingRightGhost= this->Power*this->HeatingRightGhost;	//Scale the ghost point
+	for( int i =0 ; i < this->NumGridPts; i ++)
+		VTempData[i] 	+= TmpD[i]/SD[i];
+
+	LeftTemp += 0;							//Should always be zero
+	RightTemp+= this->HeatingRightGhost/SD[End];			//Call the end boundary
+	/**/
+	this->VelIntegrate(VTempData, State, LeftTemp, RightTemp);
+	//V(x) = Integral( omega/(rho T c_p) ,[0,x] ) + V(0);		See VelIntegrate function
+	N_VLinearSum(1.0, this->Vel, 1.0, TempGrad, this->Vel);		//V+=Grad(T)(x)
+	N_VAddConst(this->Vel, -1.0*TG[0], this->Vel);			//V-=Grad(T)(0)
+	this->SetVelAve();						//Modify VelAve
+	//Destroy Temp Vectors
+	N_VDestroy(VTemp);
+	N_VDestroy(TempGrad);
+	//Exit
 }
 
 //=====================================================================
 //Verified on both Sine and Cosine waves to show second order in space.
 //=====================================================================
 //Velocity integrate function
-//Pass the off centered values as an N_Vector and it will calculate a second order integral from 0 to x.
+//Solves:	V(x) = integral( f(x), [0,x] ) + V(0);
+//Pass the off centered values as an N_Vector and it will calculate a second order integral.
 //==============================================
 void myPb2::VelIntegrate(realtype * fMid, N_Vector State, realtype LeftGhost, realtype RightGhost)
 {
@@ -190,6 +253,7 @@ void myPb2::VelIntegrate(realtype * fMid, N_Vector State, realtype LeftGhost, re
 //=============================================
 void myPb2::RunTests(N_Vector State)
 {
+	//Solve with V(0)=1, totally arbitrary.
 	N_VConst(1,this->Vel);
 	N_Vector fAve 	= N_VNew_Serial(this->NumGridPts+1);
 	realtype * FAD	= N_VGetArrayPointer(fAve);
@@ -446,10 +510,14 @@ int SUPER_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
 	realtype * SDD 		= NV_DATA_S(StateDot);
 	N_VScale(0.0, StateDot, StateDot);
 	N_VScale(0.0, pb->Tmp, pb->Tmp);
-	if(pb->React>0){
+	if(pb->React>0){//Chemistry RHS
 		SUPER_CHEM_RHS_TCHEM(t, State, StateDot, UserData);
 		N_VScale(pb->React, StateDot, StateDot);
 	}
+
+	SUPER_RHS_HEATING(t, State, pb->Tmp, UserData); 		//Heating, should be handled correctly
+	N_VLinearSum(pb->Power, pb->Tmp, 1.0, StateDot, StateDot);
+
 	if(pb->NumGridPts > 1)						//Skip if not enough points
 	{
 		SUPER_RHS_DIFF_NL(t, State, pb->Tmp, UserData);
@@ -458,9 +526,9 @@ int SUPER_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
 		//N_VMaxNorm(pb->Tmp);
 		N_VLinearSum(pb->Adv, pb->Tmp, 1.0, StateDot, StateDot);
 		N_VScale(0.0, pb->Tmp, pb->Tmp);
-		SUPER_RHS_HEATING(t, State, pb->Tmp, UserData);
-		N_VMaxNorm(pb->Tmp);
-		N_VLinearSum(pb->Power, pb->Tmp, 1.0, StateDot, StateDot);
+		//SUPER_RHS_HEATING(t, State, pb->Tmp, UserData);
+		//N_VMaxNorm(pb->Tmp);
+		//N_VLinearSum(pb->Power, pb->Tmp, 1.0, StateDot, StateDot);
 	}
 	N_VDotProd(StateDot,StateDot);
 	return 0;
@@ -811,7 +879,7 @@ int SUPER_RHS_DIFF(realtype t, N_Vector u, N_Vector uDot, void * userData)
 	realtype divisor 	= 1.0/(delx * delx);
 	int grid = 0;
 	int tempInd = 0;
-	realtype T = 1;
+	realtype T = 1.0;
 	realtype * Ghost = NV_DATA_S(problem->Ghost);
         int vecLength = problem->num_equations * problem->NumGridPts;
 	realtype c = 1.0 * divisor;
@@ -935,15 +1003,22 @@ int SUPER_RHS_HEATING(realtype t, N_Vector u, N_Vector uDot, void * userData)
         realtype * Ghost = NV_DATA_S(problem->Ghost);
         int vecLength = problem->NumGridPts;//Only march through temp
 	realtype x = 0;
-	if( N_VMaxNorm(u) <  2100)//2000 originally
+	realtype OffSet = 0;
+	realtype xEnd= vecLength*delx+delx/2;
+	if(t>1e-6 || N_VMaxNorm(u)>3500)//N_VMaxNorm(u)>2200 & problem->HeatingOn == 1)
+		problem->HeatingOn=0;
+	if(problem->HeatingOn==1 )//t<1e-5 && N_VMaxNorm(u) <  2200)//2000 originally
 	{
-		realtype OffSet = delx*(problem->NumGridPts - 0.5- 0.1*problem->NumGridPts);
-        	for (int i = 0; i < vecLength; i++)
+		//OffSet = xEnd/2;
+		OffSet = delx*(round(0.9*problem->NumGridPts) - 0.5);	//Set 1/10 to left
+		//OffSet = delx*(problem->NumGridPts - 0.5);
+        	for (int i = 0; i < numPts; i++) //Only Heat the Temp
 		{
 			x = i*delx + delx/2;
 			resultData[i] = 5e10 * exp( -1e8 * pow(x - OffSet, 2) );
 			//resultData[i] = 5e10 * exp( -1e8 * pow( delx * (i+1-problem->NumGridPts) , 2 ) );
 		}
+		problem->HeatingRightGhost=5e10 * exp( -1e8 * pow(x+delx/2 - OffSet, 2) );
 	}
 	return 0;
 }
