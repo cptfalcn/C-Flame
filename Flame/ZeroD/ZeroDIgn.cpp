@@ -196,6 +196,7 @@ int main(int argc, char* argv[])
 		N_Vector y = N_VNew_Serial(number_of_equations); //The data y
 		//Adding another N_Vector declaration here creates a bug.  Reason unknown.
 
+
 		//Set Initial conditions based on experiment# & output to terminal
 		switch(Experiment)
 		{
@@ -248,7 +249,7 @@ int main(int argc, char* argv[])
 		IntegratorStats *integratorStats = NULL;
 
 		//Parse the experiment cases
-		if(Experiment!=0)
+		if(Experiment!=0)//If using TChem problems
 		{
 			if(Method=="EPI2")
 				integrator = CreateEPI2Integrator(RHS_TCHEM, Jtv_TCHEM, pbptr,
@@ -259,7 +260,7 @@ int main(int argc, char* argv[])
 			else if(Method=="EPIRK4")
 				integrator3 = CreateEPIRK4SCIntegrator(RHS_TCHEM, Jtv_TCHEM, pbptr,
 					 MaxKrylovIters, y, number_of_equations, UseJac);
-		}else{
+		}else if(Experiment==0){
                         if(Method=="EPI2")
                                 integrator = CreateEPI2Integrator(RHS_KAPPA, Jtv_KAPPA, pbptr,
                                         MaxKrylovIters, y,number_of_equations, UseJac);
@@ -288,8 +289,10 @@ int main(int argc, char* argv[])
         	{
                 	TNow= StepCount*StepSize;
                 	TNext=(StepCount+1)*StepSize;
-			ComputeJac(y, pbptr);//Set the Jacobian for this step
 			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
+			//ComputeJac counted in integrator time
+			ComputeJac(y, pbptr);//Set the Jacobian for this step
+			//auto Start=std::chrono::high_resolution_clock::now();//Time integrator
 
 			if(	Method=="EPI2")
 			{
@@ -348,7 +351,7 @@ int main(int argc, char* argv[])
 		//double IntTime = elapsed.count()/1e9;
         	TNow=TNext;
         	cout << "]100%\n\n";
-		//Delete integrators
+		//Delete all integrators
 		delete integrator;
 		delete integrator2;
 		delete integrator3;
@@ -356,7 +359,9 @@ int main(int argc, char* argv[])
 	        //=======================================
         	//Console Output
         	//=======================================
-		if(Experiment==1)
+		if(Experiment==0)
+			cout << "y=" << data[0] << "\t\t z=" << data[1] <<"\t\t Temp=" <<data[2] <<endl;
+		else if(Experiment==1)
 		{
 		//Hydrogen layout, should also be valid for GRI 3.0
  		//Temp H2 O2 O OH H2O H HO2 H2O2
@@ -364,14 +369,11 @@ int main(int argc, char* argv[])
         		cout << "Total Mass Fractions: " <<N_VL1NormLocal(y)-data[0];
         		cout << "\t\t Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
 
-		}else if(Experiment==0)
-			cout << "y=" << data[0] << "\t\t z=" << data[1] <<"\t\t Temp=" <<data[2] <<endl;
-		else{//Gri
+		}else if (Experiment==2){//Gri
 			cout << "Temp=" << data[0] << "\t\t CH4=" << data[14] <<"\t\t O2=" << data[4]<<endl;
                         cout << "Total Mass Fractions: " <<N_VL1NormLocal(y)-data[0];
                         cout << "\t\t Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
 		}
-
 		//General Simulation paramater output to console
 		cout<< BAR << "\tSim Parameters\t\t" << BAR << endl;
 
@@ -423,6 +425,7 @@ int main(int argc, char* argv[])
  	/// Kokkos finalize checks any memory leak that are not properly deallocated.
   	Kokkos::finalize();
 	cout << BAR << "\tExiting without error\t" << BAR <<endl;
+	return 0;
 }
 
 
@@ -467,8 +470,13 @@ int CheckStep(realtype FinalTime, realtype StepSize)
 }
 
 	//======================================================
-	//Initial condition functions
+	//   ____  _  _  ____  ____        __
+	//  (_  _)| \| |(_  _)(_  _)      / _)
+	//    ||  |  \ |  ||    ||   _   / /
+	//   _||_ | |  | _||_   ||  (_)  \ \_
+	//  (____)|_|\_|(____)  []	  \__)
 	//======================================================
+
 //====================================================
 //Kapila problem
 //====================================================
@@ -644,10 +652,12 @@ realtype LocalErrorEstimate(realtype StepSize, realtype t, N_Vector y, N_Vector 
 
 
 /*
+//Matrix Vector Product
 //=============================================================
-//Matrix Vector product
-//
-//
+//  __ __    ___   _____      __   __ ___   ___
+// |  V  | ./ _ \.|_   _| ___ \ \ / /| __) / __)
+// | .V. | | (_) |  | |  |___| \ v / | __)( (__
+// |_| |_| |_/ \_|  |_|         \_/  |___) \___)
 //============================================================
 */
 void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N_Vector tmp, realtype * JV)
@@ -665,13 +675,13 @@ void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N
 
 
 
-	//===============================================================//
+	//===============================================================
 	//   _____   ___     ____   ___    _____   _____    ___   __   _
 	//  |__ __| /   \   / ___) / _ \  |     \ |__ __|  /   \ |  \ | |
 	//  _ | |  | (x) | | /    / / \ \ |  x  /   | |   | (x) ||   \| |
  	// / (| |  |  n  | | \___ \ \_/ / |  x  \  _| |   |  n  || |\   |
 	// \____/  |_| |_|  \____) \___/  |_____/ |_____| |_| |_||_| \__|
-	//===============================================================//
+	//===============================================================
 
 int ComputeJac(N_Vector u, void* pb)
 {
@@ -702,7 +712,11 @@ int ComputeJac(N_Vector u, void* pb)
         //===============================
         auto member =  Tines::HostSerialTeamMember();
         g_timer.reset();
+	//auto Start=std::chrono::high_resolution_clock::now();
         pbPtr->computeJacobian(member, x ,J);
+	//auto Stop=std::chrono::high_resolution_clock::now();
+	//auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+	//JacTime+=Pass.count()/1e9;
         JacTime+=g_timer.seconds();
         JacCnt++;
 	return 0;
@@ -802,7 +816,6 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 	//===================
 	//Compute JV
 	//===================
-
 	g_timer.reset();
 	MatrixVectorProduct(number_of_equations, JacD, v, tmp, JV);
 	MatVecTime+=g_timer.seconds();
@@ -875,7 +888,7 @@ void ErrorCheck(ofstream & myfile, N_Vector y, realtype * data, int number_of_eq
                                 if(abs(data[0])>1e5)
                                         cout<<"Temperature instability detected. Check output file for details.\n";
 
-                                cout<<"\nFailed after step: "<< TNext<<endl;
+                                cout<<"\nFailed computing during time: "<< TNext<<endl;
                                 exit(EXIT_FAILURE);
 	}
 

@@ -16,7 +16,7 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 {
 	this->num_equations= num_eqs;
 	this->pb;//create the problem
-	this->pb._p 	= 101325;			//Standard (1 atm) pressure
+	this->pb._p 	= 101325;				//Standard (1 atm) pressure
 	this->pb._work	= work;
 	this->pb._kmcd 	= kmcd;
 	this->NumGridPts= GridPts;
@@ -26,9 +26,9 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 	this->pb._fac   = fac;
 	this->Jac	= N_VNew_Serial(Block);
 	this->Mat	= SUNDenseMatrix(num_eqs*GridPts,num_eqs*GridPts);
-	this->Vel 	= N_VNew_Serial( (GridPts+1)); //This is staggered bigger
+	this->Vel 	= N_VNew_Serial( (GridPts+1));		//This is staggered bigger
 	this->Ghost 	= N_VNew_Serial(num_eqs);
-	N_VScale(1.0 , y, this->Ghost);
+	N_VScale(1.0 , y, this->Ghost);				//Use y to get the ghost points.
 	this->Tmp 	= N_VNew_Serial(vecLength);
 	this->delx 	= Delx;
 	this->VelAve	= N_VNew_Serial(GridPts);
@@ -152,6 +152,7 @@ void myPb2::UpdateOneDVel(N_Vector State)
 	N_Vector TempGrad	= N_VClone(this->Vel);			//Velocity size.
 	N_VScale(0.0, VTemp, VTemp);					//Clean
 	N_VScale(0.0, Tmp, Tmp);					//Clean
+	N_VScale(0.0, TempGrad, TempGrad);				//Clean
 	realtype * SD		= N_VGetArrayPointer(State);
 	realtype * VTempData	= N_VGetArrayPointer(VTemp);
 	realtype * TmpD		= N_VGetArrayPointer(Tmp);
@@ -160,7 +161,6 @@ void myPb2::UpdateOneDVel(N_Vector State)
 	realtype * TG		= N_VGetArrayPointer(TempGrad);
 	realtype LeftTemp	= 0;
 	realtype RightTemp	= 0;
-	//realtype x		= 0;
 	int End 		= this->NumGridPts-1;			//The final vector entry
 
 	//See Dr. Bisetti's book, chapter 17 for full details.
@@ -205,7 +205,7 @@ void myPb2::UpdateOneDVel(N_Vector State)
 	/**/
 	this->VelIntegrate(VTempData, State, LeftTemp, RightTemp);
 	//V(x) = Integral( omega/(rho T c_p) ,[0,x] ) + V(0);		See VelIntegrate function
-	N_VLinearSum(1.0, this->Vel, 1.0, TempGrad, this->Vel);		//V+=Grad(T)(x)
+	N_VLinearSum(1.0, this->Vel, 1.0, TempGrad, this->Vel);//V+=Grad(T)(x)
 	N_VAddConst(this->Vel, -1.0*TG[0], this->Vel);			//V-=Grad(T)(0)
 	this->SetVelAve();						//Modify VelAve
 	//Destroy Temp Vectors
@@ -287,7 +287,7 @@ void myPb2::SetGhostPVel(N_Vector y, int Experiment, int SampleNum, realtype Vel
 {
 	this->SetGhost(y);
 	this->ScaleP(Experiment, SampleNum);
-	if(SampleNum ==10)//AdvDiffCoS problem
+	if(SampleNum ==10|| SampleNum == 12 )//AdvDiffCoS problem
 		this->SetVels(this->NumGridPts+1, 1);
 	else
 		this->SetVels(this->NumGridPts+1,VelVal);
@@ -959,34 +959,34 @@ int SUPER_DIFF_NL_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector 
         realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
         realtype * resultData   = NV_DATA_S(Jv);//stuff goes in here.
 	realtype * vData 	= NV_DATA_S(v);//Stuff also comes from here
-        int numPts = problem->NumGridPts;
+        int numPts 		= problem->NumGridPts;
         realtype delx           = problem->delx;
         realtype divisor        = 1.0/(delx * delx);
-        int tempInd 		= 0;
+        int TI	 		= 0;
 	int grid 		= 0;
-	realtype * Ghost = NV_DATA_S(problem->Ghost);
+	realtype * Ghost 	= NV_DATA_S(problem->Ghost);
 	realtype T 		= 0;
         int vecLength 		= problem->vecLength;
-        realtype c 		= 1.0 * divisor;
+        realtype c 		= divisor;
         for (int i = 0; i < vecLength; i++)
         {
-		tempInd = i%numPts;
-		grid = floor(i/problem->NumGridPts);
-                T = uData[tempInd];//This adds the non-linearity we wanted
+		TI = i%numPts;
+		grid = floor(i/numPts);
+                T = uData[TI];					//Associated point's temperature
                 if(i% numPts == 0)//left
 		{
                         resultData[i] = c * T * (-2*vData[i] + vData[i+1]);
-			resultData[i]+= c * vData[tempInd] * (Ghost[grid] - 2 *uData[0] + uData[1]);
+			resultData[i]+= c * vData[TI] * (Ghost[ grid ] - 2 *uData[ i ] + uData[ i + 1 ]);
 		}
                 else if (i % numPts == (numPts - 1) )//right 0 neumann
 		{
                         resultData[i] = c * T * ( vData[i-1] - vData[i] );
-			resultData[i]+= c * vData[tempInd] *  (uData[i-1] - uData[i]);
+			resultData[i]+= c * vData[TI] *  (uData[i-1] - uData[i]);
 		}
                 else
 		{
                         resultData[i] = c * T * (vData[i-1] - 2*vData[i] + vData[i+1]);
-			resultData[i]+= c * vData[ tempInd ] * (uData[ i-1 ]-2 * uData[ i ]+ uData[ i-1 ] );
+			resultData[i]+= c * vData[ TI ] * (uData[ i-1 ]- 2 * uData[ i ]+ uData[ i-1 ] );
 		}
         }
         return 0;
@@ -998,6 +998,7 @@ int SUPER_RHS_HEATING(realtype t, N_Vector u, N_Vector uDot, void * userData)
         myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
         realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
         realtype * resultData   = NV_DATA_S(uDot);//stuff goes in here.
+	N_VScale(0.0, uDot, uDot);		//Clean, new
         int numPts = problem->NumGridPts;
         realtype delx           = problem->delx;
         realtype * Ghost = NV_DATA_S(problem->Ghost);
@@ -1005,8 +1006,7 @@ int SUPER_RHS_HEATING(realtype t, N_Vector u, N_Vector uDot, void * userData)
 	realtype x = 0;
 	realtype OffSet = 0;
 	realtype xEnd= vecLength*delx+delx/2;
-	if(t>1e-6 || N_VMaxNorm(u)>3500)//N_VMaxNorm(u)>2200 & problem->HeatingOn == 1)
-		problem->HeatingOn=0;
+
 	if(problem->HeatingOn==1 )//t<1e-5 && N_VMaxNorm(u) <  2200)//2000 originally
 	{
 		//OffSet = xEnd/2;
@@ -1015,10 +1015,13 @@ int SUPER_RHS_HEATING(realtype t, N_Vector u, N_Vector uDot, void * userData)
         	for (int i = 0; i < numPts; i++) //Only Heat the Temp
 		{
 			x = i*delx + delx/2;
-			resultData[i] = 5e10 * exp( -1e8 * pow(x - OffSet, 2) );
+			//x = delx * ( i + 0.5);
+			// a exp( - 1/(2* rad^2) * (x-center)^2)
+			//resultData[i] = 5e10 * exp(-1e5 * pow(x - OffSet, 2 ) );
+			resultData[i] = 5e8 * exp( -1e8 * pow(x - OffSet, 2) );
 			//resultData[i] = 5e10 * exp( -1e8 * pow( delx * (i+1-problem->NumGridPts) , 2 ) );
 		}
-		problem->HeatingRightGhost=5e10 * exp( -1e8 * pow(x+delx/2 - OffSet, 2) );
+		problem->HeatingRightGhost=5e8 * exp( -1e8 * pow(x+delx/2 - OffSet, 2) );
 	}
 	return 0;
 }
@@ -1032,3 +1035,49 @@ void myPb2::GhostChem(realtype t, N_Vector y, N_Vector ydot, void * pb)
 	N_VScale(0.0, problem->SmallChem, problem->SmallChem);
 	CHEM_RHS_TCHEM(t, y, ydot, pb);
 }
+
+//================================
+//Check heating
+//================================
+void myPb2::CheckHeating(N_Vector State, realtype t)
+{
+	if(this->HeatingOn ==1)
+		if(N_VMaxNorm(State)>3500 && t > 1e-6)//2600 originally
+		{
+			this->HeatingOn = 0;
+			std :: cout << "Heating off \n";
+		}
+
+}
+
+void myPb2::VerifyHeatingExp(N_Vector State, N_Vector State0, realtype tElapsed)
+{
+	if( this->Adv == 0.0 && this->Diff == 0.0 && this->React == 0.0 && this->Power!=0)
+	{
+		//N_VPrint_Serial(State0);
+		CheckHeating(State0, 0);
+		if(this->HeatingOn==1)
+			std:: cout <<"Verifying Heating\n";
+		else
+		{
+			std :: cout << "Error with the Heating Check\n";
+		 	exit(EXIT_FAILURE);
+		}
+		N_Vector Powered 	= N_VClone(State0);
+		//N_Vector Scrap 		= N_VClone(State0);
+		N_VScale(1.0, State0, Powered);
+		//N_VScale(0.0, State0, Scrap);
+		SUPER_RHS_HEATING(tElapsed, State0, Powered, this);
+		N_VScale(tElapsed*this->Power, Powered, Powered);		//RHS*Time
+		N_VLinearSum(1.0, State0, 1.0, Powered, Powered);		//S(0)+RHS*Time
+		N_VLinearSum(1.0, State, -1.0, Powered, Powered);
+		std :: cout << "Powered Error: " << sqrt(N_VDotProd(Powered,Powered)) << std :: endl ;
+	}
+	else
+	{
+		std :: cout << "Heating check skipped\n";
+	}
+
+
+}
+

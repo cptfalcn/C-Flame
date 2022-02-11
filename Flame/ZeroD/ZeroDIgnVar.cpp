@@ -21,6 +21,7 @@
 #include <fstream>
 #include <iomanip>
 #include "TChem_CommandLineParser.hpp"
+#include "Epi3SC_KIOPS.h"
 
 //These two will be needed in the future
 //#include "TChem_Impl_NewtonSolver.hpp"
@@ -48,12 +49,13 @@ void PrintBanner();
 int CheckStep(realtype, realtype);
 int SetInteriorSize(realtype);
 int TrackProgress(realtype, realtype, realtype, int);
-void ErrorCheck(ofstream &, N_Vector, realtype *, int, int, realtype);
+//void ErrorCheck(ofstream &, N_Vector, realtype *, int, int, realtype);
 void TrackSlowDown(IntegratorStats *, int *,  int, int *, realtype *, realtype, int*);
 void TrackCVODEKryIters(SUNLinearSolver, realtype *, realtype, int *, int*, int*);
 void ReadData(N_Vector, string);
 void CheckNanBlowUp(N_Vector, int);
-//int SetNumIntPts(realtype, realtype, int); //Marked for removal
+//Stepping
+realtype IntervalStep(realtype, realtype, realtype);
 
 //=====================
 //Namespaces and globals
@@ -68,41 +70,38 @@ int main(int argc, char* argv[])
 	//====================
 	// Intial Declarations
 	//====================
-	int SlowDown 		= 0,	OldProjections	= 0;
 	int MaxIters	= 0,	OldIters	= 0,	CurrStepIters	 = 0, TotalIters = 0;
-	realtype SlowTime	= 0;
-	static realtype FinalTime = 0;//1.0e-4;//1e-4 seems to be the max
+	realtype SlowTime		= 0;
+	int SlowDown 			= 0;
+	static realtype FinalTime 	= 0;//1.0e-4;//1e-4 seems to be the max
 	static const int NumBands = 3;//Epic stuff, default is 3.
-	realtype StepSize=0;
-	realtype KTime=0;
-	int ProgressDots=0; //From 0 to 100; only care about percentage
-	int StepCount = 0;
-	//int SpeedRatio = 1e-2;
-	realtype PercentDone=0;
-	realtype TNow=0;
-	realtype TNext=0;
-	realtype TNextC=0;			//CVODE TNext, has a tendency to change TNext
-	string MyFile="Default.txt";
-	string Method="EPI2";//This is the default method
+	realtype StepSize	= 0;
+	realtype KTime 		= 0;
+	int ProgressDots	= 0; //From 0 to 100; only care about percentage
+	int StepCount 		= 0;
+	realtype maxStep 	= 1e-3;
+	realtype PercentDone	= 0;
+	realtype TNow		= 0;
+	realtype TNext		= 0;
+	realtype TNextC		= 0;			//CVODE TNext, has a tendency to change TNext
+	string MyFile		= "Default.txt";
+	string Method		= "EPI2";//This is the default method
 	static realtype KrylovTol=1e-14;
-	int UseJac=1; 				//weither will we use the Jacobian or not
-	int SampleNum=0;
-	int Experiment=1; 			//default is hydrogen, set to 0 for kapila
-	int Profiling=0;			//default to no profiling, need to edit profiling
-	int number_of_equations=0;
-	int NumScalarPoints = 0;
-	realtype Delx = 5e-1;
-	realtype absTol = 1e-8;
-        realtype relTol = 1e-8;
-	int startingBasisSizes[] = {10, 10};//{3,3}
-	int TubeLength  = 1;
-	int VelUp 	= 1;
-	int Movie	= 0;
+	int SampleNum		= 0;
+	int Experiment		= 1; 		//default is hydrogen, set to 0 for kapila
+	int Profiling		= 0;		//default to no profiling, need to edit profiling
+	int number_of_equations	= 0;
+	int NumScalarPoints 	= 1;
+	realtype absTol 	= 1e-8;
+        realtype relTol 	= 1e-8;
+	int startingBasisSizes[]= {10, 10};//{3,3}
+	int Movie		= 0;
+	realtype VelRate	= 1e-5;
 
-	realtype ADV 	= 1.0;
-	realtype DIFF 	= 1.0;
-	realtype CHEM 	= 1.0;
-	realtype POW	= 0.0;
+	//realtype ADV 	= 1.0;
+	//realtype DIFF 	= 1.0;
+	//realtype CHEM 	= 1.0;
+	//realtype POW	= 0.0;
 
 	//=====================================================
 	//Kokkos Input Parser
@@ -120,20 +119,20 @@ int main(int argc, char* argv[])
 	opts.set_option<realtype>("FinalTime", "The final simulation time", &FinalTime);//New
 	opts.set_option<std::string>("MyFile","Where we output data", &MyFile);//New
 	opts.set_option<realtype>("KrylovTol", "KrylovTolerance", &KrylovTol);
-	opts.set_option<int>("UseJac","Will we use the Jacobian", &UseJac);
+	//opts.set_option<int>("UseJac","Will we use the Jacobian", &UseJac);
 	opts.set_option<int>("SampleNum", "Sample used", &SampleNum);
 	opts.set_option<std::string>("Method", "The time integration method", & Method);
 	opts.set_option<int>("Experiment", "Experiment chosen", &Experiment);
 	opts.set_option<int>("Profiling", "Output profiling data or not", &Profiling);
-	opts.set_option<realtype>("Delx", "Grid Delx", &Delx);
+	//opts.set_option<realtype>("Delx", "Grid Delx", &Delx);
         opts.set_option<realtype>("relTol", "Solver Relative Tol", &relTol);
         opts.set_option<realtype>("absTol", "Solver Absolulte Tol", &absTol);
-	opts.set_option<realtype>("Adv", "Advection coefficient", &ADV);
-	opts.set_option<realtype>("Diff", "Diffusion coefficient", &DIFF);
-	opts.set_option<realtype>("Chem", "Chemistry coefficient", &CHEM);
-	opts.set_option<realtype>("Pow", "Power coefficient", &POW);
-	opts.set_option<int>("VelUp", "Do we do velocity up?", &VelUp);
-	opts.set_option<int>("NumPts", "Interior points for each grid", &NumScalarPoints);
+	//opts.set_option<realtype>("Adv", "Advection coefficient", &ADV);
+	//opts.set_option<realtype>("Diff", "Diffusion coefficient", &DIFF);
+	//opts.set_option<realtype>("Chem", "Chemistry coefficient", &CHEM);
+	//opts.set_option<realtype>("Pow", "Power coefficient", &POW);
+	//opts.set_option<int>("VelUp", "Do we do velocity up?", &VelUp);
+	//opts.set_option<int>("NumPts", "Interior points for each grid", &NumScalarPoints);
 	opts.set_option<int>("Movie", "Generate a data set at every step", &Movie);
 
 	const bool r_parse = opts.parse(argc, argv);
@@ -142,7 +141,7 @@ int main(int argc, char* argv[])
 
 	ofstream myfile(MyFile, std::ios_base::app);
 	int Steps=CheckStep(FinalTime, StepSize);		//Checks the number of steps
-	realtype VelStep = min(1e-5, FinalTime);
+	VelRate		= max(FinalTime / 100, 100 * StepSize);	//Window for CVODE is either 100 steps  100xStepsize
 
 	//=====================================
 	//Kokkos Sub-declarations
@@ -169,54 +168,23 @@ int main(int argc, char* argv[])
 		//=======================================
 		//Set number of equations and grid points
 		//=======================================
-		//if(Experiment==0)
-		//	number_of_equations=3;
-		//else
 		number_of_equations=problem_type::getNumberOfEquations(kmcd);
 
-		//=================================================================
-		//This block needs to be well thought out, it is causing a headache
-		//=================================================================
-		if(Delx<0.0)
-		{
-			std :: cout << "Invalid Spatial Step!\n";
-			exit(EXIT_FAILURE);
-		}
-		else if(Delx==0)
-			NumScalarPoints = 1 ;
-		else//Accept the user input.  That could be a disaster.
-			if(NumScalarPoints == 0)		//Avoid that disaster
-			{
-				Delx = 0 ;			//Delx changes Heating module
-				NumScalarPoints = 1;
-			}
-			else if(NumScalarPoints == 1)		//Accept the input
-			{
-				Delx = 0 ;
-			}
-		int vecLength = number_of_equations * NumScalarPoints;	//For readability
+		int vecLength = number_of_equations;	//For readability
 		int num_eqs = number_of_equations;			//To reduce size
-		int num_pts = NumScalarPoints;				//To reduce size
+		int num_pts = 1;					//To reduce size
 		//==================================================
 		//Prep/Set initial conditions, inherited from Zero-D
 		//==================================================
-		N_Vector State 		= N_VNew_Serial(vecLength);	//State vector
-		N_Vector StateDot	= N_VNew_Serial(vecLength);	//State Derivative RHS vector
-		N_Vector y 		= N_VNew_Serial(num_eqs);	//intial conditions.
-		N_Vector State0 	= N_VClone(State);		//For testing purposes
+		N_Vector y 		= N_VNew_Serial(vecLength);	//intial conditions/Data
+		N_Vector yDot		= N_VClone(y);			//State RHS
 		N_VScale(0.0 , y, y);					//Zero out the y vector.
-		N_VScale(0.0, State, State);				//Zero out the State vector.
-		N_VScale(0.0, StateDot, StateDot);			//Zero out the StateDot vector.
-		N_VScale(1.0, State, State0);				//Copy State
+		N_VScale(0.0, yDot, yDot);				//Zero out the StateDot vector.
 		realtype *data 		= NV_DATA_S(y);			//Set the y data pointer.
-		realtype *StateData 	= NV_DATA_S(State);		//Set the State data pointer.
+		realtype *dataDot 	= NV_DATA_S(yDot);		//Set the State data pointer.
 
 		//Initial Conditions sub-block
 		SetIntCons(Experiment, SampleNum, data);		//Set Initial Conditions
-		SetSuperInitCons(data, StateData, num_eqs, num_pts);	//Copy IC to State.
-		//std :: cout << "\n" << data[0] << "\n";
-		TestingInitCons(SampleNum, num_pts, num_eqs, vecLength, Delx, data, StateData);//Keep until final version
-		N_VScale(1.0, State, State0);
 		//===================================================
 		//Set TChem
 		//===================================================
@@ -227,9 +195,10 @@ int main(int argc, char* argv[])
 		const int problem_workspace_size = problem_type::getWorkSpaceSize(kmcd);
 		real_type_1d_view_type work("workspace", problem_workspace_size);
 
-		myPb2 problem2(num_eqs, work, kmcd, num_pts, y, Delx);	//Construct new Problem.
+		myPb2 problem2(num_eqs, work, kmcd, num_pts, y, 0);	//Construct new Problem.
 		problem2.SetGhostPVel(y, Experiment, SampleNum, 0);	//Do additional set up.
-		problem2.SetAdvDiffReacPow(ADV, DIFF, CHEM, POW, VelUp);//Additional set up.
+		problem2.SetAdvDiffReacPow(0, 0, 0, 0, 0);//Additional set up.
+		problem2.kmd		= kmd;
 		void *UserData = &problem2;
 		int MaxKrylovIters = 500; //max(vecLength, 500);//500 is the base
 		//==================
@@ -238,142 +207,132 @@ int main(int argc, char* argv[])
 		//CVODE
                 void * cvode_mem;
 		SUNMatrix A			= SUNDenseMatrix(vecLength, vecLength);
-		SUNLinearSolver SUPERLS 	= SUNLinSol_SPGMR(State, PREC_NONE, 20);
-		SUNNonlinearSolver SUPERNLS 	= SUNNonlinSol_Newton(State);
+		SUNLinearSolver SUPERLS 	= SUNLinSol_SPGMR(y, PREC_NONE, 20);
+		SUNNonlinearSolver SUPERNLS 	= SUNNonlinSol_Newton(y);
+
+
 		//Set EPI_KIOPS methods
-		Epi2_KIOPS	*Epi2			= NULL;
-		Epi3_KIOPS 	*Epi3			= NULL;
-		EpiRK4SC_KIOPS	*EpiRK4			= NULL;
 		IntegratorStats *integratorStats 	= NULL;
 		//===================================================
 		//Parse the experiment cases and make the integrators
 		//===================================================
-		//if(Experiment!=0)//If using TChem problems
-		//{//Epi2=new Epi2_KIOPS(SUPER_CHEM_RHS_TCHEM, SUPER_CHEM_JTV, UserData, MaxKrylovIters, State, vecLength);//old version
-		Epi2 = 	new Epi2_KIOPS(SUPER_RHS,SUPER_JTV,UserData,MaxKrylovIters,State,vecLength);
 
-		Epi3 = 	new Epi3_KIOPS(SUPER_RHS,SUPER_JTV,UserData,MaxKrylovIters,State,vecLength);
+		Epi3VChem_KIOPS * EPI3V
+				= new Epi3VChem_KIOPS(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, UserData,
+				MaxKrylovIters, y, vecLength);
 
-		EpiRK4=	new EpiRK4SC_KIOPS(SUPER_RHS,SUPER_JTV, UserData, MaxKrylovIters, State,vecLength);
+		cvode_mem= 	CreateCVODEAdp(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, CHEM_COMP_JAC_CVODE_V2, UserData, A,
+				SUPERLS, SUPERNLS, vecLength, y, relTol, absTol, StepSize);
 
-		cvode_mem= CreateCVODE(SUPER_RHS, SUPER_JTV, SUPER_CHEM_JAC_TCHEM, UserData, A,
-					SUPERLS, SUPERNLS, vecLength, State, relTol, absTol, StepSize, 1);
+		CVodeSetMaxStep(cvode_mem, 1e-5);
 
-		PrintPreRun(StepSize, Delx, Steps, KrylovTol, absTol, relTol, Method, num_pts, BAR);
-		//if(problem2.NumGridPts>1)
-		//	problem2.RunTests(State);
+		PrintPreRun(StepSize, 0, Steps, KrylovTol, absTol, relTol, Method, num_pts, BAR);
+
+		//======================
+		//Start run
+		//======================
+		if(Method == "EPI3V")
+        	{
+                	auto Start=std::chrono::high_resolution_clock::now();//Time integrator
+                	integratorStats = EPI3V->Integrate(StepSize, 1e-3, KrylovTol,
+						KrylovTol, 0.0, FinalTime, NumBands,
+						startingBasisSizes, y);
+                	auto Stop=std::chrono::high_resolution_clock::now();
+                	auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+                	KTime+=Pass.count()/1e9;
+        	}
+		/**/
+		else if(Method == "CVODEKry")
+		{
+			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
+			//CVode(cvode_mem, TNext, State, &TNextC, CV_NORMAL);
+			CVode(cvode_mem, FinalTime, y, &TNextC, CV_NORMAL);
+                        auto Stop=std::chrono::high_resolution_clock::now();
+                        auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+                        KTime+=Pass.count()/1e9;
+		}
+		/**/
+
         	//=================================
         	// Run the time integrator loop
         	//=================================
-		cout <<"[";
-		cout.flush();
-		while(StepCount<Steps)//while(TNext<FinalTime)
-        	{
-                	TNow= StepCount*StepSize;
-                	TNext=TNow + StepSize;
-			TNextC = TNext;
-			//Integrate
-			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
-			if(Method != "CVODEKry")//Set the step Jacobian
-				SUPER_CHEM_JAC_TCHEM(TNow, State, StateDot, A, UserData, State, State, State);
-			if(Method == "EPI2")
-				integratorStats =Epi2->Integrate(StepSize, TNow, TNext, NumBands,
-					State, KrylovTol, startingBasisSizes);
-			else if(Method == "EPI3")
-				integratorStats =Epi3->Integrate(StepSize, TNow, TNext, NumBands,
-					State, KrylovTol, startingBasisSizes);
-			else if(Method == "EPIRK4")
-				integratorStats =EpiRK4->Integrate(StepSize, TNow, TNext, NumBands,
-					State, KrylovTol, startingBasisSizes);
-			else if(Method == "CVODEKry")//This appears to be bugged for the full problem
-				CVode(cvode_mem, TNext, State, &TNextC, CV_NORMAL);//CV_NORMAL/CV_ONE_STEP
-			auto Stop=std::chrono::high_resolution_clock::now();
-                       	auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-			KTime+=Pass.count()/1e9;
-			//Step checking, factor into Error check
-			if( TNext != TNextC)
-			{
-				std :: cout << "CVODE step issue\n";
-				std :: cout << "TNext : " << TNext << "\t\tTNextC: " << TNextC <<endl;
-				exit(EXIT_FAILURE);
-			}
-			//Error check
-			if(SampleNum!=10 && Delx==0) 		//Error check
-				ErrorCheck(myfile, State, StateData, num_eqs, num_pts, TNext);//Needs editing
-			CheckNanBlowUp(State, vecLength);
+		else
+		{
+			cout <<"[";
+			cout.flush();
+			while(TNext<FinalTime)
+        		{
+                		TNow= StepCount*VelRate;
+                		TNext=TNow + VelRate;
+				TNextC = TNext;
+				//Integrate
+				auto Start=std::chrono::high_resolution_clock::now();//Time integrator
+				//cout << "In loop\n";
+				//===============
+				//Integrator gate
+				//===============
+				//if(Method == "CVODEKry")//This appears to be bugged for the full problem
+				//	CVode(cvode_mem, TNext, y, &TNextC, CV_NORMAL);//CV_NORMAL/CV_ONE_STEP
 
-			//Profiling
-			if(Profiling == 1)
-			{
-				if(Method != "CVODEKry")
-					TrackSlowDown(integratorStats, &SlowDown, StepCount,
-							&OldIters, &SlowTime, TNext, & MaxIters);
-				if(Method == "CVODEKry")
-					TrackCVODEKryIters(SUPERLS, &SlowTime,TNext, &OldIters,
-							&MaxIters, &TotalIters);
-			}
+				auto Stop=std::chrono::high_resolution_clock::now();
+                       		auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+				KTime+=Pass.count()/1e9;
+				if( TNext != TNextC)
+				{
+					cout << "CVODE step failure\n";
+					//cout << "TNext : " << TNext << "\t\tTNextC: " << TNextC << endl;
+					exit(EXIT_FAILURE);
+				}
+				//Error check
+				CheckNanBlowUp(y, vecLength);
 
-			//Clean
-			Clean(vecLength, StateData);
+				//Clean
+				Clean(vecLength, data);
 
-			//Vel Update
-			if(problem2.NumGridPts > 1 && VelUp==1 && (StepCount%100==0) && StepCount!=0 )
-				problem2.UpdateOneDVel(State);
+				/*
+				if(Profiling == 1)
+                        	{
+                                	if(Method != "CVODEKry")
+                                        	TrackSlowDown(integratorStats, &SlowDown, StepCount,
+                                                        &OldIters, &SlowTime, TNext, & MaxIters);
+                                	if(Method == "CVODEKry")
+                                        	TrackCVODEKryIters(SUPERLS, &SlowTime,TNext, &OldIters,
+                                                        &MaxIters, &TotalIters);
+                        	}
+				*/
 
-			//Check heating
-			problem2.CheckHeating(State, TNow);
+				//Track Progress
+				ProgressDots=TrackProgress(FinalTime, TNext, PercentDone, ProgressDots);
 
-			//Track Progress
-			ProgressDots=TrackProgress(FinalTime, TNext, PercentDone, ProgressDots);
-
-			if(Movie ==1 ) //Use if we want a time-series plot
-			{
-				PrintDataToFile(myfile, StateData,vecLength, absTol, BAR, MyFile, TNext);
-				PrintDataToFile(myfile, N_VGetArrayPointer(problem2.Vel), num_pts+1,
+				if(Movie ==1 ) //Use if we want a time-series plot
+				{
+					PrintDataToFile(myfile, data,vecLength, absTol, BAR, MyFile, TNext);
+					PrintDataToFile(myfile, N_VGetArrayPointer(problem2.Vel), num_pts+1,
 						0, BAR, MyFile, 0);
-			}
-                	StepCount++;
+				}
+                		StepCount++;
         		}//End integration loop
-        	TNow=TNext;
-        	cout << "]100%\n" << BAR << "\tIntegration complete\t" << BAR <<endl;
-		//=======================================
-		//Various testing
-		//=======================================
-		problem2.VerifyHeatingExp(State, State0, FinalTime);
+			/**/
+        		TNow=TNext;
+        		cout << "]100%\n" ;
+			problem2.t=TNow;
+		}
+		cout << BAR << "\tIntegration complete\t" << BAR <<endl;
 	        //=======================================
         	//Console Output
         	//=======================================
 		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
-		PrintExpParam(FinalTime, TNow, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
-		PrintSuperVector(StateData, Experiment, NumScalarPoints, BAR);
+		PrintExpParam(FinalTime, problem2.t, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
+		PrintSuperVector(data, Experiment, NumScalarPoints, BAR);
 		PrintProfiling(integratorStats, Profiling, Method,  BAR, cvode_mem);
-		PrintDataToFile(myfile, StateData, vecLength, absTol, BAR, MyFile, KTime);//change  4th
-
-		//Refactor into PrintProfiling later.
-		if(Profiling == 1)
-		{
-			if(Method == "EPI2")
-				cout << "Max Kry Iters: " << MaxIters << " at " << SlowTime << endl;
-			if(Method == "CVODEKry")
-			{
-				cout << "Max Krylov Iterates: " << MaxIters << " at " << SlowTime <<endl;
-				cout << "Total Krylov iterates: " << TotalIters<< endl;
-			}
-		}
-		if(problem2.NumGridPts > 1)
-			PrintDataToFile(myfile, N_VGetArrayPointer(problem2.Vel), num_pts+1,
-					0, BAR, MyFile, 0);
+		PrintDataToFile(myfile, data, vecLength, absTol, BAR, MyFile, KTime);//change  4th
         	myfile.close();
 		//==========================
 		//Time to take out the trash
 		//==========================
-		delete Epi2;
-		delete Epi3;
-		delete EpiRK4;
+		delete EPI3V;
 		N_VDestroy_Serial(y);
-		N_VDestroy_Serial(State);
-		N_VDestroy_Serial(StateDot);
-		N_VDestroy_Serial(State0);
+		N_VDestroy_Serial(yDot);
 		SUNMatDestroy(A);
 		SUNLinSolFree(SUPERLS);
 		SUNNonlinSolFree(SUPERNLS);
@@ -391,18 +350,6 @@ int main(int argc, char* argv[])
 // |  _)| | ||   |/ _)(. .)[_]/ _ \|   |( .)
 // |_|  |___||_|_|\__) |_| |_|\___/|_|_|(`_)
 //===========================================
-*/
-//==========================================
-//Set num_pts, marked for removal.
-//==========================================
-/*
-int SetNumIntPts(realtype delx, realtype xScale, int TubeLength)
-{
-	if(delx==0)
-		return 1;
-	else
-		return round(TubeLength/(xScale *delx));
-}
 */
 //===========================================
 //Check the number of steps
@@ -426,33 +373,6 @@ int CheckStep(realtype FinalTime, realtype StepSize)
                 cout<<"Cannot perform non-integer number of steps!!\n";
                 exit(EXIT_FAILURE);
         }
-}
-
-
-//=======================================================
-//RHS Error Check
-//realtype* y 		y Data ptr
-//realtype* rhs		rhs Data ptr
-//int num_eqs		number of equations in the system
-//========================================================
-void ErrorCheck(ofstream & myfile, N_Vector y, realtype * data, int number_of_equations, int num_pts,
-			realtype TNext)
-{
-	realtype MassError=abs( N_VL1NormLocal(y)/num_pts -data[0] -1.0);
-	if(MassError>.1 || abs(data[0])>1e5 )
-	{
-		//PrintDataToFile(myfile, data, number_of_equations, TNext);
-                cout<<"\n===============!!!Critical error!!!================\n";
-                if(MassError>.1)//originally .1
-                {
-                        cout<<"Severe mass loss detected. Check output file for details.\n";
-                   	myfile <<"Mass fraction error : " << abs( N_VL1NormLocal(y)-data[0]-1.0)<< endl;
-              	}
-             	if(abs(data[0])>1e5)
-            		cout<<"Temperature instability detected. Check output file for details.\n";
-             	cout<<"\nFailed computing during time: "<< TNext<<endl;
-              	exit(EXIT_FAILURE);
-	}
 }
 
 
@@ -526,3 +446,4 @@ void CheckNanBlowUp(N_Vector State, int vecLength)
 
 
 }
+

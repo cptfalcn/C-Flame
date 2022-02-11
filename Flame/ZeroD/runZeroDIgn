@@ -19,7 +19,7 @@ EndT=1e-4
 Method="EPI3"
 
 #Select Krylov tolerances 
-Tol=1e-4
+Tol=1e-6
 
 #Set the output file name
 #OutputFile="Scrapt.txt"
@@ -33,6 +33,9 @@ Sam=1
 #Set Profiling. Add Profiling=1 if you want to see the profile.
 Prof=1
 
+OutputFile="GriScrap.txt"
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-8 --FinalTime=1e-1 --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method="EPI2" --Experiment=2 --Profiling=$Prof
+
 <<Scrap
 OutPutFile="Scrap.txt"
 
@@ -44,7 +47,7 @@ OutPutFile="Scrap.txt"
   ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method="EPIRK4" --Experiment=$Experiment --Profiling=$Prof
 Scrap
 
-#<<Converge
+<<Converge
 OutputFile="DataEPI3GriSample1Jac.txt"
  ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment 
  ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-7 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=1 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
@@ -64,7 +67,7 @@ OutputFile="DataEPI3GriSample1NoJac.txt"
  ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=5e-8 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
  ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=2e-8 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
  ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-8 --FinalTime=$EndT --MyFile=$OutputFile  --KrylovTol=$Tol --UseJac=0 --SampleNum=$Sam --Method=$Method --Experiment=$Experiment
-#Converge
+Converge
 
 <<Kapila 
 OutputFile="DataKapilaMatched.txt"

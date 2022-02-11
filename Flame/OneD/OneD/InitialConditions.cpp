@@ -1,4 +1,5 @@
 #include "Derivatives.h"
+#include "InitialConditions.h"
 #define BAR "===================="
 using namespace std;
 //========================================
@@ -182,6 +183,10 @@ void IntConGri30(realtype * data, int SampleNum)
                 data[48]	=  0.736962400000000; //N2
 		cout << BAR << "Gri Sample: Hi Pressure" << BAR << endl;
 		break;
+	case 69:
+		cout << BAR << "Gri Sample: 1e-4 Hi-P" << BAR << endl;
+		ConditionsFromFile(data, "GriIgnition.txt");
+		break;
         }
 }
 
@@ -249,6 +254,27 @@ void SinWave2(realtype * data, int numPts, int myLength, realtype h)
         }
 }
 
+void GuassWave(realtype * data, int numPts, int myLength, realtype h)
+{
+        realtype x = 0;
+        int myIndex;
+        realtype temp1 = 0;
+	realtype OffSet = h*( round (0.5 * numPts) -0.5);
+        for (int i = 0; i < myLength; i++)
+        {
+                myIndex = i % numPts;
+                //cout << myIndex << "\t\t";
+                x =  myIndex*h + h/2;
+                //cout << x << endl;
+                temp1 = 1e3 * exp(-1e8 * pow(x - OffSet, 2 ) );
+                //cout << temp1 << endl;
+                //realtype temp2 = pow(1-x, 3.0/2.0);
+                data[i] = temp1;
+        }
+}
+
+
+
 void Constant(realtype * data, int vecLength)
 {
 	for(int i = 0; i < vecLength ; i ++)
@@ -266,4 +292,44 @@ void TestingInitCons(int SampleNum, int numPts, int numEqs, int vecLength, realt
 	}
 	if(SampleNum == 11)
 		Constant(data, vecLength);
+
+	if(SampleNum == 12)
+	{
+		SinWave2(StateData, numPts, vecLength, Delx);
+		for( int i = 0 ; i < numEqs; i ++)
+		{
+			data[i] = StateData[0];
+		}
+	}
+
+	if(SampleNum ==13)
+	{
+		GuassWave(StateData, numPts, vecLength, Delx);
+		for( int i = 0 ; i < numEqs; i++)
+		{
+			data[i] = StateData[0];
+		}
+	}
+}
+
+void ConditionsFromFile(realtype * Ref, std :: string file)
+{
+        std :: string line;
+        cout << "Getting Reference from: " << file << endl;
+        //realtype * REF = N_VGetArrayPointer(Ref);
+        //realtype Test = 0;
+        std :: ifstream inputFile;
+        inputFile.open(file);
+        cout << "Is the file valid? " << (inputFile.good()? "Yes" : "No" ) << endl;
+        int i = 0;
+        while(!inputFile.eof())
+        {
+                getline(inputFile,line);
+                Ref[i] = stod(line);          	//This is the problem line, shifts the solution by one.
+                i++;
+                inputFile.peek();               //Set the flag to see if the next entry is good.
+        }
+        inputFile.close();
+
+
 }

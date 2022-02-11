@@ -57,6 +57,7 @@ class myPb2{
 	void UpdateOneDVel(N_Vector);
 	void VelIntegrate(realtype *, N_Vector, realtype, realtype);
 	void RunTests(N_Vector State);
+	void CheckHeating(N_Vector State, realtype t);
 	void SetLeftDiff(N_Vector State);
 	void GhostChem(realtype t, N_Vector y, N_Vector ydot, void * pb);
 	void SetGhostPVel(N_Vector y, int Experiment, int SampleNum, realtype VelVal);
@@ -77,6 +78,7 @@ class myPb2{
 	int		FlameFrontLocation;
 	realtype	HeatingRightGhost;
 	int 		HeatingOn;
+	void VerifyHeatingExp(N_Vector State, N_Vector State0, realtype tElapsed);
 };
 
 //End class stuff
