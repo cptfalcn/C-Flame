@@ -1,0 +1,1 @@
+./OneDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-9 --FinalTime=1e-9 --MyFile="Debug.txt" --KrylovTol=1e-4 --SampleNum=4 --Method="CVODEKry" --Profiling=1 --Experiment=2 --Delx=1e-4 --absTol=1e-8 --relTol=1e-5 --Adv=1.0 --Diff=1.0 --Chem=1.0 --Pow=1.0 --VelUp=1 --NumPts=100 --Movie=1

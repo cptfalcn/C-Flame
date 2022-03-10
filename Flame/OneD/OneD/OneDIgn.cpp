@@ -53,6 +53,7 @@ void TrackSlowDown(IntegratorStats *, int *,  int, int *, realtype *, realtype, 
 void TrackCVODEKryIters(SUNLinearSolver, realtype *, realtype, int *, int*, int*);
 void ReadData(N_Vector, string);
 void CheckNanBlowUp(N_Vector, int);
+void SetCP(myPb2);
 //int SetNumIntPts(realtype, realtype, int); //Marked for removal
 
 //=====================
@@ -230,6 +231,8 @@ int main(int argc, char* argv[])
 		myPb2 problem2(num_eqs, work, kmcd, num_pts, y, Delx);	//Construct new Problem.
 		problem2.SetGhostPVel(y, Experiment, SampleNum, 0);	//Do additional set up.
 		problem2.SetAdvDiffReacPow(ADV, DIFF, CHEM, POW, VelUp);//Additional set up.
+		problem2.kmd = kmd;
+		//SetCP(problem2);					//Adding this line causes segfault *shrugs
 		void *UserData = &problem2;
 		int MaxKrylovIters = 500; //max(vecLength, 500);//500 is the base
 		//==================
@@ -272,10 +275,13 @@ int main(int argc, char* argv[])
                 	TNow= StepCount*StepSize;
                 	TNext=TNow + StepSize;
 			TNextC = TNext;
+			problem2.t	= TNow;
 			//Integrate
 			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
 			if(Method != "CVODEKry")//Set the step Jacobian
+			{
 				SUPER_CHEM_JAC_TCHEM(TNow, State, StateDot, A, UserData, State, State, State);
+			}
 			if(Method == "EPI2")
 				integratorStats =Epi2->Integrate(StepSize, TNow, TNext, NumBands,
 					State, KrylovTol, startingBasisSizes);
@@ -317,7 +323,7 @@ int main(int argc, char* argv[])
 			Clean(vecLength, StateData);
 
 			//Vel Update
-			if(problem2.NumGridPts > 1 && VelUp==1 && (StepCount%100==0) && StepCount!=0 )
+			if(problem2.NumGridPts > 1 && VelUp==1 && (StepCount%10==0) && StepCount!=0 )
 				problem2.UpdateOneDVel(State);
 
 			//Check heating
@@ -359,6 +365,10 @@ int main(int argc, char* argv[])
 				cout << "Max Krylov Iterates: " << MaxIters << " at " << SlowTime <<endl;
 				cout << "Total Krylov iterates: " << TotalIters<< endl;
 			}
+			cout << "\nTotal integration time: " << KTime << " sec " << endl;
+			cout << "Total time spent in rhs: " << problem2.rhsTime << " sec" << endl;
+			cout << "Total time spent in jtv: " << problem2.jacTime << " sec" << endl;
+			cout << "Total time spent in jacMake: " << problem2.jacMakeTime << " sec\n";
 		}
 		if(problem2.NumGridPts > 1)
 			PrintDataToFile(myfile, N_VGetArrayPointer(problem2.Vel), num_pts+1,
@@ -525,4 +535,63 @@ void CheckNanBlowUp(N_Vector State, int vecLength)
 	}
 
 
+}
+
+void SetCP(myPb2 pb)
+{
+	realtype * CPP 	= N_VGetArrayPointer(pb.CP);		//Rescale by 1e-3 at end
+	CPP[1]		= 0.1014;
+	CPP[2]		= 0.1674;
+    	CPP[3]		= 0.0433;
+    	CPP[4]		= 0.0273;
+    	CPP[5]		= 0.0425;
+    	CPP[6]		= 0.0354;
+   	CPP[7]		= 0.0280;
+    	CPP[8]		= 0.0279;
+    	CPP[9]		= 0.0408;
+    	CPP[10]		= 0.0464;
+    	CPP[11]		= 0.0316;
+    	CPP[12]		= 0.0316;
+    	CPP[13]		= 0.0309;
+    	CPP[14]		= 0.0316;
+    	CPP[15]		= 0.0279;
+    	CPP[16]		= 0.0224;
+    	CPP[17]		= 0.0238;
+    	CPP[18]		= 0.0236;
+    	CPP[19]		= 0.0232;
+    	CPP[20]		= 0.0232;
+    	CPP[21]		= 0.0231;
+ 	CPP[22]		= 0.0237;
+    	CPP[23]		= 0.0235;
+    	CPP[24]		= 0.0232;
+    	CPP[25]		= 0.0231;
+    	CPP[26]		= 0.0213;
+    	CPP[27]		= 0.0211;
+    	CPP[28]		= 0.0348;
+    	CPP[29]		= 0.0201;
+    	CPP[30]		= 0.0201;
+    	CPP[31]		= 0.0387;
+    	CPP[32]		= 0.0457;
+    	CPP[33]		= 0.0447;
+   	CPP[34]		= 0.0336;
+    	CPP[35]		= 0.0273;
+    	CPP[36]		= 0.0276;
+    	CPP[37]		= 0.0244;
+    	CPP[38]		= 0.0222;
+    	CPP[39]		= 0.0280;
+   	CPP[40]		= 0.0275;
+    	CPP[41]		= 0.0236;
+    	CPP[42]		= 0.0233;
+    	CPP[43]		= 0.0348;
+   	CPP[44]		= 0.0222;
+	CPP[45]		= 0.0222;
+    	CPP[46] 	= 0.0222;
+    	CPP[47]		= 0.0224;
+    	CPP[48]		= 0.0285;
+    	CPP[49]		= 0.0273;
+    	CPP[50]		= 0.0164;
+    	CPP[51]		= 0.0164;
+    	CPP[52]		= 0.0200;
+    	CPP[53]		= 0.0199;
+	N_VScale(1e-3, pb.CP, pb.CP);
 }

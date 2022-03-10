@@ -7,6 +7,7 @@
 //Class stuff
 using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
+using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
 
 //==================================
 //New problem class
@@ -15,10 +16,12 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 			N_Vector y,realtype Delx)
 {
 	this->num_equations= num_eqs;
-	this->pb;//create the problem
+	//Create TChem Pb
+	this->pb;						//create the problem
 	this->pb._p 	= 101325;				//Standard (1 atm) pressure
 	this->pb._work	= work;
 	this->pb._kmcd 	= kmcd;
+	//End TChem problem
 	this->NumGridPts= GridPts;
 	this->vecLength = num_eqs * GridPts;
 	sunindextype Block = this->vecLength * this->vecLength;
@@ -30,6 +33,7 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 	this->Ghost 	= N_VNew_Serial(num_eqs);
 	N_VScale(1.0 , y, this->Ghost);				//Use y to get the ghost points.
 	this->Tmp 	= N_VNew_Serial(vecLength);
+	this->OMEGA	= N_VNew_Serial(vecLength);
 	this->delx 	= Delx;
 	this->VelAve	= N_VNew_Serial(GridPts);
 	this->LeftDiff	= 0;
@@ -37,6 +41,11 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 	this->VelScrap	= N_VNew_Serial(GridPts+1);
 	this->SmallChem	= N_VNew_Serial(num_eqs);
 	this->HeatingOn = 1;
+	this->Scrap 	= N_VNew_Serial(vecLength);		//Temp storage, clean before accessing.
+	this->CP	= N_VNew_Serial(vecLength);
+	this->Lambda	= 6.17e-2;				//Refactor in an input later.
+	this->RHO	= N_VNew_Serial(vecLength);		//Stores the density
+	this->dumpJac	= 0;
 }
 
 void myPb2::SetAdvDiffReacPow(realtype adv, realtype diff, realtype reac, realtype pow, bool up)
@@ -72,6 +81,10 @@ myPb2::~myPb2()
 	N_VDestroy_Serial(this->SmallChem);
 	N_VDestroy_Serial(this->SmallScrap);//Problematic line?
 	N_VDestroy_Serial(this->VelScrap);
+	N_VDestroy_Serial(this->OMEGA);
+	N_VDestroy_Serial(this->Scrap);
+	N_VDestroy_Serial(this->CP);
+	//N_VDestroy_Serial(this->RHO);
 }
 
 //===============================
@@ -128,15 +141,23 @@ void myPb2::TempGradient(N_Vector State, N_Vector Gradient)
 	realtype * GD		= N_VGetArrayPointer(this->Ghost);
 	realtype * GradD	= N_VGetArrayPointer(Gradient);
 	int	MaxPos		= 0;
+	int	End		= this->NumGridPts;
 	N_VScale(0.0, Gradient, Gradient);				//Zero out
 	//Loop
 	GradD[0]=(SD[0]-GD[0])/this->delx;				// Boundary
+	//Old Version
+	/*
 	for( int i =1 ; i < this->NumGridPts-1; i ++)			// Treat boundary separately
 	{
 		GradD[i]= (SD[i]-SD[i-1])/this->delx;			// (T[i]-T[i-1])/Delx
 		if(GradD[i]>GradD[MaxPos])
 			MaxPos=i;
 	}
+	*/
+	//New Version
+	for( int i = 1 ; i < End; i ++)
+		GradD[i] = ( SD[i] - SD[i - 1])/this->delx;
+	//GradD[End]	=  GradD[End-1];
 	this->FlameFrontLocation=MaxPos;
 }
 
@@ -144,12 +165,14 @@ void myPb2::TempGradient(N_Vector State, N_Vector Gradient)
 //Called by the main function in the integration loop
 //===================================================
 //Still debugging
+//ToDo:		The best Experiment with 50 points still has a cusp on the right side velocity.
 //===================================================
 void myPb2::UpdateOneDVel(N_Vector State)
 {//This might be bugged.  Need further investigation.
 	//Declare and clean
 	N_Vector VTemp 		= N_VClone(this->VelAve);		//Scalar size
 	N_Vector TempGrad	= N_VClone(this->Vel);			//Velocity size.
+	N_Vector Scratch	= N_VClone(this->SmallChem);		//Used for right ghost
 	N_VScale(0.0, VTemp, VTemp);					//Clean
 	N_VScale(0.0, Tmp, Tmp);					//Clean
 	N_VScale(0.0, TempGrad, TempGrad);				//Clean
@@ -159,58 +182,90 @@ void myPb2::UpdateOneDVel(N_Vector State)
 	realtype * SCP		= N_VGetArrayPointer(this->SmallChem);
 	realtype * GD		= N_VGetArrayPointer(this->Ghost);
 	realtype * TG		= N_VGetArrayPointer(TempGrad);
+	realtype * VelP		= N_VGetArrayPointer(this->Vel);
 	realtype LeftTemp	= 0;
 	realtype RightTemp	= 0;
 	int End 		= this->NumGridPts-1;			//The final vector entry
 
+	realtype DT		= 0.1470/(1.7 * 1286);
+	//realtype LPre         	= 0.0617;
+        realtype LPost          = .147;
+        //realtype mad            = 1e-4;
+        realtype cpPI           = 1456.9;
+        //realtype cp             = 1286;
+        //realtype rho            = 1.7;
+        realtype rhoPI          = 0.32758;
+        //realtype DiffP          = LPre/(cp * rho);
+        realtype DiffPI         = LPost/(cpPI * rhoPI);
+	//realtype DTPre	= DiffP;
+	realtype DTPost	= 	DiffPI;
+	//realtype RhoCp	= 1.0/(1.7 * 1286);
+
 	//See Dr. Bisetti's book, chapter 17 for full details.
-	//Begin Chem term
-	this->GhostChem(0, this->Ghost, this->SmallChem, this);		//Set left boundary Chem term
+	//Begin Chem term: omegaT/(rho* cp * T)
+	//Need to modify the ghost point
+	//???
+	SUPER_2_VEC(End, N_VGetArrayPointer(Scratch), SD, this->num_equations, this->NumGridPts);//Added now
+	//???
+	//this->GhostChem(0, this->Ghost, this->SmallChem, this);	//Set left boundary Chem term Original
+
+	this->GhostChem(0, Scratch, this->SmallChem, this);		//Floating Chem using Scratch
 	SUPER_CHEM_RHS_TCHEM(0, State, this->Tmp, this);		//Set post integration Chem term
-	//The grids are different sizes so we need to manually move the data.
-	//calculate Omega/(T rho c_p)
+
+	//calculate OmegaT/(T rho c_p)= SUPER_CHEM_RHS_TCHEM / T
 	for(int i = 0 ; i < this->NumGridPts; i ++)			//Put the temp int VTemp
-		VTempData[i]	= TmpD[i]/SD[i];			//Divide by temperature
+		VTempData[i]	= TmpD[i]/(SD[i]); 			//Divide by temperature
 
-	LeftTemp  = SCP[0]/GD[0];//May need to be zero			//Set left boundary data, fixed point
+	LeftTemp  = SCP[0]/(GD[0]);					//May need to be zero //Set left boundary data, fixed point
 	RightTemp = VTempData[End];					//Set right boundary 0 N conditions
-	N_VScale(0.0, this->Tmp, this->Tmp);				//Zero out the Tmp Vector
+	//End first component: omegaT/(rhp * cp * T)
 
-	//Start Diff Term
-	/*
-	SUPER_RHS_DIFF(0, State, this->Tmp, this);			//Set regular State Diffuision
-	N_VScale(this->Diff, this->Tmp, this->Tmp);			//Scale by Diff term
-									//Different sized grids, loop
-	for(int i = 0 ; i < this->NumGridPts; i ++)			//Place Temp Diff into VTemp
-		VTempData[i]	+= TmpData[i];				//Only use regular diffusion.
-	//Empty Right boundary						//0 Diffusion boundary condition
-	LeftTemp += this->Diff * (SD[0] - GD[0])/(pow(this->delx,2));	//Set Left Boundary condtion.
-	*/
+	N_VScale(0.0, this->Tmp, this->Tmp);				//Clean out Tmp Vec for later use
+	//========================================
 	//New Derivative and flame front position.
+	//========================================
 	//Set grad(T)(x)
-	this->TempGradient(State, TempGrad);
-	N_VScale(this->Diff, TempGrad, TempGrad);
-
-	//Start Heat source term
 	/**/
+	this->TempGradient(State, TempGrad);				//Call the method to set TempGrad
+	N_VScale(this->Diff, TempGrad, TempGrad);			//Scale TempGrad by Diff setting, 0 or 1 
+		N_VScale(DTPost, TempGrad, TempGrad);			//Scale TempGrad by DT.
+		for(int i = 0; i < this->NumGridPts; i++)		//Loop over Temp indices.
+		{
+			TG[i] = TG[i]/SD[i];				//Divide by the temperature.
+		}
+	TG[End+1]	= TG[End]/SD[End-1];
+	/**/
+	//=========================================
+	//Heating component
+	//=========================================
 	//This will turn on/off depending on Temperature max value or time.
-	SUPER_RHS_HEATING(0, State, this->Tmp, this);			//Calculate heating
-	N_VScale(this->Power, this->Tmp, this->Tmp);			//Scale appropriately
-	this->HeatingRightGhost= this->Power*this->HeatingRightGhost;	//Scale the ghost point
-	for( int i =0 ; i < this->NumGridPts; i ++)
-		VTempData[i] 	+= TmpD[i]/SD[i];
+	if(this->HeatingOn==1)
+	{
+		SUPER_RHS_HEATING(0, State, this->Tmp, this);			//Calculate heating
+		N_VScale(this->Power, this->Tmp, this->Tmp);			//Scale on/off
+		this->HeatingRightGhost	= this->HeatingOn *
+				this->Power*this->HeatingRightGhost;	//Scale on/off the ghost point
+		for( int i =0 ; i < this->NumGridPts; i ++)
+			VTempData[i] 	+= TmpD[i]/SD[i];
 
-	LeftTemp += 0;							//Should always be zero
-	RightTemp+= this->HeatingRightGhost/SD[End];			//Call the end boundary
+		LeftTemp += 0;							//Should always be zero
+		RightTemp+= this->HeatingRightGhost/SD[End];			//Call the end boundary
+	}
 	/**/
+	//======================
+	//Finalize
+	//======================
 	this->VelIntegrate(VTempData, State, LeftTemp, RightTemp);
 	//V(x) = Integral( omega/(rho T c_p) ,[0,x] ) + V(0);		See VelIntegrate function
-	N_VLinearSum(1.0, this->Vel, 1.0, TempGrad, this->Vel);//V+=Grad(T)(x)
+	N_VLinearSum(1.0, this->Vel, 1.0, TempGrad, this->Vel);		//V+=Grad(T)(x)
 	N_VAddConst(this->Vel, -1.0*TG[0], this->Vel);			//V-=Grad(T)(0)
 	this->SetVelAve();						//Modify VelAve
+	if(N_VMin(this->Vel)<0)
+		std :: cout << "Warning: Velocity is negative @" << this->t <<"\n";
 	//Destroy Temp Vectors
 	N_VDestroy(VTemp);
 	N_VDestroy(TempGrad);
+	N_VDestroy(Scratch);
 	//Exit
 }
 
@@ -293,8 +348,133 @@ void myPb2::SetGhostPVel(N_Vector y, int Experiment, int SampleNum, realtype Vel
 		this->SetVels(this->NumGridPts+1,VelVal);
 }
 
+void myPb2::CheckNaN(N_Vector State, int vecLength)
+{
+        realtype * DATA = N_VGetArrayPointer(State);
+        for( int i = 0 ; i < vecLength; i ++)
+        {
+                if(isnan(DATA[i]) || abs(DATA[i]) >1e5)
+                {
+                        if( isnan(DATA[i]) )
+                                std :: cout << "Data has NaN: " <<  i << DATA[i] << "\n";
+                        if(abs(DATA[i]) > 1e5)
+                                std :: cout << "Data is out of control: "<< i << DATA[i] <<"\n";
+                        exit(EXIT_FAILURE);
+
+                }
+        }
 
 
+}
+//================================
+//   ___
+//  / _ \                     _
+// / / \ \  _  _   ___   ___ (_)  ____
+// \ \_/ < | || | / _ | |  _|| | |    |
+//  \___^_\\___.| \_._| |_|  |_| |_||_|
+//Remove later
+//==================================================================================
+//Fetches the thermal data given the input State.
+//Note:  The state needs to be ripped apart and remodified to be run via TCHEM.
+//State is written as [T1...Tn, Y11, ..., Y1n, Y21, ... , Y2n, ... , Ym1, ..., Ymn]
+//Needs to have pressure following the Ti statement.
+//We really only care about Cp Mass Mix, which gets tacked onto the temperature term.
+//==================================================================================
+void myPb2::FetchTherm(N_Vector State)
+{
+        int Length              = N_VGetLength(State);				//Length = n+1
+        int num_eqs             = this->num_equations;
+        int grid_sz   		= this->NumGridPts;
+        N_Vector smallY	    	= N_VNew_Serial(num_eqs);			//[T, Y1, ..., Yn]
+	N_Vector TCState	= N_VNew_Serial(num_eqs+1);			//[T, p , Y1, ... , Yn]
+        N_Vector fTmp    	= N_VClone(smallY);				//[f1, f2, ... , fn+1]
+	N_Vector cpmm		= N_VNew_Serial(1);				//cpmm
+        realtype * yPtr 	= NV_DATA_S(smallY);				//points to small y
+	realtype * PDATA	= N_VGetArrayPointer(TCState);			//points to TCState
+        realtype * STATEDATA    = NV_DATA_S(State);				//points to the state grids
+        realtype * FDATA        = NV_DATA_S(fTmp);				//points to the rhs, output
+        realtype * cpArrPtr	= N_VGetArrayPointer(this->CP);            	//CP data ptr
+        realtype * cpmmArrPtr	= N_VGetArrayPointer(this->SmallScrap);   	//CPMassMix array data ptr
+	realtype * cpmmPtr	= N_VGetArrayPointer(cpmm);			//points to cpmm
+	//realtype * omegaPtr	= N_VGetArrayPointer(this->OMEGA);		//Points to Omega
+	//realtype * rhoPtr	= N_VGetArrayPointer(this->RHO);		//Points to Rho
+
+        //TCHEM stuff
+        int nBatch=1;
+        const auto kmcd = this->kmd.createConstData<TChem::exec_space>();
+        const auto exec_space_instance = TChem::exec_space();
+        using policy_type = typename TChem::UseThisTeamPolicy<TChem::exec_space>::type;
+        policy_type policy(exec_space_instance, nBatch, Kokkos::AUTO());
+        const ordinal_type level = 1;
+        //const ordinal_type per_team_extent = NetProductionRatePerMass::getWorkSpaceSize(kmcd);
+        const ordinal_type per_team_extent = SpecificHeatCapacityPerMass :: getWorkSpaceSize();
+        ordinal_type per_team_scratch =TChem::Scratch<real_type_1d_view>::shmem_size(per_team_extent);
+        policy.set_scratch_size(level, Kokkos::PerTeam(per_team_scratch));
+        //Main loop
+        for(int i = 0 ; i < grid_sz ; i ++ )
+        {//March over copies/grid points and grab a data set.
+                SUPER_2_VEC(i, yPtr, STATEDATA, num_eqs, grid_sz);              //Appears to be working
+		//ToDo
+		//begin loop
+		//Get x from superX  							(./)
+		//Organize x into pGrid							(./)
+		//Wrap the pGrid into X							(./)
+		//run TChem.  f will have the cp data, g will have the cpmm data.	(./)
+		//put f and g back into the big grid					(./)
+		//end loop
+
+		//ToDo
+		//Wrap RHO
+		//run TCHEM RHO function
+		//place each instance into RHO
+
+		PDATA[0]		= yPtr[0];
+		PDATA[1]		= this->pb._p;
+		for (int j = 1 ; j < Length; j ++)
+			PDATA[ j + 1 ] 	= yPtr[j];
+
+                using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
+                using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
+                // output rhs vector and x via a kokkos wrapper.
+                real_type_2d_view_type X(PDATA          ,       1,      num_eqs + 1);
+                real_type_2d_view_type f(FDATA          ,       1,      num_eqs);
+                real_type_1d_view_type g(cpmmPtr        ,       1);			//Needs fixing sb 1
+		//real_type_2d_view_type O(omegaPtr	,	1,	num_eqs-1);
+		//real_type_2d_view_type R(rhoPtr		,	1,	1);
+                //===============================
+                // Compute cp and cpmm
+                //===============================
+                //auto member =  Tines::HostSerialTeamMember();
+                //pbPtr->pb.computeFunction(member, x ,f);
+                TChem::SpecificHeatCapacityPerMass::runDeviceBatch(policy, X, f, g, kmcd);
+		//TChem::Impl::RhoMixMs();//(policy,		R,	kmcd); 	//???
+                //TChem::NetProductionRatePerMass::runDeviceBatch(policy, x, f, kmcd);  //Enters and nans
+                VEC_2_SUPER(i, FDATA, cpArrPtr, num_eqs, grid_sz);          	//Set FDATA into cpArr
+		cpmmArrPtr[i] = cpmmPtr[0];					//Set cpmm into its array.
+        }
+}
+
+
+
+//=====================================================================
+//Try manually computing the cp_T, which is the sum of cp_k * Y_k
+//input	: y
+//Note	: y must be organized as [T, y1, y2, ... ,yk] for this to work.
+//=====================================================================
+realtype myPb2::ComputeCpTemp(N_Vector y)
+{
+	realtype cpmm 		= 0;
+	realtype * cpData	= N_VGetArrayPointer(this->CP);
+	realtype * data		= N_VGetArrayPointer(y);
+	int length		= N_VGetLength(y);
+
+	//Ignore temp, thus data starts @ i=1, while cpData starts @ i=0.
+	for( int i = 1 ; i < length; i++)
+	{
+		cpmm	+=cpData[i-1]*data[i];
+	}
+	return cpmm;
+}
 //=====================================
 //End Class functions
 //===========================================================
@@ -324,6 +504,28 @@ int CHEM_RHS_TCHEM(realtype t, N_Vector u, N_Vector udot, void * pb)
         pbPtr->computeFunction(member, x ,f);
         return 0;
 }
+int CHEM_RHS_TCHEM_V2(realtype t, N_Vector u, N_Vector udot, void * pb)
+{
+        //TCHEMPB *pbPtr{ static_cast<TCHEMPB*>(pb)} ;//recast the type here.
+        myPb2 * pbPtr{static_cast<myPb2 *> (pb)};//Recast
+        ordinal_type number_of_equations = pbPtr->num_equations;
+        realtype *y= NV_DATA_S(u);
+        realtype *dy=NV_DATA_S(udot);
+        /// we use std vector mimicing users' interface
+        using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
+        using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
+        // output rhs vector and x via a kokkos wrapper.
+        real_type_1d_view_type x(y,     number_of_equations);
+        real_type_1d_view_type f(dy,    number_of_equations);
+        //=================================
+        // Compute right hand side vector
+        //=================================
+        auto member =  Tines::HostSerialTeamMember();
+        pbPtr->pb.computeFunction(member, x ,f);
+        return 0;
+}
+
+
 
 //===============================================================
 //   _____   ___     ____   ___    _____   _____    ___   __   _
@@ -364,6 +566,39 @@ int CHEM_COMP_JAC(N_Vector u, void* pb)
         return 0;
 }
 
+
+int CHEM_COMP_JAC_V2(N_Vector u, void* pb)
+{
+        //problem_type problem;
+        myPb2 * pbPtr{static_cast<myPb2 *> (pb)};//Recast
+        ordinal_type number_of_equations=pbPtr->num_equations;//Get number of equations
+        //======================================
+        //Set the necessary vectors and pointers
+        //======================================
+        realtype *y= NV_DATA_S(u);
+        realtype *JacD= NV_DATA_S(pbPtr->Jac);
+        //=============================================
+        //We use std vector mimicing users' interface
+        //=============================================
+        using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
+        using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
+        using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
+
+        //============================================
+        // output rhs vector and J matrix wrappers.
+        //============================================
+
+        real_type_1d_view_type x(y   ,   number_of_equations);
+        real_type_2d_view_type J(JacD,   number_of_equations, number_of_equations);
+
+        //===============================
+        /// Compute Jacobian
+        //===============================
+        auto member =  Tines::HostSerialTeamMember();
+        pbPtr->pb.computeJacobian(member, x ,J);
+        return 0;
+}
+
 int CHEM_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void* pb, N_Vector tmp)
 {
         //problem_type problem;
@@ -381,6 +616,27 @@ int CHEM_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void*
         MatrixVectorProduct(number_of_equations, JacD, v, tmp, JV);
         return 0;
 }
+
+
+int CHEM_JTV_V2(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void* pb, N_Vector tmp)
+{
+        //problem_type problem;
+        myPb2 * pbPtr{static_cast<myPb2 *> (pb)};//Recast
+        ordinal_type number_of_equations=pbPtr->num_equations;//Get number of equations
+        //======================================
+        //Set the necessary vectors and pointers
+        //======================================
+        realtype *y= NV_DATA_S(u);
+        realtype *JacD= NV_DATA_S(pbPtr->Jac);
+        realtype *JV=NV_DATA_S(Jv);
+        //===================
+        //Compute JV
+        //===================
+        MatrixVectorProduct(number_of_equations, JacD, v, tmp, JV);
+        return 0;
+}
+
+
 
 int CHEM_JAC_VOID(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
                void * pb, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3)
@@ -418,6 +674,7 @@ int CHEM_COMP_JAC_CVODE(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
         auto member =  Tines::HostSerialTeamMember();
         pbPtr->computeJacobian(member, x ,J);//Do not transpose, let Jtv handle this.
 	/**/
+	//This may be entirely uneccessary
 	for (int i = 0 ; i < number_of_equations; i ++)//Need to swap orientation
 	{//row
 		for (int j = 0 ; j < number_of_equations; j++)//column
@@ -426,6 +683,49 @@ int CHEM_COMP_JAC_CVODE(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
 	/**/
 	return 0;
 }
+
+
+
+int CHEM_COMP_JAC_CVODE_V2(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
+               void * pb, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3)
+{
+        //problem_type problem;
+        myPb2 * pbPtr{static_cast<myPb2 *> (pb)};//Recast
+        ordinal_type number_of_equations=pbPtr->num_equations;//Get number of equations
+        //======================================
+        //Set the necessary vectors and pointers
+        //======================================
+        realtype *y= NV_DATA_S(u);
+        realtype *JacD= NV_DATA_S(pbPtr->Jac);
+        realtype *SUNJACPTR = SM_DATA_D(Jac);
+        //=============================================
+        //We use std vector mimicing users' interface
+        //=============================================
+        using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
+        using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
+        using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
+
+        //============================================
+        // output rhs vector and J matrix wrappers.
+        //============================================
+        real_type_1d_view_type x(y   ,   number_of_equations);
+        real_type_2d_view_type J(JacD,   number_of_equations, number_of_equations);
+        //===============================
+        /// Compute Jacobian
+        //===============================
+        auto member =  Tines::HostSerialTeamMember();
+        pbPtr->pb.computeJacobian(member, x ,J);//Do not transpose, let Jtv handle this.
+        /**/
+        for (int i = 0 ; i < number_of_equations; i ++)//Need to swap orientation
+        {//row
+                for (int j = 0 ; j < number_of_equations; j++)//column
+                        SUNJACPTR[i+j*number_of_equations] = JacD[j + i *number_of_equations];//Swap
+        }
+        /**/
+        return 0;
+}
+
+
 //=============================
 //  _  _  ____  ___  ___  ____
 // | |/ /| <> || _ \| _ \| <> |
@@ -505,44 +805,64 @@ void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N
 //Setting React=0 is not the same as removing it
 int SUPER_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
 {
+
 	myPb2 * pb{static_cast<myPb2 *> (UserData)};//Recast
+	int Length = N_VGetLength(State);
+	N_VScale(0.0, pb->OMEGA, pb->OMEGA);				//Clean Omega
+	//pb->FetchTherm(State);
+	//GetOmegaCP(t, State, pb->CP, UserData);			//Store Omega || Cp for later
 	realtype * TmpData 	= NV_DATA_S(pb->Tmp);
 	realtype * SDD 		= NV_DATA_S(StateDot);
+
+	auto Start=std::chrono::high_resolution_clock::now();
 	N_VScale(0.0, StateDot, StateDot);
 	N_VScale(0.0, pb->Tmp, pb->Tmp);
 	if(pb->React>0){//Chemistry RHS
 		SUPER_CHEM_RHS_TCHEM(t, State, StateDot, UserData);
-		N_VScale(pb->React, StateDot, StateDot);
+		N_VScale(pb->React, StateDot, pb->Scrap);		//Save the reaction in Scrap
+		N_VScale(pb->React, StateDot, StateDot);		//Move Reaction to StateDot
 	}
 
-	SUPER_RHS_HEATING(t, State, pb->Tmp, UserData); 		//Heating, should be handled correctly
-	N_VLinearSum(pb->Power, pb->Tmp, 1.0, StateDot, StateDot);
+	N_VDiv(pb->Scrap, pb->OMEGA, pb->Scrap);			//Get the Diffusion: 1/(rho ||cp)
+	SUPER_RHS_HEATING(t, State, pb->Tmp, UserData); 		//Heating
+	N_VLinearSum(pb->Power, pb->Tmp, 1.0, StateDot, StateDot);	//Add the heating
 
 	if(pb->NumGridPts > 1)						//Skip if not enough points
 	{
-		SUPER_RHS_DIFF_NL(t, State, pb->Tmp, UserData);
-		N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);
-		SUPER_RHS_ADV_VEL(t,State,pb->Tmp,UserData);
-		//N_VMaxNorm(pb->Tmp);
-		N_VLinearSum(pb->Adv, pb->Tmp, 1.0, StateDot, StateDot);
-		N_VScale(0.0, pb->Tmp, pb->Tmp);
-		//SUPER_RHS_HEATING(t, State, pb->Tmp, UserData);
-		//N_VMaxNorm(pb->Tmp);
-		//N_VLinearSum(pb->Power, pb->Tmp, 1.0, StateDot, StateDot);
+		//SUPER_RHS_DIFF_NL(t, State, pb->Tmp, UserData);
+		SUPER_RHS_DIFF_CP(t, State, pb->Tmp, UserData);
+		N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);	//Add Diff to soln
+		SUPER_RHS_ADV_VEL(t,State,pb->Tmp,UserData);			//Centered Adv
+		N_VLinearSum(pb->Adv, pb->Tmp, 1.0, StateDot, StateDot);	//Add Adv
+		N_VScale(0.0, pb->Tmp, pb->Tmp);				//Clean Tmp
 	}
-	N_VDotProd(StateDot,StateDot);
+	auto Stop=std::chrono::high_resolution_clock::now();
+        auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+        pb->rhsTime+=Pass.count()/1e9;
 	return 0;
 }
 
+
+//=============================
+// _______
+//|__   __| _
+//   | |  _| |_  __    __
+// _ | | |_   _| \ \  / /
+//\ \| |   | |    \ \/ /
+// \___|   |_|     \__/
 //=============================
 //Same issue as above
 //=============================
 int SUPER_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void * pb, N_Vector tmp)
 {
-	myPb2 * pbPtr{static_cast<myPb2 *> (pb)};//Recast
+	myPb2 * pbPtr{static_cast<myPb2 *> (pb)};			//Recast
+	//N_VScale(0.0, pbPtr->CP, pbPtr->CP);                     	//Clean Omega
+	//pbPtr->FetchTherm(u);
+        //GetOmegaCP(t, u, pbPtr->CP, pb);			       	//Store Omega for later
 
         N_VScale(0.0, Jv, Jv);
         N_VScale(0.0, tmp, tmp);
+	auto Start=std::chrono::high_resolution_clock::now();
 	if(pbPtr->React>0){
       		SUPER_CHEM_JTV(v, Jv, t, u, fu, pb, tmp);
 		N_VScale(pbPtr->React, Jv, Jv);
@@ -551,9 +871,13 @@ int SUPER_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 	{
 		SUPER_ADV_VEL_JTV(v, tmp, t, v, fu, pb, tmp);
 		N_VLinearSum(pbPtr->Adv, tmp , 1.0, Jv, Jv);
-		SUPER_DIFF_NL_JTV(v,tmp,t,u, fu, pb, tmp);
+		//SUPER_DIFF_NL_JTV(v, tmp, t, u, fu, pb, tmp);
+		SUPER_DIFF_CP_JTV(v,tmp,t,u, fu, pb, tmp);
         	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
 	}
+	auto Stop=std::chrono::high_resolution_clock::now();
+        auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+        pbPtr->jacTime+=Pass.count()/1e9;
         return 0;
 }
 
@@ -603,6 +927,7 @@ int SUPER_CHEM_JAC_TCHEM(realtype t, N_Vector State, N_Vector StateDot, SUNMatri
 				N_Vector tmp2, N_Vector tmp3)
 {
 	myPb2 * pbPtr{static_cast<myPb2 *> (pb)};//Recast
+	auto Start=std::chrono::high_resolution_clock::now();
         int Length = N_VGetLength(State);
         int num_eqs = pbPtr->num_equations;
         int grid_sz = pbPtr->NumGridPts;	//Length/num_eqs; //This give a grid size/ # copies
@@ -633,7 +958,9 @@ int SUPER_CHEM_JAC_TCHEM(realtype t, N_Vector State, N_Vector StateDot, SUNMatri
                 	for(int k = 0; k < num_eqs; k++)
                         	JACDATA[i*Block + j * num_eqs + k] = TEMPJACDATA[j*num_eqs + k];
         }
-
+	auto Stop=std::chrono::high_resolution_clock::now();
+        auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+        pbPtr->jacMakeTime+=Pass.count()/1e9;
         N_VDestroy_Serial(yTemp);
 	N_VDestroy_Serial(JacTemp);
 	return 0;
@@ -743,6 +1070,9 @@ int Clean(int length, realtype * Data)
 	return 0;
 }
 
+//==================================
+//Marked for Removal upon completion
+//==================================
 int RescaleTemp(realtype scaling, realtype * StateData, int numPts)
 {//Rescales the temperature points
 	for( int i = 0 ; i < numPts; i++)
@@ -751,6 +1081,9 @@ int RescaleTemp(realtype scaling, realtype * StateData, int numPts)
 }
 
 //==================================
+//COMPLETED AND DEBUGGED
+//==================================
+//==================================
 //ADV Stuff
 //==================================
 //Super Adv
@@ -758,13 +1091,13 @@ int RescaleTemp(realtype scaling, realtype * StateData, int numPts)
 int SUPER_RHS_ADV(realtype t, N_Vector State, N_Vector StateDot, void * userData)
 {
 	myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
-	realtype delx = 1.0 / (problem->NumGridPts);
-	realtype divisor = -1.0 / (2 * delx);
+	realtype delx 		= 1.0 / (problem->NumGridPts);
+	realtype divisor 	= -1.0 / (2 * delx);
 	realtype * uData	= N_VGetArrayPointer(State);
 	realtype * resultData 	= N_VGetArrayPointer(StateDot);
-	realtype * Ghost = NV_DATA_S(problem->Ghost);
-	int numPts = problem->NumGridPts;
-	int vecLength = problem->num_equations * numPts;
+	realtype * Ghost 	= NV_DATA_S(problem->Ghost);
+	int numPts 		= problem->NumGridPts;
+	int vecLength 		= problem->num_equations * numPts;
 	int Grid = 0;
 	for (int i = 0; i < vecLength ; i++)
         {
@@ -778,24 +1111,28 @@ int SUPER_RHS_ADV(realtype t, N_Vector State, N_Vector StateDot, void * userData
         }
 	return 0;
 }
-
+//----------------------------------
+// __    __  ___   _
+// \ \  / / |  _| | |
+//  \ \/ /  |  _| | |__
+//   \__/   |___| |____|
 //==================================
 //Super Adv Vel
 //==================================
 int SUPER_RHS_ADV_VEL(realtype t, N_Vector State, N_Vector StateDot, void * userData)
 {
         myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
-        realtype delx = 1.0 / (problem->NumGridPts);
-        realtype divisor = -1.0 / (2 * delx);
+        realtype delx 		= 1.0 / (problem->NumGridPts);
+        realtype divisor 	= -1.0 / (2 * delx);
         realtype * uData        = N_VGetArrayPointer(State);
         realtype * resultData   = N_VGetArrayPointer(StateDot);
-        realtype * Ghost = NV_DATA_S(problem->Ghost);
+        realtype * Ghost 	= NV_DATA_S(problem->Ghost);
 	realtype * VAD		= N_VGetArrayPointer(problem->VelAve);
 	problem->SetVelAve();
-        int numPts = problem->NumGridPts;
-        int vecLength = problem->num_equations * numPts;
-        int Grid = 0;
-	int FI 		= 0;
+        int numPts 		= problem->NumGridPts;
+        int vecLength 		= problem->num_equations * numPts;
+        int Grid 		= 0;
+	int FI 			= 0;
         for (int i = 0; i < vecLength ; i++)
         {
                 Grid = floor(i/problem->NumGridPts);
@@ -820,11 +1157,11 @@ int SUPER_ADV_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, 
         realtype * Ghost 	= NV_DATA_S(problem->Ghost);
 	realtype * VelAveD	= NV_DATA_S(problem->VelAve);
         int numPts 		= problem->NumGridPts;
-        int vecLength = problem->num_equations * problem->NumGridPts;
-        int Grid = 0;
+        int vecLength 		= problem->num_equations * problem->NumGridPts;
+        int Grid 		= 0;
         for (int i = 0; i < vecLength; i++)
         {
-                Grid = floor(i/problem->NumGridPts);
+                Grid 		= floor(i/problem->NumGridPts);
                 if( i % numPts == 0) //left boundary
                         resultData[i] = divisor * uData[i + 1]; //fix boundary condition here
                 else if( i % numPts == (numPts-1) )//right boundary
@@ -1017,8 +1354,8 @@ int SUPER_RHS_HEATING(realtype t, N_Vector u, N_Vector uDot, void * userData)
 			x = i*delx + delx/2;
 			//x = delx * ( i + 0.5);
 			// a exp( - 1/(2* rad^2) * (x-center)^2)
-			//resultData[i] = 5e10 * exp(-1e5 * pow(x - OffSet, 2 ) );
 			resultData[i] = 5e8 * exp( -1e8 * pow(x - OffSet, 2) );
+			//resultData[i] = 5e10 * exp( -2e8 * pow(x - OffSet, 2) );
 			//resultData[i] = 5e10 * exp( -1e8 * pow( delx * (i+1-problem->NumGridPts) , 2 ) );
 		}
 		problem->HeatingRightGhost=5e8 * exp( -1e8 * pow(x+delx/2 - OffSet, 2) );
@@ -1042,7 +1379,7 @@ void myPb2::GhostChem(realtype t, N_Vector y, N_Vector ydot, void * pb)
 void myPb2::CheckHeating(N_Vector State, realtype t)
 {
 	if(this->HeatingOn ==1)
-		if(N_VMaxNorm(State)>3500 && t > 1e-6)//2600 originally
+		if(N_VMaxNorm(State)> 2600 && t > 1e-6)//2600 originally//usually 2100
 		{
 			this->HeatingOn = 0;
 			std :: cout << "Heating off \n";
@@ -1080,4 +1417,185 @@ void myPb2::VerifyHeatingExp(N_Vector State, N_Vector State0, realtype tElapsed)
 
 
 }
+//
+//Generates (omega_sum, omega_1, ... , omega_n)
+//Take RHS/ Omega to get the Thermal DT|D coefficients, sans lambda (thermal conductivity)
+//
 
+int GetOmegaCP(realtype t, N_Vector State, N_Vector Cp, void * userData)
+{
+	myPb2 * pbPtr{static_cast<myPb2 *> (userData)};//Recast
+        int Length 		= N_VGetLength(State);
+        int num_eqs 		= pbPtr->num_equations;
+        int grid_sz 		= pbPtr->NumGridPts;
+        N_Vector yTemp 		= N_VNew_Serial(num_eqs);
+        N_Vector fTemp 		= N_VNew_Serial(num_eqs);
+        realtype * DATA 	= NV_DATA_S(yTemp);
+        realtype * STATEDATA 	= NV_DATA_S(State);
+        realtype * FDATA 	= NV_DATA_S(fTemp);
+        realtype * STATEDOTDATA = NV_DATA_S(Cp);				//CP data ptr
+	realtype * CPMM		= N_VGetArrayPointer(pbPtr->SmallScrap);	//CPMassMix data ptr
+
+	//TCHEM stuff
+	int nBatch=1;
+	const auto kmcd = pbPtr->kmd.createConstData<TChem::exec_space>();
+        const auto exec_space_instance = TChem::exec_space();
+	using policy_type = typename TChem::UseThisTeamPolicy<TChem::exec_space>::type;
+        policy_type policy(exec_space_instance, nBatch, Kokkos::AUTO());
+        const ordinal_type level = 1;
+	//const ordinal_type per_team_extent = NetProductionRatePerMass::getWorkSpaceSize(kmcd);
+	const ordinal_type per_team_extent = SpecificHeatCapacityPerMass :: getWorkSpaceSize();
+        ordinal_type per_team_scratch =TChem::Scratch<real_type_1d_view>::shmem_size(per_team_extent);
+        policy.set_scratch_size(level, Kokkos::PerTeam(per_team_scratch));
+	//Main loop
+        for(int i = 0 ; i < grid_sz ; i ++ )
+        {//March over copies/grid points and grab a data set.
+                SUPER_2_VEC(i, DATA, STATEDATA, num_eqs, grid_sz);		//Appears to be working
+                using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
+                using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
+                // output rhs vector and x via a kokkos wrapper.
+                real_type_2d_view_type x(DATA		,	1,	num_eqs);
+                real_type_2d_view_type f(FDATA		,	1,	num_eqs);
+		real_type_1d_view_type g(CPMM		,	num_eqs);
+                //===============================
+                // Compute cp and cpmm
+                //===============================
+                //auto member =  Tines::HostSerialTeamMember();
+                //pbPtr->pb.computeFunction(member, x ,f);
+		TChem::SpecificHeatCapacityPerMass::runDeviceBatch(policy, x, f, g, kmcd);
+		//TChem::NetProductionRatePerMass::runDeviceBatch(policy, x, f, kmcd);	//Enters and nans
+                VEC_2_SUPER(i, FDATA, STATEDOTDATA, num_eqs, grid_sz);		//Set FDATA into OMEGA
+        }
+	for(int i = 0 ; i < Length; i ++)
+	{
+		if(isnan(STATEDOTDATA[i]))
+		{
+			std::cout<< "Cp Error\n";
+			std:: cout << i << " has " << STATEDOTDATA[i] << std :: endl;
+			exit(EXIT_FAILURE);
+		}
+	}
+	return 0;
+}
+
+
+int SUPER_RHS_DIFF_CP(realtype t, N_Vector u, N_Vector uDot, void * userData)
+{
+        myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
+        realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
+        realtype * resultData   = NV_DATA_S(uDot);//stuff goes in here.
+	realtype * CPDATA	= N_VGetArrayPointer(problem->SmallScrap);
+        int numPts 		= problem->NumGridPts;
+	realtype L		= problem->Lambda;
+        realtype delx           = problem->delx;
+        realtype divisor        = 1.0/(delx * delx);
+        int grid = 0;
+        int tempInd = 0;
+        realtype T = 1;
+        realtype * Ghost = NV_DATA_S(problem->Ghost);
+        int vecLength = problem->num_equations * problem->NumGridPts;
+        realtype c = 1.0 * divisor;
+	realtype LP             = 0.0617;
+        realtype LPI            = .147;
+        realtype mad            = 1e-4;
+        realtype cpPI           = 1456.9;
+        realtype cp             = 1286;
+        realtype rho            = 1.7;
+        realtype rhoPI          = 0.32758;
+        realtype DiffP          = LP/(cp * rho);
+        realtype DiffPI         = LPI/(cpPI * rhoPI);
+
+
+
+        for (int i = 0; i < vecLength; i++)
+        {
+                tempInd = i%numPts;
+		if(i < numPts)
+		{
+			//if(uData[i] <2600)
+			//	T = DiffP;
+			//else
+				T = DiffPI;
+			//T= 0.1470/(1.7 * 1286);	//L*uData[tempInd]/800;		//Replace later with a more accurate number
+			//T = L*uData[tempInd] / CPDATA[i];//if we are in the temp range, use 1/(rho cp)
+		}
+		else
+                	T = 1e-4;	//uData[tempInd];		//This adds the non-linearity we wanted
+
+                grid = floor(i/problem->NumGridPts);
+                if(i% numPts == 0)//left
+                        resultData[i] = T * c * (Ghost[grid] - 2*uData[i] + uData[i+1]);
+                else if (i % numPts == (numPts - 1) )//right 0 neumann
+                        resultData[i] = T * c * ( uData[i-1] - uData[i] );
+                else
+                        resultData[i] = T * c * (uData[i-1] - 2*uData[i] + uData[i+1]);
+        }
+        return 0;
+}
+
+int SUPER_DIFF_CP_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu,void* userData, N_Vector tmp)
+{
+        myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
+        realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
+        realtype * resultData   = NV_DATA_S(Jv);//stuff goes in here.
+        realtype * vData        = NV_DATA_S(v);//Stuff also comes from here
+	realtype * CPDATA	= N_VGetArrayPointer(problem->SmallScrap);
+        int numPts              = problem->NumGridPts;
+        realtype delx           = problem->delx;
+        realtype divisor        = 1.0/(delx * delx);
+        int TI                  = 0;
+        int grid                = 0;
+        realtype * Ghost        = NV_DATA_S(problem->Ghost);
+        realtype T              = 0;					//Term no Diffed temp
+	realtype DT		= 0;					//Term Diffed Temp
+        int vecLength           = problem->vecLength;
+        realtype c              = divisor;
+	realtype L		= problem->Lambda;
+	realtype LP		= 0.0617;
+	realtype LPI		= .147;
+	realtype mad		= 1e-4;
+	realtype cpPI		= 1456.9;
+	realtype cp		= 1286;
+	realtype rho		= 1.7;
+	realtype rhoPI		= 0.32758;
+	realtype DiffP		= LP/(cp * rho);
+	realtype DiffPI		= LPI/(cpPI * rhoPI);
+        for (int i = 0; i < vecLength; i++)
+        {
+                TI = i%numPts;
+                grid = floor(i/numPts);
+		if(i < numPts)						//Parse if we are in Temp or not
+		{
+			//if(uData[i] < 2600)
+			//	T	= DiffP;
+			//else
+				T	= DiffPI;
+			//T	= LPI / (rho * cp )			//Used in the default video
+			//DT	= L / 800;
+			//T 	= L*uData[i] / CPDATA[i];		//Generates:	1/(rho*cp)
+			//DT	= L / CPDATA[i];			//Generates:	1/cp
+		}
+		else
+		{
+                	T 	= mad;                       	//Associated point's temperature
+			//DT	= 1	;				//Copied for clarity
+		}
+		//Main if
+                if(i% numPts == 0)					//left
+                {
+                        resultData[i] = c * T * (-2*vData[i] + vData[i+1]);
+                        //resultData[i]+= c*DT*vData[TI] * (Ghost[ grid ] - 2 *uData[ i ] + uData[ i + 1 ]);
+                }
+                else if (i % numPts == (numPts - 1) )			//right 0 neumann
+                {
+                        resultData[i] = c * T * ( vData[i-1] - vData[i] );
+                        //resultData[i]+= c* DT * vData[TI] *  (uData[i-1] - uData[i]);
+                }
+                else
+                {
+                        resultData[i] = c * T * (vData[i-1] - 2*vData[i] + vData[i+1]);
+                        //resultData[i]+= c*DT*vData[ TI ] * (uData[ i-1 ]- 2 * uData[ i ]+ uData[ i-1 ] );
+                }
+        }
+        return 0;
+}

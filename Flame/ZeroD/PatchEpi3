@@ -23,7 +23,9 @@ OutputFile="Scratch.txt"
 ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=0 --Experiment=$Experiment
 ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI3" --Profiling=0 --Experiment=$Experiment
 ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=$Experiment
-./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=0 --Experiment=0
+
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-3 --FinalTime=10 --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI3" --Profiling=0 --Experiment=0
+
 ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=$Experiment
 ./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-6 --FinalTime=$EndT --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=0 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=$Experiment
 
@@ -31,4 +33,5 @@ inputs=gri3.0/
 chemfile=$inputs"chem.inp"
 thermfile=$inputs"therm.dat"
 OutputFile="GriScratch.txt"
-./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-7 --FinalTime=$EndT --MyFile=$OutputFile --KrylovTol=1e-6 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=2
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-8 --FinalTime=$EndT --MyFile=$OutputFile --KrylovTol=1e-2 --UseJac=1 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=2
+./ZeroDIgn.x --chemfile=$chemfile --thermfile=$thermfile --StepSize=1e-8 --FinalTime=$EndT --MyFile=$OutputFile --KrylovTol=1e-2 --UseJac=0 --SampleNum=1 --Method="EPI2" --Profiling=1 --Experiment=2
