@@ -1,12 +1,22 @@
 echo ==========================================Compiling main cpp=========================================
-#. BuildHelpers
-#Compile OneDIgn.o
+. BuildHelpers
+EPIC_PATH=/home/jstewart23/Code/C++/epic-cpp/build
+TCHEM_PATH=/home/jstewart23/Code/C++/TChem/build/install
+LIB_PATH=/home/jstewart23/Code/C++/Sundials3_0/cvode-6.1.1/installDir/lib
+NVEC_PATH=/home/jstewart23/Code/C++/Sundials3_0/cvode-6.1.1/installDir/include/nvector/
+#Compile ZeroDIgn.o
 /usr/bin/c++  -g -pg -O0 -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/Flame/OneD -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame/ZeroD/ZeroDIgnVar.cpp -o ZeroDVar.o
+
+#link in the new file: /home/jstewart23/Code/C++/Sundials3_0/cvode-6.1.1/installDir
+/usr/bin/c++  -g -pg -O0 -DKOKKOS_DEPENDENCE -I$NVEC_PATH -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/Flame/OneD -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame/ZeroD/ZeroDIgnVar.cpp -o ZeroDVar2.o
+
 echo ============================================Linking==================================================
 #Link all the helpers into OneDIgnVar.o
 /usr/bin/c++  EpiP2.o Epi3SC.o Integrators.o ZeroDVar.o trash.o Print.o Derivatives.o InitConditions.o Chemistry.o -pg -O0 -DNDEBUG -lgfortran -rdynamic -DKOKKOS_DEPENDENCE -fopenmp -Wl,-rpath,/home/jstewart23/Code/C++/TChem/build/install/openblas/lib: ~/Code/C++/TChem/build/build/tchem/core/libtchem.a /home/jstewart23/Code/C++/TChem/build/install/tines/lib/libtines.a /home/jstewart23/Code/C++/TChem/build/install/gtest/lib/libgtest_main.a /home/jstewart23/Code/C++/TChem/build/install/kokkos/lib/libkokkoscontainers.a /home/jstewart23/Code/C++/TChem/build/install/kokkos/lib/libkokkoscore.a /usr/lib/x86_64-linux-gnu/libdl.so /home/jstewart23/Code/C++/TChem/build/install/openblas/lib/libopenblas.so /home/jstewart23/Code/C++/TChem/build/install/gtest/lib/libgtest.a -lpthread -rdynamic -pthread -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so -lopenblas -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so /home/jstewart23/Code/C++/epic-cpp/build/Integrators/libepic1.0.0.a -lopenblas /usr/local/lib/libsundials_cvode.so /usr/local/lib/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -o ZeroDIgnVar.x
 
+/usr/bin/c++  EpiP2.o Epi3SC.o Integrators.o ZeroDVar2.o trash.o Print.o Derivatives.o InitConditions.o Chemistry.o -pg -O0 -DNDEBUG -lgfortran -rdynamic -DKOKKOS_DEPENDENCE -fopenmp -Wl,-rpath,$TCHEM_PATH/openblas/lib: ~/Code/C++/TChem/build/build/tchem/core/libtchem.a $TCHEM_PATH/tines/lib/libtines.a $TCHEM_PATH/gtest/lib/libgtest_main.a $TCHEM_PATH/kokkos/lib/libkokkoscontainers.a $TCHEM_PATH/kokkos/lib/libkokkoscore.a /usr/lib/x86_64-linux-gnu/libdl.so $TCHEM_PATH/openblas/lib/libopenblas.so $TCHEM_PATH/gtest/lib/libgtest.a -lpthread -rdynamic -pthread -Wl,-rpath,/usr/local/lib:/usr/lib/x86_64-linux-gnu/openmpi/lib -lopenblas /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so $EPIC_PATH/Integrators/libepic1.0.0.a -lopenblas $LIB_PATH/libsundials_cvode.so $LIB_PATH/libsundials_cvode.so.6 $LIB_PATH/libsundials_nvecparallel.so /usr/local/lib/libsundials_nvecserial.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -o ZeroDIgnVar2.x
 echo =======================================Removing intermediary objects=================================
 
 #Clean up
 rm ZeroDVar.o
+rm ZeroDVar2.o

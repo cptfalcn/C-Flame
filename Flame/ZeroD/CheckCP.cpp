@@ -180,30 +180,47 @@ int main(int argc, char* argv[])
 		problem2.SetGhostPVel(y,Experiment, SampleNum,0);
 		problem2.kmd		= kmd;
 		void *UserData2		= &problem2;
-		/**/
+		/*
 
+
+		//This block writes the state into the TChem vector, formatted [T, p, Y's], then runs
 		SetState(data, SDot, problem.pb._p, vecLength);
 		GetOmegaCP(0, State, problem.CP, UserData);			//Store cp in problem2.CP
+
 
 
 		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
 		cout << "Data:\n";
 		PrintData(State);
+
 		//CPMass
 		cout << "cp:\n";
 		PrintData(problem.CP);
 		//CPMass Mixture
 		cout << "cp mass mix:\n";
 		PrintData(problem.SmallScrap);
-
-
-		//Likely bugged, remove for now
-		/*
-		cout << "Manual cp mass mix:\n";
-		realtype cpmm = problem.ComputeCpTemp(y);
-		cout << cpmm << endl;
 		*/
+		//End block
 
+		realtype Rho 		= 0;
+		realtype ySum		= 0;
+		realtype cp		= 0;
+
+		//========================================
+		//Rho calculation
+		//Factor this into Chemistry.cpp in a loop
+		//========================================
+		for(int i = 0; i < problem.pb._kmcd.nSpec; i++)
+		{
+			ySum	+= data[i+1]/problem.pb._kmcd.sMass(i);
+		}
+
+		//cout << "Mass sum\n";
+		//cout << ySum << endl;
+		cout << "input\n";
+		PrintData(y);
+		Rho 	= problem.pb._p/ (kmcd.Runiv * ySum * data[0]  );
+		cout << "Density calculation: " << Rho << endl;
 
 		//Compare against the wrapped function
 		//Known now to be bugged
@@ -215,16 +232,23 @@ int main(int argc, char* argv[])
 		PrintData(problem2.SmallScrap);
 		*/
 
-		/*
+		/**/
 		problem.FetchTherm(y);
+		GetOmegaCP(0, y, problem.CP, UserData);
+		realtype * cpData	= N_VGetArrayPointer(problem.CP);
+		//Try to manually calculate cp
+		for( int i = 0 ; i  < problem.pb._kmcd.nSpec; i ++)
+			cp	+= cpData[ i + 1 ] * data[ i+1 ];//Using i+2 makes it agree with the call to TChem
+
 		cout << "\nFetch function version\n";
-		cout << "cp mass mix:\n";
+		cout << "Single Fetch cp mass mix:\n";
 		PrintData(problem.SmallScrap);
-		*/
+		cout << "Calculated cp: " << cp << endl;
+		/**/
 
 		/**/
 		problem2.FetchTherm(y2);
-		//cout << "Lifted y\n";
+		cout << "Lifted y\n";
 		//PrintData(y2);
 		cout << "\nFetch function on lifted version\n";
 		PrintData(problem2.CP);

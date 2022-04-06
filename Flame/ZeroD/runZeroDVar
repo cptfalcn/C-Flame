@@ -1,0 +1,3 @@
+./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-6 --FinalTime=10 --MyFile="KapiliDebug.txt" --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="CVODEKry" --Profiling=0 --Experiment=0 --absTol=1e-8 --relTol=1e-6
+
+./ZeroDIgnVar2.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=.00001 --FinalTime=10 --MyFile="KapiliDebug.txt" --KrylovTol=1e-4 --UseJac=1 --SampleNum=1 --Method="EPI3V" --Profiling=0 --Experiment=2 --absTol=1e-10 --relTol=1e-1
