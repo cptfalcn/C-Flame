@@ -232,6 +232,14 @@ int main(int argc, char* argv[])
 		problem2.SetGhostPVel(y, Experiment, SampleNum, 0);	//Do additional set up.
 		problem2.SetAdvDiffReacPow(ADV, DIFF, CHEM, POW, VelUp);//Additional set up.
 		problem2.kmd = kmd;
+		if(problem2.NumGridPts>1)		//If there are more than 1 point we need the transport data
+		{
+			ReadData(problem2.CPPoly, "Cp_fT.txt");
+			ReadData(problem2.TempTable, "Tf.txt");
+			ReadData(problem2.RhoTable, "rho_fT.txt");
+			ReadData(problem2.DiffTable, "Diff_fT.txt");
+			problem2.VerifyTempTable(State);
+		}
 		//SetCP(problem2);					//Adding this line causes segfault *shrugs
 		void *UserData = &problem2;
 		int MaxKrylovIters = 500; //max(vecLength, 500);//500 is the base
@@ -367,7 +375,13 @@ int main(int argc, char* argv[])
 			}
 			cout << "\nTotal integration time: " << KTime << " sec " << endl;
 			cout << "Total time spent in rhs: " << problem2.rhsTime << " sec" << endl;
+			cout << "\t Diff rhs: " <<problem2.rhs_Diff << " sec\n";
+			cout << "\t Adv rhs: " << problem2.rhs_Adv << " sec\n";
+			cout << "\t Chem rhs: " << problem2.rhs_Chem << " sec\n";
 			cout << "Total time spent in jtv: " << problem2.jacTime << " sec" << endl;
+			cout << "\t Diff jtv: " <<problem2.jtv_Diff << " sec\n";
+                        cout << "\t Adv jtv: " << problem2.jtv_Adv << " sec\n";
+                        cout << "\t Chem jtv: " << problem2.jtv_Chem << " sec\n";
 			cout << "Total time spent in jacMake: " << problem2.jacMakeTime << " sec\n";
 		}
 		if(problem2.NumGridPts > 1)
@@ -537,8 +551,10 @@ void CheckNanBlowUp(N_Vector State, int vecLength)
 
 }
 
+//Appears unused
 void SetCP(myPb2 pb)
 {
+	//This fills thermal diffusion coefficients, idk but naming is dumb
 	realtype * CPP 	= N_VGetArrayPointer(pb.CP);		//Rescale by 1e-3 at end
 	CPP[1]		= 0.1014;
 	CPP[2]		= 0.1674;
@@ -594,4 +610,20 @@ void SetCP(myPb2 pb)
     	CPP[52]		= 0.0200;
     	CPP[53]		= 0.0199;
 	N_VScale(1e-3, pb.CP, pb.CP);
+}
+
+
+//Currently writing, uncompiled.
+void ReadData(N_Vector target, string fileName)
+{
+	realtype * ptr	= N_VGetArrayPointer(target);
+	int len		= N_VGetLength(target);
+	string line;
+	ifstream file (fileName);			//Open the file
+	for( int i =0 ; i < len; i ++)
+	{
+		getline(file, line);
+		ptr[i] = std :: stod(line);
+	}
+	file.close();
 }

@@ -183,6 +183,23 @@ void IntConGri30(realtype * data, int SampleNum)
                 data[48]	=  0.736962400000000; //N2
 		cout << BAR << "Gri Sample: Hi Pressure" << BAR << endl;
 		break;
+	case 5: //High temp setup
+		data[0]  =  1300;
+		data[14] =  5.483858845025559731e-02;//CH4
+                data[4]  =  2.187578062376045740e-01;//O2
+                data[48] =  7.137587863547695255e-01;//N2
+                data[49] =  1.264481895737025810e-02;//AR
+                cout << BAR <<"GRI Experiment Sample 2\t" << BAR <<endl;
+		break;
+	case 6: //Low temp long burn
+		cout << BAR << "GRI Experiment: Long burn" << BAR << endl;
+		data[0] =   810.0;//use 1000 for base
+                data[14] =  5.483858845025559731e-02;//CH4
+                data[4]  =  2.187578062376045740e-01;//O2
+                data[48] =  7.137587863547695255e-01;//N2
+                data[49] =  1.264481895737025810e-02;//AR
+                cout << BAR <<"GRI Experiment Sample 1\t" << BAR <<endl;
+                break;
 	case 69:
 		cout << BAR << "Gri Sample: 1e-4 Hi-P" << BAR << endl;
 		ConditionsFromFile(data, "GriIgnition.txt");

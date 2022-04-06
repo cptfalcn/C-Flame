@@ -476,7 +476,12 @@ IntegratorStats *Epi3VChem_KIOPS::Integrate(const realtype hStart, const realtyp
 	int ProgressDots	= 0;
 	myPb2 * pb{static_cast<myPb2 *> (userData)};    //Recast
 	ofstream myfile;
+	pb->MaxStepTaken		= 0;
+	pb->MinStepTaken		= 1;
         myfile.open(pb->dumpJacFile, std:: ios_base::app);
+	ofstream datafile;
+	datafile.open("EPI3VData.txt", std::ios_base::app);
+	int IgnDelay		= 0;
         //=======================
         //Standard error checking
         //=======================
@@ -511,7 +516,7 @@ IntegratorStats *Epi3VChem_KIOPS::Integrate(const realtype hStart, const realtyp
                 realtype ErrEst=0;
                 count = 0;
 		IntSteps ++;
-                while(Err > 1.0 )
+                while(Err > 1 )//was 1
                 {
                         count ++;
                         h=hNew;//h = k;
@@ -549,15 +554,6 @@ IntegratorStats *Epi3VChem_KIOPS::Integrate(const realtype hStart, const realtyp
                         N_VScale(h,Remainder,Remainder);        //set Remainder= h R(Y1)
                         N_Vector stage2InputVecs[]= {zeroVec, zeroVec, zeroVec, Remainder}; //[0,0,0,hR(Y1)]
 
-                		//std :: cout << "\n\n Jac: \n";
-                		//N_VPrint_Serial(pb->Jac);
-                		//std :: cout << "\n\n hfy: \n";
-                		//N_VPrint_Serial(hfy);
-				//std :: cout <<"Remainder: \n";
-				//N_VPrint_Serial(Remainder);
-				//std :: cout << "y: \n";
-				//N_VPrint_Serial(y);
-				//std :: cout << "h: \n"<< h << "\n";
 
                         krylov->Compute(4, stage2InputVecs, timePts2, 1, stage2OutputVecs, &jtimesv,
                                 h, krylovTol, basisSizes[0], &integratorStats->krylovStats[0]);
@@ -571,8 +567,6 @@ IntegratorStats *Epi3VChem_KIOPS::Integrate(const realtype hStart, const realtyp
                         ErrEst = ErrEst/ N_VGetLength(r3);			//Normalize ErrEst
                         ErrEst = EPICRSqrt(ErrEst);				//sqrt ErrEst
                         Err = ErrEst;                                           //Finalize Error Estimate
-                        //ErrEst= sqrt(N_VDotProd(r3,r3)/N_VGetLength(r3));     //Get the error estimate
-
 
 			//============================
 			//Past this point errors arise
@@ -581,12 +575,16 @@ IntegratorStats *Epi3VChem_KIOPS::Integrate(const realtype hStart, const realtyp
                         //hNew = min(tFinal-t, max(h/5.0, min(5.0*h,hNew)));
 			//hNew = h * min(2.0, max(.01, min(5.0, 0.9 * pow(ErrEst, - 1.0/2.0) ) ) );
 			//cout << "hNew Est: " << hNew << "\t\t" << t  << "\t\tErrEst: " << Err;
-				if(hNew>100*h)//we increase the time
-				{
-					hNew= 2*h;			//throttle
-					//std :: cout <<"throttled @ t = " << t << endl;
-				}
-
+			if(hNew>100*h)//we increase the time
+			{
+				hNew= 2*h;			//throttle
+				//std :: cout <<"throttled @ t = " << t << endl;
+			}
+			if(1000*hNew<h)
+			{
+				hNew= 0.01*h;
+				std :: cout << "Woah buddy, you are slowing down too much, take a break\n";
+			}
                         if( hNew>hMax)
                         {
                                 hNew=hMax;
@@ -613,26 +611,52 @@ IntegratorStats *Epi3VChem_KIOPS::Integrate(const realtype hStart, const realtyp
 		this->CheckNanBlowUp(y, N_VGetLength(y));	//Check for errors
 		t = t + h;                              	//Advance the time
 		myPb2 * pb{static_cast<myPb2 *> (userData)};	//Recast
+
+		//Check curret stepsize against mins and maxes
+		if(h > pb->MaxStepTaken)
+			pb->MaxStepTaken=h;
+		if(h < pb->MinStepTaken)
+			pb->MinStepTaken=h;
+
+		if(data[0] >1500 && IgnDelay ==0)
+		{
+			cout << "Ign Delay between: ";
+			cout << t-h << "and " << t << endl;
+			IgnDelay=1;
+			pb->ignTime= t - h/2.0;
+		}
 		pb->t=t;					//Set time for pass back;
 		if(pb->Movie==1)
 		{
+			//myfile.open(pb->dumpJacFile, std:: ios_base::app);
 			realtype * jacPtr	= N_VGetArrayPointer(pb->Jac);
-			//ofstream myfile;
-			//myfile.open(pb->dumpJacFile);
+			//cout << N_VGetLength(pb->Jac)<< endl;
 			for(int i = 0 ; i < N_VGetLength(pb->Jac); i ++)
-				myfile << jacPtr[i] << "\n";
+			{
+				myfile << jacPtr[i];
+				myfile.flush();
+				myfile << "\n";
+			}
 			myfile << h << "\n";
-			//std :: cout << "MOVIE PRINTED!\n";
-			//myfile.close();
-		}
-		//N_VPrint_Serial(y);
-		//std :: cout << "\n\n Jac: \n";
-		//N_VPrint_Serial(pb->Jac);
-		//std :: cout << "\n\n hfy: \n";
-		//N_VPrint_Serial(hfy);
-		//std :: cout << "\n\n h: " << h << "\n";
-		ProgressDots = TrackProgress(tFinal, t, PercentDone, ProgressDots);
+			//Print y data to file
+			for(int i = 0 ; i < N_VGetLength(y); i++)
+				datafile << data[i] << endl;
 
+			datafile << h << endl;
+			datafile << Err << endl;
+			datafile << IgnDelay << endl;
+			datafile << t << endl;
+			datafile << relTol << endl;
+			datafile << absTol << endl;
+			//cout << "\ny: \n";
+			//N_VPrint_Serial(y);
+			//cout << "\nhfy:\n";
+			//N_VPrint_Serial(hfy);
+			//cout << "\nRemainder:\n";
+			//N_VPrint_Serial(Remainder);
+			//cout << h <<endl;
+		}
+		ProgressDots = TrackProgress(tFinal, t, PercentDone, ProgressDots);
 
 		if(finalStep)					//Check EOL
 			break;					//Yes?  	Exit
@@ -648,7 +672,10 @@ IntegratorStats *Epi3VChem_KIOPS::Integrate(const realtype hStart, const realtyp
         }
 	std :: cout << std :: endl;
 	if(pb->Movie==1)
+	{
 		myfile.close();
+		datafile.close();
+	}
         return integratorStats;
 }
 
@@ -660,7 +687,9 @@ void Epi3VChem_KIOPS::Clean(N_Vector y, int length)
         realtype * yD = N_VGetArrayPointer(y);
         for(int i = 0;   i<length;  i++)
                 if(yD[i]<0)
+		{
                         yD[i]=0;
+		}
 
 }
 

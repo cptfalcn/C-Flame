@@ -78,11 +78,25 @@ class myPb2{
 	//Timers
 	realtype	dataMoveTime;
 	realtype	jacTime;
+	realtype	jtv_Chem;
+	realtype	jtv_Adv;
+	realtype	jtv_Diff;
 	realtype	rhsTime;
+	realtype	rhs_Chem;
+	realtype	rhs_Adv;
+	realtype	rhs_Diff;
 	realtype        jacMakeTime;
-	//End Timers
+	realtype	integrateTime;
+	//Timestep data
+	realtype	MaxStepTaken;
+	realtype	MinStepTaken;
+	//Storage vectors
 	N_Vector	OMEGA;
 	N_Vector	CP;
+	N_Vector	CPPoly;
+	N_Vector	TempTable;
+	N_Vector	RhoTable;
+	N_Vector	DiffTable;
 	N_Vector	RHO;
 	N_Vector	Vel;
 	N_Vector	Scrap;
@@ -92,11 +106,13 @@ class myPb2{
 	realtype	PMultiplier;
 	realtype	LeftDiff;
 	N_Vector	SmallChem;
+	//Parameter selectors
 	realtype	Adv;
 	realtype	Diff;
 	realtype	React;
 	realtype	Power;
 	realtype	t;
+	realtype	ignTime;
 	bool		VelUp;
 	int		FlameFrontLocation;
 	realtype	HeatingRightGhost;
@@ -108,6 +124,8 @@ class myPb2{
 	void CheckNaN(N_Vector, int);				//Checks the vector for NaN
 	realtype ComputeCpTemp(N_Vector y);
 	void FetchTherm(N_Vector State);			//Sets cp and cpmm(the wanted quantity).
+	void VerifyTempTable(N_Vector State);			//Verify Read in and run a temperature test.
+	int  TempTableLookUp(realtype Temp, N_Vector TempTable);//Lookup a table
 };
 
 //End class stuff

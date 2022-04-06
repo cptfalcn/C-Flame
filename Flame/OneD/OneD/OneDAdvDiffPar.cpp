@@ -132,9 +132,7 @@ int main(int argc, char *argv[])
 	realtype * EPI3VDATA= NV_DATA_P(EPI3VState->u);
 	realtype * EPI3DATA= NV_DATA_P(EPI3State->u);
 	//Print2File(UDATA, problemState, "AdvDiffIC.txt");
-	
-
-    // Create the integrator. In this case we use EpiRK5C, for other integrators just use their name.
+    	// Create the integrator. In this case we use EpiRK5C, for other integrators just use their name.
     	const int MaxKryIts = 500;
 
     	Epi2_KIOPS * EPI2 = new Epi2_KIOPS(RHS, Jtv, EPI2State->userData, MaxKryIts, EPI2State->u, NEQ);
@@ -194,7 +192,7 @@ int main(int argc, char *argv[])
 
 	auto Stop3 =std::chrono::high_resolution_clock::now();
         auto Pass3 = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop3-Start3);
-	std :: cout << "Completed variable Epi3 integration\n";
+	std :: cout << "Completed Epi3 integration\n";
 
 	//EPI3
 	auto Start4 = std::chrono::high_resolution_clock::now();
@@ -203,14 +201,14 @@ int main(int argc, char *argv[])
 
 	auto Stop4 =std::chrono::high_resolution_clock::now();
 	auto Pass4 = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop4-Start4);
-	std :: cout << "Completed Epi3 integration.\n";
+	std :: cout << "Completed Epi3 ROS integration.\n";
 
 			  Ros3->Integrate(ModStepSize, InitTime, FinalTime, NumBands, EPI3RosState->u,
 						KrylovTol, startingBasisSizes);
 	std :: cout << "Completed Rosenbrock3 integration.\n";
 
 	/**/
-    // Print the statistics
+    	// Print the statistics
 	/*
 	std :: cout << "EPI2 Run\n";
 	PrintStats(myProcessor, integratorStats);
@@ -245,7 +243,7 @@ int main(int argc, char *argv[])
 	//EPI3V vs reference experiment
 	/**/
 	N_VLinearSum(1.0, RefState->u, -1.0, EPI3VState->u, EPI3VState->userData->scratch1);
-	std :: cout << "Adaptive EPI3 integration time: " << Pass3.count()/1e9 << std:: endl;
+	std :: cout << "EPI3 integration time: " << Pass3.count()/1e9 << std:: endl;
 	std :: cout << "TimeSteps: " << integratorStats2->numTimeSteps << endl; 
 	std :: cout << "L2 error norm of adaptive method from fixed method: " <<
 	  sqrt(N_VDotProd(EPI3VState->userData->scratch1, EPI3VState->userData->scratch1)) << std :: endl;
@@ -255,16 +253,10 @@ int main(int argc, char *argv[])
 	N_VLinearSum(1.0, EPI3State->u, -1.0, RefState->u, EPI3State->userData->scratch1);
 	std :: cout << "EPI3 Stepsize: " << ModStepSize << endl;
 	std :: cout << "EPI3 integration time: " << Pass4.count()/1e9 << std ::endl;
-	std :: cout << "EPI3 L2 error norm: " <<
+	std :: cout << "EPI3 ROS L2 error norm: " <<
 		sqrt(N_VDotProd(EPI3State->userData->scratch1, EPI3State->userData->scratch1))<< std::endl;
 	std :: cout << "\n";
 	//EPI3 vs EPI3V experiment
-	/*
-	N_VLinearSum(1.0, problemState3->u, -1.0, problemState4->u, problemState4->userData->scratch1);
-	std :: cout << "EPI3 method differences: " <<
-		sqrt(N_VDotProd(problemState4->userData->scratch1, problemState4->userData->scratch1)) <<std::endl;
-	std :: cout << "\n";
-	*/
 	//EPIP2 Vs Ref
 	N_VLinearSum(1.0, EPIP2State->u, -1.0, RefState->u, EPIP2State->userData->scratch1);
 	std :: cout << "EPIP2 Stepsize: " << ModStepSize << endl;

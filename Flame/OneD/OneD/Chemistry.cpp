@@ -35,17 +35,22 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 	this->Tmp 	= N_VNew_Serial(vecLength);
 	this->OMEGA	= N_VNew_Serial(vecLength);
 	this->delx 	= Delx;
-	this->VelAve	= N_VNew_Serial(GridPts);
+	this->VelAve	= N_VNew_Serial(GridPts);		//Averaged velocity
 	this->LeftDiff	= 0;
-	this->SmallScrap= N_VNew_Serial(GridPts);
-	this->VelScrap	= N_VNew_Serial(GridPts+1);
+	this->SmallScrap= N_VNew_Serial(GridPts);		//Used for any small grid
+	this->VelScrap	= N_VNew_Serial(GridPts+1);		//Used for any velocity grid
 	this->SmallChem	= N_VNew_Serial(num_eqs);
 	this->HeatingOn = 1;
 	this->Scrap 	= N_VNew_Serial(vecLength);		//Temp storage, clean before accessing.
-	this->CP	= N_VNew_Serial(vecLength);
+	this->CP	= N_VNew_Serial(vecLength);		//Needs editing
 	this->Lambda	= 6.17e-2;				//Refactor in an input later.
-	this->RHO	= N_VNew_Serial(vecLength);		//Stores the density
-	this->dumpJac	= 0;
+	this->RHO	= N_VNew_Serial(vecLength);		//Stores the density, needs editing
+	this->dumpJac	= 0;					//Do we dump the Jac for visualization
+	//Data Tables:	All fixed sizes
+	this->CPPoly	= N_VNew_Serial(500);
+	this->TempTable	= N_VNew_Serial(500);
+	this->RhoTable	= N_VNew_Serial(500);
+	this->DiffTable	= N_VNew_Serial(500*num_eqs);		//Each scalar has its own table
 }
 
 void myPb2::SetAdvDiffReacPow(realtype adv, realtype diff, realtype reac, realtype pow, bool up)
@@ -84,7 +89,10 @@ myPb2::~myPb2()
 	N_VDestroy_Serial(this->OMEGA);
 	N_VDestroy_Serial(this->Scrap);
 	N_VDestroy_Serial(this->CP);
-	//N_VDestroy_Serial(this->RHO);
+	N_VDestroy_Serial(this->TempTable);
+	N_VDestroy_Serial(this->RhoTable);
+	N_VDestroy_Serial(this->CPPoly);
+	N_VDestroy_Serial(this->DiffTable);
 }
 
 //===============================
@@ -183,9 +191,17 @@ void myPb2::UpdateOneDVel(N_Vector State)
 	realtype * GD		= N_VGetArrayPointer(this->Ghost);
 	realtype * TG		= N_VGetArrayPointer(TempGrad);
 	realtype * VelP		= N_VGetArrayPointer(this->Vel);
+
+	realtype * CPDATA	= N_VGetArrayPointer(this->SmallScrap);
+	realtype * LookupTemp	= N_VGetArrayPointer(this->TempTable);
+	realtype * LookupCp	= N_VGetArrayPointer(this->CPPoly);
+	realtype * LookupDiff	= N_VGetArrayPointer(this->DiffTable);
+	realtype * LookupRho	= N_VGetArrayPointer(this->RhoTable);
+
 	realtype LeftTemp	= 0;
 	realtype RightTemp	= 0;
 	int End 		= this->NumGridPts-1;			//The final vector entry
+	int TInd		= 0;
 
 	realtype DT		= 0.1470/(1.7 * 1286);
 	//realtype LPre         	= 0.0617;
@@ -228,10 +244,11 @@ void myPb2::UpdateOneDVel(N_Vector State)
 	/**/
 	this->TempGradient(State, TempGrad);				//Call the method to set TempGrad
 	N_VScale(this->Diff, TempGrad, TempGrad);			//Scale TempGrad by Diff setting, 0 or 1 
-		N_VScale(DTPost, TempGrad, TempGrad);			//Scale TempGrad by DT.
+		//N_VScale(DTPost, TempGrad, TempGrad);			//Scale TempGrad by DT.
 		for(int i = 0; i < this->NumGridPts; i++)		//Loop over Temp indices.
 		{
-			TG[i] = TG[i]/SD[i];				//Divide by the temperature.
+			TInd = this->TempTableLookUp(SD[i], this->TempTable);
+			TG[i] = LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  ) * TG[i]/SD[i];//Divide by the temperature.
 		}
 	TG[End+1]	= TG[End]/SD[End-1];
 	/**/
@@ -373,6 +390,7 @@ void myPb2::CheckNaN(N_Vector State, int vecLength)
 // \ \_/ < | || | / _ | |  _|| | |    |
 //  \___^_\\___.| \_._| |_|  |_| |_||_|
 //Remove later
+/*
 //==================================================================================
 //Fetches the thermal data given the input State.
 //Note:  The state needs to be ripped apart and remodified to be run via TCHEM.
@@ -447,7 +465,7 @@ void myPb2::FetchTherm(N_Vector State)
                 //auto member =  Tines::HostSerialTeamMember();
                 //pbPtr->pb.computeFunction(member, x ,f);
                 TChem::SpecificHeatCapacityPerMass::runDeviceBatch(policy, X, f, g, kmcd);
-		//TChem::Impl::RhoMixMs();//(policy,		R,	kmcd); 	//???
+		//TChem::Impl::RhoMixMs();//(policy, R, kmcd); //???
                 //TChem::NetProductionRatePerMass::runDeviceBatch(policy, x, f, kmcd);  //Enters and nans
                 VEC_2_SUPER(i, FDATA, cpArrPtr, num_eqs, grid_sz);          	//Set FDATA into cpArr
 		cpmmArrPtr[i] = cpmmPtr[0];					//Set cpmm into its array.
@@ -455,12 +473,12 @@ void myPb2::FetchTherm(N_Vector State)
 }
 
 
-
 //=====================================================================
 //Try manually computing the cp_T, which is the sum of cp_k * Y_k
 //input	: y
 //Note	: y must be organized as [T, y1, y2, ... ,yk] for this to work.
 //=====================================================================
+
 realtype myPb2::ComputeCpTemp(N_Vector y)
 {
 	realtype cpmm 		= 0;
@@ -475,6 +493,7 @@ realtype myPb2::ComputeCpTemp(N_Vector y)
 	}
 	return cpmm;
 }
+*/
 //=====================================
 //End Class functions
 //===========================================================
@@ -521,7 +540,11 @@ int CHEM_RHS_TCHEM_V2(realtype t, N_Vector u, N_Vector udot, void * pb)
         // Compute right hand side vector
         //=================================
         auto member =  Tines::HostSerialTeamMember();
+	auto StartChem=std::chrono::high_resolution_clock::now();
         pbPtr->pb.computeFunction(member, x ,f);
+	auto StopChem=std::chrono::high_resolution_clock::now();
+        auto PassChem = std::chrono::duration_cast<std::chrono::nanoseconds>(StopChem-StartChem);
+        pbPtr->rhs_Chem+=PassChem.count()/1e9;
         return 0;
 }
 
@@ -632,7 +655,11 @@ int CHEM_JTV_V2(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, vo
         //===================
         //Compute JV
         //===================
+	auto StartChem=std::chrono::high_resolution_clock::now();
         MatrixVectorProduct(number_of_equations, JacD, v, tmp, JV);
+	auto StopChem=std::chrono::high_resolution_clock::now();
+        auto PassChem = std::chrono::duration_cast<std::chrono::nanoseconds>(StopChem-StartChem);
+        pbPtr->jtv_Chem+=PassChem.count()/1e9;
         return 0;
 }
 
@@ -692,6 +719,7 @@ int CHEM_COMP_JAC_CVODE_V2(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
         //problem_type problem;
         myPb2 * pbPtr{static_cast<myPb2 *> (pb)};//Recast
         ordinal_type number_of_equations=pbPtr->num_equations;//Get number of equations
+	auto Start=std::chrono::high_resolution_clock::now();
         //======================================
         //Set the necessary vectors and pointers
         //======================================
@@ -722,6 +750,9 @@ int CHEM_COMP_JAC_CVODE_V2(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
                         SUNJACPTR[i+j*number_of_equations] = JacD[j + i *number_of_equations];//Swap
         }
         /**/
+	auto Stop=std::chrono::high_resolution_clock::now();
+        auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+        pbPtr->jacMakeTime+=Pass.count()/1e9;
         return 0;
 }
 
@@ -818,9 +849,13 @@ int SUPER_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
 	N_VScale(0.0, StateDot, StateDot);
 	N_VScale(0.0, pb->Tmp, pb->Tmp);
 	if(pb->React>0){//Chemistry RHS
+		auto StartChem=std::chrono::high_resolution_clock::now();
 		SUPER_CHEM_RHS_TCHEM(t, State, StateDot, UserData);
 		N_VScale(pb->React, StateDot, pb->Scrap);		//Save the reaction in Scrap
 		N_VScale(pb->React, StateDot, StateDot);		//Move Reaction to StateDot
+		auto StopChem=std::chrono::high_resolution_clock::now();
+		auto PassChem = std::chrono::duration_cast<std::chrono::nanoseconds>(StopChem-StartChem);
+                pb->rhs_Chem+=PassChem.count()/1e9;
 	}
 
 	N_VDiv(pb->Scrap, pb->OMEGA, pb->Scrap);			//Get the Diffusion: 1/(rho ||cp)
@@ -830,10 +865,19 @@ int SUPER_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
 	if(pb->NumGridPts > 1)						//Skip if not enough points
 	{
 		//SUPER_RHS_DIFF_NL(t, State, pb->Tmp, UserData);
+		auto StartDiff=std::chrono::high_resolution_clock::now();
 		SUPER_RHS_DIFF_CP(t, State, pb->Tmp, UserData);
 		N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);	//Add Diff to soln
+		auto StopDiff=std::chrono::high_resolution_clock::now();
+		auto PassDiff = std::chrono::duration_cast<std::chrono::nanoseconds>(StopDiff-StartDiff);
+                pb->rhs_Diff+=PassDiff.count()/1e9;
+
+		auto StartAdv=std::chrono::high_resolution_clock::now();
 		SUPER_RHS_ADV_VEL(t,State,pb->Tmp,UserData);			//Centered Adv
 		N_VLinearSum(pb->Adv, pb->Tmp, 1.0, StateDot, StateDot);	//Add Adv
+		auto StopAdv=std::chrono::high_resolution_clock::now();
+		auto PassAdv = std::chrono::duration_cast<std::chrono::nanoseconds>(StopAdv-StartAdv);
+                pb->rhs_Adv+=PassAdv.count()/1e9;
 		N_VScale(0.0, pb->Tmp, pb->Tmp);				//Clean Tmp
 	}
 	auto Stop=std::chrono::high_resolution_clock::now();
@@ -864,16 +908,28 @@ int SUPER_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
         N_VScale(0.0, tmp, tmp);
 	auto Start=std::chrono::high_resolution_clock::now();
 	if(pbPtr->React>0){
+		auto StartChem=std::chrono::high_resolution_clock::now();
       		SUPER_CHEM_JTV(v, Jv, t, u, fu, pb, tmp);
 		N_VScale(pbPtr->React, Jv, Jv);
+		auto StopChem=std::chrono::high_resolution_clock::now();
+		auto PassChem = std::chrono::duration_cast<std::chrono::nanoseconds>(StopChem-StartChem);
+        	pbPtr->jtv_Chem+=PassChem.count()/1e9;
 	}
 	if(pbPtr->NumGridPts > 1 )//skip if not enough points
 	{
+		auto StartAdv=std::chrono::high_resolution_clock::now();
 		SUPER_ADV_VEL_JTV(v, tmp, t, v, fu, pb, tmp);
 		N_VLinearSum(pbPtr->Adv, tmp , 1.0, Jv, Jv);
+		auto StopAdv=std::chrono::high_resolution_clock::now();
+		auto PassAdv = std::chrono::duration_cast<std::chrono::nanoseconds>(StopAdv-StartAdv);
+                pbPtr->jtv_Adv+=PassAdv.count()/1e9;
 		//SUPER_DIFF_NL_JTV(v, tmp, t, u, fu, pb, tmp);
+		auto StartDiff=std::chrono::high_resolution_clock::now();
 		SUPER_DIFF_CP_JTV(v,tmp,t,u, fu, pb, tmp);
         	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
+		auto StopDiff=std::chrono::high_resolution_clock::now();
+		auto PassDiff = std::chrono::duration_cast<std::chrono::nanoseconds>(StopDiff-StartDiff);
+                pbPtr->jtv_Diff+=PassDiff.count()/1e9;
 	}
 	auto Stop=std::chrono::high_resolution_clock::now();
         auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
@@ -1394,7 +1450,7 @@ void myPb2::VerifyHeatingExp(N_Vector State, N_Vector State0, realtype tElapsed)
 		//N_VPrint_Serial(State0);
 		CheckHeating(State0, 0);
 		if(this->HeatingOn==1)
-			std:: cout <<"Verifying Heating\n";
+			std:: cout << "Verifying Heating\n";
 		else
 		{
 			std :: cout << "Error with the Heating Check\n";
@@ -1417,6 +1473,57 @@ void myPb2::VerifyHeatingExp(N_Vector State, N_Vector State0, realtype tElapsed)
 
 
 }
+
+void myPb2::VerifyTempTable(N_Vector State)
+{
+	realtype * Data 	= N_VGetArrayPointer(State);
+	realtype * LookupTemp	= N_VGetArrayPointer(this->TempTable);
+	realtype * LookupCp	= N_VGetArrayPointer(this->CPPoly);
+	realtype * LookupDiff	= N_VGetArrayPointer(this->DiffTable);
+	realtype * LookupRho	= N_VGetArrayPointer(this->RhoTable);
+	realtype Temp		= Data[0];			//Just check against temp
+	std :: cout << "Temperature: " << Temp << "\n";
+	int TempInd		= 0;
+	realtype indErr		= 5;
+	int lookupLen		= N_VGetLength(this->TempTable);
+	for(int i = 0; i < lookupLen; i++)
+	{
+		if(abs(Temp-LookupTemp[i])< indErr)
+		{
+			indErr=abs(Temp-LookupTemp[i]);
+			TempInd=i;
+		}
+	}
+	if( TempInd == this->TempTableLookUp(Temp, this->TempTable) )
+		std :: cout << "Table lookup functions agree\n";
+	std :: cout << "Temp Lookup index: " << TempInd << "\n" << "Extrapolated cp: " << LookupCp[TempInd];
+	std :: cout << "Extrapolated density: " << LookupRho[TempInd] << "\n";
+	for( int i = 0 ; i < this->num_equations; i ++)
+	{
+		std :: cout << "Extrapolated D_" <<i << "\t" << LookupDiff[ TempInd + i*500] << "\n";
+	}
+}
+
+int myPb2::TempTableLookUp(realtype Temp, N_Vector TempTable)
+{
+	realtype * LookupTemp	= N_VGetArrayPointer(TempTable);
+	//realtype * Data		= N_VGetArrayPointer(State);
+	int len			= N_VGetLength(TempTable);
+	int TempInd		= 0;
+	realtype indErr		= 5;
+	//Temp			= Data[0];			//Dummy check for run.
+	for(int i = 0 ; i < len ; i ++)
+	{
+		if(abs(Temp-LookupTemp[i])< indErr)
+                {
+                        indErr=abs(Temp-LookupTemp[i]);
+                        TempInd=i;
+                }
+	}
+	return TempInd;
+}
+
+//End Verification block
 //
 //Generates (omega_sum, omega_1, ... , omega_n)
 //Take RHS/ Omega to get the Thermal DT|D coefficients, sans lambda (thermal conductivity)
@@ -1485,13 +1592,19 @@ int SUPER_RHS_DIFF_CP(realtype t, N_Vector u, N_Vector uDot, void * userData)
         realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
         realtype * resultData   = NV_DATA_S(uDot);//stuff goes in here.
 	realtype * CPDATA	= N_VGetArrayPointer(problem->SmallScrap);
+	realtype * LookupTemp	= N_VGetArrayPointer(problem->TempTable);
+	realtype * LookupCp	= N_VGetArrayPointer(problem->CPPoly);
+	realtype * LookupDiff	= N_VGetArrayPointer(problem->DiffTable);
+	realtype * LookupRho	= N_VGetArrayPointer(problem->RhoTable);
         int numPts 		= problem->NumGridPts;
 	realtype L		= problem->Lambda;
         realtype delx           = problem->delx;
         realtype divisor        = 1.0/(delx * delx);
         int grid = 0;
         int tempInd = 0;
-        realtype T = 1;
+		int TI		= 0;
+        realtype T  = 1;
+		int TInd 	= 0; 
         realtype * Ghost = NV_DATA_S(problem->Ghost);
         int vecLength = problem->num_equations * problem->NumGridPts;
         realtype c = 1.0 * divisor;
@@ -1504,25 +1617,25 @@ int SUPER_RHS_DIFF_CP(realtype t, N_Vector u, N_Vector uDot, void * userData)
         realtype rhoPI          = 0.32758;
         realtype DiffP          = LP/(cp * rho);
         realtype DiffPI         = LPI/(cpPI * rhoPI);
-
-
-
-        for (int i = 0; i < vecLength; i++)
-        {
-                tempInd = i%numPts;
+	//Start main loop
+	for (int i = 0; i < vecLength; i++)
+	{
+		tempInd = i%numPts;
+		TI 	= tempInd;
+		grid = floor(i/problem->NumGridPts);
+		//grid = floor(i/numPts);
+		TInd = problem->TempTableLookUp(uData[TI], problem->TempTable);
 		if(i < numPts)
 		{
-			//if(uData[i] <2600)
-			//	T = DiffP;
-			//else
-				T = DiffPI;
-			//T= 0.1470/(1.7 * 1286);	//L*uData[tempInd]/800;		//Replace later with a more accurate number
-			//T = L*uData[tempInd] / CPDATA[i];//if we are in the temp range, use 1/(rho cp)
+			T = DiffPI;
+			T = LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  );
 		}
 		else
-                	T = 1e-4;	//uData[tempInd];		//This adds the non-linearity we wanted
-
-                grid = floor(i/problem->NumGridPts);
+		{
+			T = 1e-4;	//uData[tempInd];		//This adds the non-linearity we wanted
+			T = LookupDiff[ grid * 500 + TInd];
+		}
+                //grid = floor(i/problem->NumGridPts);
                 if(i% numPts == 0)//left
                         resultData[i] = T * c * (Ghost[grid] - 2*uData[i] + uData[i+1]);
                 else if (i % numPts == (numPts - 1) )//right 0 neumann
@@ -1540,11 +1653,16 @@ int SUPER_DIFF_CP_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector 
         realtype * resultData   = NV_DATA_S(Jv);//stuff goes in here.
         realtype * vData        = NV_DATA_S(v);//Stuff also comes from here
 	realtype * CPDATA	= N_VGetArrayPointer(problem->SmallScrap);
+	realtype * LookupTemp	= N_VGetArrayPointer(problem->TempTable);
+	realtype * LookupCp	= N_VGetArrayPointer(problem->CPPoly);
+	realtype * LookupDiff	= N_VGetArrayPointer(problem->DiffTable);
+	realtype * LookupRho	= N_VGetArrayPointer(problem->RhoTable);
         int numPts              = problem->NumGridPts;
         realtype delx           = problem->delx;
         realtype divisor        = 1.0/(delx * delx);
         int TI                  = 0;
         int grid                = 0;
+	int TInd		= 0;
         realtype * Ghost        = NV_DATA_S(problem->Ghost);
         realtype T              = 0;					//Term no Diffed temp
 	realtype DT		= 0;					//Term Diffed Temp
@@ -1560,25 +1678,21 @@ int SUPER_DIFF_CP_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector 
 	realtype rhoPI		= 0.32758;
 	realtype DiffP		= LP/(cp * rho);
 	realtype DiffPI		= LPI/(cpPI * rhoPI);
-        for (int i = 0; i < vecLength; i++)
-        {
-                TI = i%numPts;
-                grid = floor(i/numPts);
+	for (int i = 0; i < vecLength; i++)
+	{
+		TI   = i%numPts;
+		grid = floor(i/numPts);
+		TInd = problem->TempTableLookUp(uData[TI], problem->TempTable);
+		//Set Coefficient for step
 		if(i < numPts)						//Parse if we are in Temp or not
-		{
-			//if(uData[i] < 2600)
-			//	T	= DiffP;
-			//else
-				T	= DiffPI;
-			//T	= LPI / (rho * cp )			//Used in the default video
-			//DT	= L / 800;
-			//T 	= L*uData[i] / CPDATA[i];		//Generates:	1/(rho*cp)
-			//DT	= L / CPDATA[i];			//Generates:	1/cp
+		{//In this case we need to get lambda/rhoCp for this temp
+			T	= DiffPI;
+			T 	= LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  );
 		}
 		else
-		{
+		{//We need to get DT
                 	T 	= mad;                       	//Associated point's temperature
-			//DT	= 1	;				//Copied for clarity
+			T 	= LookupDiff[ grid * 500 + TInd];
 		}
 		//Main if
                 if(i% numPts == 0)					//left

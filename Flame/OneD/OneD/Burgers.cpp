@@ -193,12 +193,12 @@ int main(int argc, char *argv[])
 	//EPI3V
 
 	auto Start3 = std::chrono::high_resolution_clock::now();
-	integratorStats2 =EPI3V->Integrate(TestStep,  FinalTime/10, KrylovTol, KrylovTol, InitTime,
+	integratorStats2 =EPI3V->Integrate(ModStepSize,  FinalTime/10, KrylovTol, KrylovTol, InitTime,
 						FinalTime, NumBands, startingBasisSizes,  EPI3VState->u);
 
 	auto Stop3 =std::chrono::high_resolution_clock::now();
         auto Pass3 = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop3-Start3);
-	std :: cout << "Completed variable Epi3 integration\n";
+	std :: cout << "Completed Epi3SV integration\n";
 
 	//EPI3
 	auto Start4 = std::chrono::high_resolution_clock::now();
@@ -245,9 +245,9 @@ int main(int argc, char *argv[])
 	//EPI3V vs reference experiment
 	/**/
 	PrintErrStepTime2File(EPI3VState->u, RefState->u, EPI3VState->userData->scratch1,
-                                Pass3.count()/1e9, ModStepSize, "BurgersDebug.txt", "EPI3V");
+                                Pass3.count()/1e9, ModStepSize, "BurgersDebug.txt", "EPI3SV");
 	PrintErrStepTime2Console(EPI3VState->u, RefState->u, EPI3VState->userData->scratch1,
-                                Pass3.count()/1e9, ModStepSize, "EPI3V");
+                                Pass3.count()/1e9, ModStepSize, "EPI3SV");
 	std :: cout << "TimeSteps: " << integratorStats2->numTimeSteps << endl << endl;
 
 	/**/
