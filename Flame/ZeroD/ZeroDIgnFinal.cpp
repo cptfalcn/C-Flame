@@ -21,11 +21,6 @@
 #include <fstream>
 #include <iomanip>
 #include "TChem_CommandLineParser.hpp"
-
-//These two will be needed in the future
-//#include "TChem_Impl_NewtonSolver.hpp"
-//#include "TChem_KineticModelData.hpp"
-//#include "TChem_Impl_TrBDF2.hpp"
 #include <chrono>
 #include "InitialConditions.h"
 #include "Chemistry.h"
@@ -82,23 +77,20 @@ int main(int argc, char* argv[])
 	realtype TNow			= 0;
 	realtype TNext			= 0;
 	realtype TNextC			= 0;			//CVODE TNext, has a tendency to change TNext
-	string MyFile 			= "Default.txt";	//Default Data dump file
-	string JacFile			= "Defaut.txt";		//Default Jac dump file
+	string MyFile 			= "Default.txt";//Default Data dump file
+	string JacFile			= "Defaut.txt";	//Default Jac dump file
 	string Method 			= "EPI2";		//Default method signature.
 	static realtype KrylovTol 	= 1e-14;
-	int UseJac=1; 						//Use the Jacobian?  1/0
-	int SampleNum=0;
-	int Experiment=1; 					//default is hydrogen, set to 0 for kapila
-	int Profiling=0;					//default to no profiling.
-	int number_of_equations=0;
-	int NumScalarPoints = 0;
-	realtype absTol = 1e-8;
-        realtype relTol = 1e-8;
-	int startingBasisSizes[] = {10, 10};//{3,3}
-
+	int UseJac				= 1; 			//Use the Jacobian?  1/0
+	int SampleNum			= 0;
+	int Experiment			= 1; 			//default is hydrogen
+	int Profiling			= 0;			//default to no profiling.
+	int number_of_equations	= 0;
+	int NumScalarPoints 	= 0;
+	realtype absTol 		= 1e-8;
+	realtype relTol 		= 1e-8;
+	int startingBasisSizes[]= {10, 10};//{3,3}
 	int Movie	= 0;
-
-
 	//=====================================================
 	//Kokkos Input Parser
 	//=====================================================
@@ -120,8 +112,8 @@ int main(int argc, char* argv[])
 	opts.set_option<std::string>("Method", "The time integration method", & Method);
 	opts.set_option<int>("Experiment", "Experiment chosen", &Experiment);
 	opts.set_option<int>("Profiling", "Output profiling data or not", &Profiling);
-        opts.set_option<realtype>("relTol", "Solver Relative Tol", &relTol);
-        opts.set_option<realtype>("absTol", "Solver Absolulte Tol", &absTol);
+	opts.set_option<realtype>("relTol", "Solver Relative Tol", &relTol);
+	opts.set_option<realtype>("absTol", "Solver Absolulte Tol", &absTol);
 	opts.set_option<int>("NumPts", "Interior points for each grid", &NumScalarPoints);
 	opts.set_option<int>("Movie", "Generate a data set at every step", &Movie);
 	opts.set_option<std::string>("JacFile", "The dump file for the Jacobian", &JacFile);
@@ -133,8 +125,6 @@ int main(int argc, char* argv[])
 	ofstream myfile(MyFile, std::ios_base::app);
 	ofstream jacfile(JacFile, std::ios_base::app);
 	int Steps=CheckStep(FinalTime, StepSize);		//Checks the number of steps
-	realtype VelStep = min(1e-5, FinalTime);
-
 	//=====================================
 	//Kokkos Sub-declarations
 	//=====================================
@@ -147,121 +137,100 @@ int main(int argc, char* argv[])
 		using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
 		//using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
 
-	    	// construct TChem's kinect model and read reaction mechanism
-    		TChem::KineticModelData kmd(chemFile, thermFile);
+		// construct TChem's kinect model and read reaction mechanism
+		TChem::KineticModelData kmd(chemFile, thermFile);
 
-	    	// construct const (read-only) data and move the data to device.
-	    	// for host device, it is soft copy (pointer assignmnet).
-	    	auto kmcd = kmd.createConstData<host_device_type>();
+		// construct const (read-only) data and move the data to device.
+		// for host device, it is soft copy (pointer assignmnet).
+		auto kmcd = kmd.createConstData<host_device_type>();
 
-    		// use problem object for ignition zero D problem, interface to source term and jacobian
-    		using problem_type = TChem::Impl::IgnitionZeroD_Problem<decltype(kmcd)>;
+		// use problem object for ignition zero D problem, interface to source term and jacobian
+		using problem_type = TChem::Impl::IgnitionZeroD_Problem<decltype(kmcd)>;
 
 		//=======================================
 		//Set number of equations and grid points
 		//=======================================
 		number_of_equations=problem_type::getNumberOfEquations(kmcd);
 
-		realtype Delx 		= 0;				//Forced to 0
-		NumScalarPoints		= 1;				//Fixed for 0-D
-		int vecLength = number_of_equations * NumScalarPoints;	//For readability
-		int num_eqs = number_of_equations;			//To reduce size
-		int num_pts = NumScalarPoints;				//To reduce size
+		realtype Delx 		= 0;					//Forced to 0
+		NumScalarPoints		= 1;					//Fixed for 0-D
+		int vecLength 		= number_of_equations;	//For readability
+		int num_eqs 		= number_of_equations;	//To reduce size
+		int num_pts 		= 1;					//To reduce size
 		//==================================================
-		//Prep/Set initial conditions, inherited from Zero-D
+		//Prep/Set initial conditions
 		//==================================================
-		N_Vector State 		= N_VNew_Serial(vecLength);	//State vector
-		N_Vector StateDot	= N_VNew_Serial(vecLength);	//State Derivative RHS vector
-		N_Vector y 		= N_VNew_Serial(num_eqs);	//intial conditions.
-		N_Vector State0 	= N_VClone(State);		//For testing purposes
-		N_VScale(0.0 , y, y);					//Zero out the y vector.
-		N_VScale(0.0, State, State);				//Zero out the State vector.
-		N_VScale(0.0, StateDot, StateDot);			//Zero out the StateDot vector.
-		N_VScale(1.0, State, State0);				//Copy State
-		realtype *data 		= NV_DATA_S(y);			//Set the y data pointer.
-		realtype *StateData 	= NV_DATA_S(State);		//Set the State data pointer.
-
-		//Initial Conditions sub-block
+		N_Vector y 			= N_VNew_Serial(num_eqs);	//intial conditions.
+		N_VScale(0.0 , y, y);							//Zero out the y vector.
+		realtype *data 		= NV_DATA_S(y);				//Set the y data pointer.
 		SetIntCons(Experiment, SampleNum, data);		//Set Initial Conditions
-		SetSuperInitCons(data, StateData, num_eqs, num_pts);	//Copy IC to State.
-		//std :: cout << "\n" << data[0] << "\n";
-		TestingInitCons(SampleNum, num_pts, num_eqs, vecLength, Delx, data, StateData);//Keep until final version
-		N_VScale(1.0, State, State0);
 		//===================================================
 		//Set TChem
 		//===================================================
-    		//TChem does not allocate any workspace internally. You create the work space using NVector,
+		//TChem does not allocate any workspace internally. You create the work space using NVector,
 		//std::vector or real_type_1d_view_type (Kokkos view). Here we use kokkos view.
-		//Set up an ignition problem and the workspace. Unused in Experiment 0.
 		//=========================================================================
 		const int problem_workspace_size = problem_type::getWorkSpaceSize(kmcd);
 		real_type_1d_view_type work("workspace", problem_workspace_size);
 
 		myPb2 problem2(num_eqs, work, kmcd, num_pts, y, Delx);	//Construct new Problem.
-		//problem2.SetGhostPVel(y, Experiment, SampleNum, 0);	//Do additional set up.
 		problem2.SetAdvDiffReacPow(0, 0, 1, 0, 0);//Additional set up.
-		problem2.kmd = kmd;
-		void *UserData = &problem2;
-		int MaxKrylovIters = 500; //max(vecLength, 500);//500 is the base
+		problem2.kmd 		= kmd;
+		void *UserData 		= &problem2;
+		int MaxKrylovIters 	= 500; //max(vecLength, 500);//500 is the base
 		//==================
 		//Create integrators
 		//==================
 		//CVODE
-                void * cvode_mem;
-		SUNMatrix A			= SUNDenseMatrix(vecLength, vecLength);
-		SUNLinearSolver SUPERLS 	= SUNLinSol_SPGMR(State, PREC_NONE, 20);
-		SUNNonlinearSolver SUPERNLS 	= SUNNonlinSol_Newton(State);
-		//Set EPI_KIOPS methods
-		Epi2_KIOPS	*Epi2			= NULL;
-		Epi3_KIOPS 	*Epi3			= NULL;
-		EpiRK4SC_KIOPS	*EpiRK4			= NULL;
+		void * cvode_mem;
+		SUNMatrix A							= SUNDenseMatrix(vecLength, vecLength);
+		SUNLinearSolver SUPERLS 			= SUNLinSol_SPGMR(y, PREC_NONE, 20);
+		SUNNonlinearSolver SUPERNLS 		= SUNNonlinSol_Newton(y);
+		
+		//Set EPIXX_KIOPS methods
+		Epi2_KIOPS	*Epi2					= NULL;
+		Epi3_KIOPS 	*Epi3					= NULL;
+		EpiRK4SC_KIOPS	*EpiRK4				= NULL;
 		IntegratorStats *integratorStats 	= NULL;
-		//===================================================
-		//Parse the experiment cases and make the integrators
-		//===================================================
-		//if(Experiment!=0)//If using TChem problems
-		//{//Epi2=new Epi2_KIOPS(SUPER_CHEM_RHS_TCHEM, SUPER_CHEM_JTV, UserData, MaxKrylovIters, State, vecLength);//old version
-		Epi2 = 	new Epi2_KIOPS(CHEM_RHS_TCHEM_V2,CHEM_JTV_V2,UserData,MaxKrylovIters,State,vecLength);
 
-		Epi3 = 	new Epi3_KIOPS(SUPER_RHS,SUPER_JTV,UserData,MaxKrylovIters,State,vecLength);
+		Epi2 = 	new Epi2_KIOPS(CHEM_RHS_TCHEM_V2,CHEM_JTV_V2,UserData,MaxKrylovIters, y,vecLength);
 
-		EpiRK4=	new EpiRK4SC_KIOPS(SUPER_RHS,SUPER_JTV, UserData, MaxKrylovIters, State,vecLength);
+		Epi3 = 	new Epi3_KIOPS(SUPER_RHS,SUPER_JTV,UserData,MaxKrylovIters, y,vecLength);
+
+		EpiRK4=	new EpiRK4SC_KIOPS(SUPER_RHS,SUPER_JTV, UserData, MaxKrylovIters, y,vecLength);
 
 		cvode_mem= CreateCVODE(SUPER_RHS, SUPER_JTV, SUPER_CHEM_JAC_TCHEM, UserData, A,
-					SUPERLS, SUPERNLS, vecLength, State, relTol, absTol, StepSize, 1);
-
+					SUPERLS, SUPERNLS, vecLength, y, relTol, absTol, StepSize, 1);
 		CVodeSetMaxNumSteps     (cvode_mem, 1e6);
 
 		PrintPreRun(StepSize, Delx, Steps, KrylovTol, absTol, relTol, Method, num_pts, BAR);
-		//if(problem2.NumGridPts>1)
-		//	problem2.RunTests(State);
-        	//=================================
-        	// Run the time integrator loop
-        	//=================================
+		//=================================
+		// Run the time integrator loop
+		//=================================
 		cout <<"[";
 		cout.flush();
 		while(StepCount<Steps)//while(TNext<FinalTime)
-        	{
-                	TNow= StepCount*StepSize;
-                	TNext=TNow + StepSize;
+		{
+			TNow= StepCount*StepSize;
+			TNext=TNow + StepSize;
 			TNextC = TNext;
 			//Integrate
 			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
 			if(Method != "CVODEKry")//Set the step Jacobian
-				CHEM_COMP_JAC_V2(State, UserData);
+				CHEM_COMP_JAC_V2(y, UserData); //State
 			if(Method == "EPI2")
 				integratorStats =Epi2->Integrate(StepSize, TNow, TNext, NumBands,
-					State, KrylovTol, startingBasisSizes);
+					y, KrylovTol, startingBasisSizes);
 			else if(Method == "EPI3")
 				integratorStats =Epi3->Integrate(StepSize, TNow, TNext, NumBands,
-					State, KrylovTol, startingBasisSizes);
+					y, KrylovTol, startingBasisSizes);
 			else if(Method == "EPIRK4")
 				integratorStats =EpiRK4->Integrate(StepSize, TNow, TNext, NumBands,
-					State, KrylovTol, startingBasisSizes);
+					y, KrylovTol, startingBasisSizes);
 			else if(Method == "CVODEKry")//This appears to be bugged for the full problem
-				CVode(cvode_mem, TNext, State, &TNextC, CV_NORMAL);//CV_NORMAL/CV_ONE_STEP
+				CVode(cvode_mem, TNext, y, &TNextC, CV_NORMAL);//CV_NORMAL/CV_ONE_STEP
 			auto Stop=std::chrono::high_resolution_clock::now();
-                       	auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+			auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
 			KTime+=Pass.count()/1e9;
 			//Step checking, factor into Error check
 			if( TNext != TNextC)
@@ -271,9 +240,9 @@ int main(int argc, char* argv[])
 				exit(EXIT_FAILURE);
 			}
 			//Error check
-			if(SampleNum!=10 && Delx==0) 		//Error check
-				ErrorCheck(myfile, State, StateData, num_eqs, num_pts, TNext);//Needs editing
-			CheckNanBlowUp(State, vecLength);
+			if(SampleNum!=10) 		//Error check
+				ErrorCheck(myfile, y, data, num_eqs, num_pts, TNext);//Needs editing
+			CheckNanBlowUp(y, vecLength);
 
 			//Profiling
 			if(Profiling == 1)
@@ -287,40 +256,37 @@ int main(int argc, char* argv[])
 			}
 
 			//Clean
-			Clean(vecLength, StateData);
+			Clean(vecLength, data);
 
 			//Track Progress
 			ProgressDots=TrackProgress(FinalTime, TNext, PercentDone, ProgressDots);
-			if( data[0] >1500)
-				std :: cout << "Ign Delay acheived" << std :: endl;
+			// if( data[0] >1500)
+			// 	std :: cout << "Ign Delay acheived" << std :: endl;
 
 			if(Movie ==1 ) //Use if we want a time-series plot
 			{
-				PrintDataToFile(myfile, StateData,vecLength, absTol, BAR, MyFile, TNext);
+				PrintDataToFile(myfile, data,vecLength, absTol, BAR, MyFile, TNext);
 				PrintDataToFile(myfile, N_VGetArrayPointer(problem2.Vel), num_pts+1,
 						0, BAR, MyFile, 0);
 				realtype * jacPtr       = N_VGetArrayPointer(problem2.Jac);
                         	for(int i = 0 ; i < N_VGetLength(problem2.Jac); i ++)
-                                	jacfile << jacPtr[i] << "\n";
+								jacfile << jacPtr[i] << "\n";
                         	jacfile << StepSize << "\n";
 			}
-                	StepCount++;
-        		}//End integration loop
-        	TNow=TNext;
-        	cout << "]100%\n" << BAR << "\tIntegration complete\t" << BAR <<endl;
+			StepCount++;
+		}//End integration loop
+        TNow=TNext;
+        cout << "]100%\n" << BAR << "\tIntegration complete\t" << BAR <<endl;
 		cout << "Congrats\n";
-		//=======================================
-		//Various testing
-		//=======================================
-		//problem2.VerifyHeatingExp(State, State0, FinalTime);
-	        //=======================================
-        	//Console Output
-        	//=======================================
+		
+	    //=======================================
+        //Console Output
+        //=======================================
 		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
 		PrintExpParam(FinalTime, TNow, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
-		PrintSuperVector(StateData, Experiment, 1, BAR);
+		PrintSuperVector(data, Experiment, 1, BAR);
 		PrintProfiling(integratorStats, Profiling, Method,  BAR, cvode_mem);
-		PrintDataToFile(myfile, StateData, vecLength, absTol, BAR, MyFile, KTime);//change  4th
+		PrintDataToFile(myfile, data, vecLength, absTol, BAR, MyFile, KTime);//change  4th
 
 		//Refactor into PrintProfiling later.
 		if(Profiling == 1)
@@ -333,10 +299,8 @@ int main(int argc, char* argv[])
 				cout << "Total Krylov iterates: " << TotalIters<< endl;
 			}
 		}
-		if(problem2.NumGridPts > 1)
-			PrintDataToFile(myfile, N_VGetArrayPointer(problem2.Vel), num_pts+1,
-					0, BAR, MyFile, 0);
-        	myfile.close();
+
+        myfile.close();
 		jacfile.close();
 		//==========================
 		//Time to take out the trash
@@ -345,13 +309,10 @@ int main(int argc, char* argv[])
 		delete Epi3;
 		delete EpiRK4;
 		N_VDestroy_Serial(y);
-		N_VDestroy_Serial(State);
-		N_VDestroy_Serial(StateDot);
-		N_VDestroy_Serial(State0);
 		SUNMatDestroy(A);
 		SUNLinSolFree(SUPERLS);
 		SUNNonlinSolFree(SUPERNLS);
-                CVodeFree(&cvode_mem);
+		CVodeFree(&cvode_mem);
   	}//end local kokkos scope.
   	Kokkos::finalize();	/// Kokkos finalize checks any memory leak that are not properly deallocated.
 	cout << BAR << "\tExiting without error\t" << BAR <<endl;
@@ -365,18 +326,6 @@ int main(int argc, char* argv[])
 // |  _)| | ||   |/ _)(. .)[_]/ _ \|   |( .)
 // |_|  |___||_|_|\__) |_| |_|\___/|_|_|(`_)
 //===========================================
-*/
-//==========================================
-//Set num_pts, marked for removal.
-//==========================================
-/*
-int SetNumIntPts(realtype delx, realtype xScale, int TubeLength)
-{
-	if(delx==0)
-		return 1;
-	else
-		return round(TubeLength/(xScale *delx));
-}
 */
 //===========================================
 //Check the number of steps
