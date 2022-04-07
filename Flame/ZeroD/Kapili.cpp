@@ -26,6 +26,7 @@ N_Vector InitialConditions();
 int RHS(realtype, N_Vector, N_Vector, void *);
 int Jtv(N_Vector, N_Vector, realtype, N_Vector, N_Vector , void *, N_Vector);
 int CheckStep(realtype, realtype);
+void postProcess(N_Vector);
 
 using namespace std;
 
@@ -105,13 +106,15 @@ int main(int argc, char* argv[])
     	Epi2_KIOPS *integrator 	= new Epi2_KIOPS(RHS, Jtv, userData, MaxKrylovIters, y, NEQ);
 	Epi3_KIOPS * Epi3 	= new Epi3_KIOPS(RHS, Jtv, userData, MaxKrylovIters, y, NEQ);
 	Epi3SC_KIOPS * Epi3SC  	= new Epi3SC_KIOPS(RHS, Jtv, userData, MaxKrylovIters, y, NEQ);
-	EpiP2_KIOPS * EpiP2 	= new EpiP2_KIOPS(RHS,Jtv, userData, MaxKrylovIters, y, NEQ);
+	EpiP2_KIOPS * EpiP2 	= new EpiP2_KIOPS(RHS,Jtv, userData, MaxKrylovIters, y, NEQ, 3, 0, &postProcess);
 	//========================
 	// Set integrator parameters
 	//========================
 	//const realtype KrylovTol = RCONST(1.0e-14);//1e-14
 	int startingBasis[] = {3, 3};
-
+	cout<<"=======================Initial Data======================\n";
+	cout << setprecision(17);
+	cout <<"y=" << data[0] << "\t\t z=" << data[1] <<"\t\t Temp=" << data[2]<<endl;
 
 
 	//=================================
@@ -126,11 +129,24 @@ int main(int argc, char* argv[])
 		auto Stop=std::chrono::high_resolution_clock::now();
                 auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
                 KTime+=Pass.count()/1e9;
+		TNow = FinalTime;
 	}
-	/**/
+	else if(opt == "EPIP2")
+	{
+		auto Start=std::chrono::high_resolution_clock::now();
+		Stats= EpiP2->Integrate(StepSize, 0.0, FinalTime, y, KrylovTol, startingBasis);
+		auto Stop=std::chrono::high_resolution_clock::now();
+		auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+		KTime+=Pass.count()/1e9;
+		TNow = FinalTime;
+	}
+
+	
+	
 	TNext = StepSize;
 	if(TNext>FinalTime)
 		StepSize=FinalTime;
+
 
 	cout<<"[";
 	while(TNow<FinalTime)
@@ -142,8 +158,8 @@ int main(int argc, char* argv[])
 			Stats= integrator->Integrate(StepSize,TNow, TNext, NumBands, y,
 						KrylovTol, startingBasis);
 			auto Stop=std::chrono::high_resolution_clock::now();
-                        auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-                        KTime+=Pass.count()/1e9;
+						auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+						KTime+=Pass.count()/1e9;
 
 		}
 		else if(opt=="EPI3")
@@ -152,8 +168,8 @@ int main(int argc, char* argv[])
 			Stats= Epi3->Integrate(StepSize, TNow, TNext, NumBands, y,
 						KrylovTol, startingBasis);
 			auto Stop=std::chrono::high_resolution_clock::now();
-                        auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-                        KTime+=Pass.count()/1e9;
+						auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+						KTime+=Pass.count()/1e9;
 		}
 		else if(opt=="EPI3SC"){
 			break;
@@ -161,11 +177,11 @@ int main(int argc, char* argv[])
 		else if(opt == "EPIP2")
 		{
 			auto Start=std::chrono::high_resolution_clock::now();
-			Stats= EpiP2->Integrate(StepSize, TNow, TNext, NumBands, y,
+			Stats= EpiP2->Integrate(StepSize, TNow, TNext, y,
 						KrylovTol, startingBasis);
 			auto Stop=std::chrono::high_resolution_clock::now();
-                        auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-                        KTime+=Pass.count()/1e9;
+						auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+						KTime+=Pass.count()/1e9;
 		}
 		else
 		{
@@ -174,9 +190,12 @@ int main(int argc, char* argv[])
 		}
 
 		//Removing this cleaning loop will cause stalls.
-		for (int j=0; j<NEQ; j++)
-			if(data[j]<0)
-				data[j]=0;
+		postProcess(y);
+		
+		// for (int j=0; j<NEQ; j++)
+		// 	if(data[j]<0)
+		// 		data[j]=0;
+		
 		//Track the progress
 		PercentDone=floor(TNext/FinalTime*100);
 		for (int k=0; k<PercentDone-ProgressDots;k++)
@@ -201,10 +220,34 @@ int main(int argc, char* argv[])
 	cout << "]100%\n\n";
 	/**/
 
+	
+
+
 	printf("Run stats:\n");
     	Stats->PrintStats();
 
-
+	realtype error_inf = 0;
+	
+	if(EPS == 1e-1)
+	{
+		error_inf = max( 
+			data[0] - 0.000000002988028,
+			max(
+				data[1] - 0.032702315935000,
+				data[2] - 1.967297681076978
+			)
+		);
+	}
+	else if(EPS == 1e-2)
+	{
+		error_inf = max( 
+			data[0] - 0.000000000000000,
+			max(
+				data[1] - 0.005848132117459,
+				data[2] - 1.994151867882557
+			)
+		);
+	}
 
 	//=======================================
 	//Console Output
@@ -218,9 +261,25 @@ int main(int argc, char* argv[])
 	cout << "Steps taken: " << StepCount <<endl;
 	cout << "Integration time: " <<KTime << endl;
 	cout << "StepSize: " << StepSize << endl;
+
+	cout << "Temp Error:" << data[2] - 1.9672976810661789 << std::endl;
+	cout << "Error Inf:" << error_inf << std::endl;
 	//cout <<"Sum of y=" <<data[0]+ data [1] + data [2]<<"\t\t";
 	//cout <<"Error in sum=" << data[0]+data[1]+data[2]-Y0[0]-Y0[1]-Y0[2]<<endl;
 	cout <<"===================Printing data to " <<MyFile <<"==============\n";
+
+	// error_inf = math.max( 
+	// 	 data[0] - 0.000000002988028
+	// 	 math.max(
+	// 		 data[1] - 0.032702315935000,
+	// 		 data[2] - 1.967297681076978
+	// 	 )
+	// );
+
+
+//    0.000000002988028
+//    0.032702315935000
+//    1.967297681076978
 
 
 	//=======================================
@@ -385,4 +444,30 @@ int Jtv(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void *user
 			}
 		}*/
         return 0;
+}
+
+
+
+void postProcess(N_Vector solution)
+{
+	realtype * data = N_VGetArrayPointer(solution);
+	int len 		= N_VGetLength(solution);
+	for (int i = 0; i < len; i ++ )
+	{
+		data[i] = std::max(0.0, data[i]);
+	}
+	//std::cout << "I AM HERE\n";
+	
+	
+	/* 
+		Maximum Brilliance: 
+		clipping is equivalent to: x = (|x| + x ) / 2
+	
+		tmp = N_VClone(solution)
+		N_VScale(
+			0.5,
+			N_VLinearSum(N_VAbs(temp, temp), solution)
+		)
+	*/
+
 }
