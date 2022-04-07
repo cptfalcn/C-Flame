@@ -22,6 +22,7 @@
 #include <iomanip>
 #include "TChem_CommandLineParser.hpp"
 #include "Epi3SC_KIOPS.h"
+#include "EpiP2_KIOPS.h"
 
 
 #include <chrono>
@@ -55,6 +56,7 @@ void PrintProfilingToFile(ofstream &, IntegratorStats* , int , string, string, v
 //int WrapCvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void* pb, N_Vector tmp);
 void PrintToFile(ofstream &, realtype *, int, realtype, realtype, realtype, realtype, realtype, realtype);
 int CVODEMonitorFunction(N_Vector State);
+void postProcess(N_Vector);
 //=====================
 //Namespaces and globals
 //=====================
@@ -68,33 +70,32 @@ int main(int argc, char* argv[])
 	//====================
 	// Intial Declarations
 	//====================
-	int MaxIters			= 0,	OldIters = 0,	CurrStepIters	= 0, 	TotalIters = 0;
-	realtype SlowTime		= 0;
-	int SlowDown 			= 0;
-	static realtype FinalTime 	= 0;		//1.0e-4;//1e-4 seems to be the max
+	int MaxIters				= 0,	OldIters = 0,	CurrStepIters	= 0, 	TotalIters = 0;
+	realtype SlowTime			= 0;
+	int SlowDown 				= 0;
+	static realtype FinalTime	= 0;		//
 	static const int NumBands 	= 3;		//Epic stuff, default is 3.
-	realtype StepSize		= 0;
-	realtype KTime 			= 0;
-	int ProgressDots		= 0; 		//From 0 to 100; only care about percentage
-	int StepCount 			= 0;
+	realtype StepSize			= 0;
+	realtype KTime 				= 0;
+	int ProgressDots			= 0; 		//From 0 to 100; only care about percentage
+	int StepCount 				= 0;
 	realtype PercentDone		= 0;
-	realtype TNow			= 0;
-	realtype TNext			= 0;
-	realtype TNextC			= 0;		//CVODE TNext, has a tendency to change TNext
-	string MyFile			= "Default.txt";
-	string Method			= "EPI3V";	//This is the default method
+	realtype TNow				= 0;
+	realtype TNext				= 0;
+	realtype TNextC				= 0;		//CVODE TNext, has a tendency to change TNext
+	string MyFile				= "Default.txt";
+	string Method				= "EPI3V";	//This is the default method
 	static realtype KrylovTol	= 1e-14;
-	int SampleNum			= 1;
-	int Experiment			= 1; 		//default is hydrogen, set to 0 for kapila
-	int Profiling			= 0;		//default to no profiling, need to edit profiling
+	int SampleNum				= 1;
+	int Experiment				= 1; 		//default is hydrogen, set to 0 for kapila
+	int Profiling				= 0;		//default to no profiling, need to edit profiling
 	int number_of_equations		= 0;		//Varies on problem
-	realtype absTol 		= 1e-8;
-        realtype relTol 		= 1e-8;
+	realtype absTol 			= 1e-8;
+	realtype relTol 			= 1e-8;
 	int startingBasisSizes[]	= {10, 10};	//{3,3}
-	int Movie			= 0;
-	realtype maxSS			= 1e-3;		//1e-5		//Refactor as an input
-	int UseJac			= 1;
-
+	int Movie					= 0;
+	realtype maxSS				= 1e-3;		//Default value.
+	int UseJac					= 1;
 	//=====================================================
 	//Kokkos Input Parser
 	//=====================================================
@@ -121,9 +122,7 @@ int main(int argc, char* argv[])
 	const bool r_parse = opts.parse(argc, argv);
 	if (r_parse)
 		return 0; // print help return
-
 	ofstream myfile(MyFile, std::ios_base::app);
-
 	//=====================================
 	//Kokkos Sub-declarations
 	//=====================================
@@ -135,31 +134,26 @@ int main(int argc, char* argv[])
 		using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 		using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
 		//using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
-
-	    	// construct TChem's kinect model and read reaction mechanism
-    		TChem::KineticModelData kmd(chemFile, thermFile);
-
-	    	// construct const (read-only) data and move the data to device.
-	    	// for host device, it is soft copy (pointer assignmnet).
-	    	auto kmcd = kmd.createConstData<host_device_type>();
-
-    		// use problem object for ignition zero D problem, interface to source term and jacobian
-    		using problem_type = TChem::Impl::IgnitionZeroD_Problem<decltype(kmcd)>;
-
+	    // construct TChem's kinect model and read reaction mechanism
+    	TChem::KineticModelData kmd(chemFile, thermFile);
+    	// construct const (read-only) data and move the data to device.
+    	// for host device, it is soft copy (pointer assignmnet).
+    	auto kmcd = kmd.createConstData<host_device_type>();
+   		// use problem object for ignition zero D problem, interface to source term and jacobian
+   		using problem_type = TChem::Impl::IgnitionZeroD_Problem<decltype(kmcd)>;
 		//=======================================
 		//Set number of equations
 		//=======================================
 		number_of_equations	= problem_type::getNumberOfEquations(kmcd);
 		int vecLength 		= number_of_equations;			//For readability
 		int num_eqs 		= number_of_equations;			//To reduce size
-		int num_pts 		= 1;					//To reduce size
+		int num_pts 		= 1;							//To reduce size
 		//==================================================
 		//Prep/Set initial conditions, inherited from Zero-D
 		//==================================================
 		N_Vector y 			= N_VNew_Serial(vecLength);	//intial conditions/Data
 		N_VScale(0.0 , y, y);						//Zero out the y vector.
-		realtype *data 			= N_VGetArrayPointer(y);	//Set the y data pointer.
-
+		realtype *data 		= N_VGetArrayPointer(y);	//Set the y data pointer.
 		//Initial Conditions sub-block
 		SetIntCons(Experiment, SampleNum, data);		//Set Initial Conditions
 		PrintSuperVector(data, Experiment, 1, BAR);
@@ -172,8 +166,6 @@ int main(int argc, char* argv[])
 		//=========================================================================
 		const int problem_workspace_size = problem_type::getWorkSpaceSize(kmcd);
 		real_type_1d_view_type work("workspace", problem_workspace_size);
-
-
 		myPb2 problem2(num_eqs, work, kmcd, num_pts, y, 0);	//Construct new Problem.
 		problem2.SetAdvDiffReacPow(0, 0, 0, 1, 0);//Additional set up.
 		problem2.kmd			= kmd;
@@ -184,33 +176,26 @@ int main(int argc, char* argv[])
 		//==================
 		//CVODE
         void * cvode_mem;
-		SUNMatrix A			= SUNDenseMatrix(vecLength, vecLength);
+		SUNMatrix A					= SUNDenseMatrix(vecLength, vecLength);
 		SUNLinearSolver SUPERLS 	= SUNLinSol_SPGMR(y, PREC_NONE, 20);
-		SUNNonlinearSolver SUPERNLS 	= SUNNonlinSol_Newton(y);
-
+		SUNNonlinearSolver SUPERNLS = SUNNonlinSol_Newton(y);
 
 		//Set EPIxx_KIOPS methods
 		IntegratorStats *integratorStats 	= NULL;
-		//===================================================
-		//Parse the experiment cases and make the integrators
-		//===================================================
-		//This loop has significant changes
-		//===================================================
-		Epi3VChem_KIOPS * EPI3V
-				= new Epi3VChem_KIOPS(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, UserData,
+		Epi3VChem_KIOPS * EPI3V = new Epi3VChem_KIOPS(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, UserData,
 				MaxKrylovIters, y, vecLength);
 
 		//EPI3V->TestMatMult();
-
-		//cvode_mem =	CreateCVODE(WrapCvodeRHS, WrapCvodeJtv, CHEM_COMP_JAC_CVODE_V2, UserData, A,
 		cvode_mem= 	CreateCVODE(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, CHEM_COMP_JAC_CVODE_V2, UserData, A,
 				SUPERLS, SUPERNLS, vecLength, y, relTol, absTol, StepSize, UseJac);
 
-
-		CVodeSetMaxStep		(cvode_mem, maxSS);		//Needs an input
-		CVodeSetMaxNumSteps	(cvode_mem, 1e6);
+		CVodeSetMaxStep			(cvode_mem, maxSS);
+		CVodeSetMaxNumSteps		(cvode_mem, 1e6);
 		CVodeSetMonitorFrequency(cvode_mem, 1);
 
+		//EPIP2 method, with post processing
+		EpiP2_KIOPS * EPIP2 = new EpiP2_KIOPS(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, UserData, MaxKrylovIters,
+				y, vecLength, 3, 0, &postProcess);
 		//======================
 		//Preparation of rites
 		//======================
@@ -223,18 +208,16 @@ int main(int argc, char* argv[])
 		//======================
 		//Endure the ritual herein
 		//======================
-		//Start run
-		//======================
 		if(Method == "EPI3V")
-        	{
+        {
 			cout << BAR <<"\tEPI3V Selected\t\t" << BAR <<endl;
-                	auto Start=std::chrono::high_resolution_clock::now();//Time integrator
-                	integratorStats = EPI3V->Integrate(StepSize, maxSS,	 	absTol, relTol,
-							0.0, FinalTime, 	NumBands, startingBasisSizes, y);
-                	auto Stop=std::chrono::high_resolution_clock::now();
-                	auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-                	KTime+=Pass.count()/1e9;
-        	}
+			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
+			integratorStats = EPI3V->Integrate(StepSize, maxSS,	 	absTol, relTol,
+				0.0, FinalTime, 	NumBands, startingBasisSizes, y);
+			auto Stop=std::chrono::high_resolution_clock::now();
+			auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+			KTime+=Pass.count()/1e9;
+        }
 		else if(Method == "CVODEKry")
 		{
 			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
@@ -245,24 +228,25 @@ int main(int argc, char* argv[])
                         KTime+=Pass.count()/1e9;
 			problem2.t = TNextC;
 		}
+		else if(Method == "EPIP2")
+		{
+			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
+			integratorStats= EPIP2->Integrate(StepSize, 0.0, FinalTime, y, KrylovTol, startingBasisSizes);
+			auto Stop=std::chrono::high_resolution_clock::now();
+			auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+			KTime+=Pass.count()/1e9;
+		}
 		//=======================================
 		//End rites
-	        //=======================================
 		//Enscribe upon thyn tablet the results
 		//=======================================
-        	//Console Output
-        	//=======================================
 		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
 		PrintExpParam(FinalTime, problem2.t, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
 		cout << setprecision(17);
 		PrintSuperVector(data, Experiment, 1, BAR);
 		PrintProfiling(integratorStats, Profiling, Method,  BAR, cvode_mem);
-		//PrintProfilingToFile(myfile, integratorStats, Profiling, Method, BAR, cvode_mem);
-		//PrintDataToFile(myfile, data, vecLength, problem2.t, BAR, MyFile, KTime);//change  4th
-		PrintToFile(myfile, data, vecLength, problem2.t, relTol, absTol, KTime,
-				KrylovTol, problem2.ignTime);
-		//PrintProfilingToFile(myfile, integratorStats, Profiling, Method, BAR, cvode_mem);
-        	myfile.close();
+		PrintToFile(myfile, data, vecLength, problem2.t, relTol, absTol, KTime, KrylovTol, problem2.ignTime);
+		myfile.close();
 		cout << "\nTotal integration time: " << KTime << " sec " << endl;
                 cout << "\t Chem rhs: " << problem2.rhs_Chem << " sec\n";
                 cout << "\t Chem jtv: " << problem2.jtv_Chem << " sec\n";
@@ -277,7 +261,7 @@ int main(int argc, char* argv[])
 		SUNMatDestroy(A);
 		SUNLinSolFree(SUPERLS);
 		SUNNonlinSolFree(SUPERNLS);
-                CVodeFree(&cvode_mem);
+        CVodeFree(&cvode_mem);
   	}//end local kokkos scope.
   	Kokkos::finalize();	/// Kokkos finalize checks any memory leak that are not properly deallocated.
 	cout << BAR << "\tExiting without error\t" << BAR <<endl;
@@ -429,6 +413,18 @@ void PrintProfilingToFile(ofstream & myfile, IntegratorStats* integratorStats, i
 	}
 
 }
+
+void postProcess(N_Vector solution)
+{
+	realtype * data = N_VGetArrayPointer(solution);
+	int len 		= N_VGetLength(solution);
+	for (int i = 0; i < len; i ++ )
+	{
+		data[i] = std::max(1e-9, data[i]);
+	}
+}
+
+
 //     _______
 //   //       \
 //  ||  R.I.P  |
