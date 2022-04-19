@@ -48,7 +48,6 @@ void TrackSlowDown(IntegratorStats *, int *,  int, int *, realtype *, realtype, 
 void TrackCVODEKryIters(SUNLinearSolver, realtype *, realtype, int *, int*, int*);
 void ReadData(N_Vector, string);
 void CheckNanBlowUp(N_Vector, int);
-//int SetNumIntPts(realtype, realtype, int); //Marked for removal
 
 //=====================
 //Namespaces and globals

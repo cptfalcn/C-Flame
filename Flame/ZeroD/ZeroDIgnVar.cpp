@@ -47,13 +47,8 @@ void PrintBanner();
 int CheckStep(realtype, realtype);
 int SetInteriorSize(realtype);
 int TrackProgress(realtype, realtype, realtype, int);
-void TrackSlowDown(IntegratorStats *, int *,  int, int *, realtype *, realtype, int*);
-void TrackCVODEKryIters(SUNLinearSolver, realtype *, realtype, int *, int*, int*);
 void ReadData(N_Vector, string);
-void CheckNanBlowUp(N_Vector, int);
 void PrintProfilingToFile(ofstream &, IntegratorStats* , int , string, string, void*);
-//int WrapCvodeRHS(realtype , N_Vector , N_Vector, void *);
-//int WrapCvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void* pb, N_Vector tmp);
 void PrintToFile(ofstream &, realtype *, int, realtype, realtype, realtype, realtype, realtype, realtype);
 int CVODEMonitorFunction(N_Vector State);
 void postProcess(N_Vector);
@@ -70,9 +65,6 @@ int main(int argc, char* argv[])
 	//====================
 	// Intial Declarations
 	//====================
-	int MaxIters				= 0,	OldIters = 0,	CurrStepIters	= 0, 	TotalIters = 0;
-	realtype SlowTime			= 0;
-	int SlowDown 				= 0;
 	static realtype FinalTime	= 0;		//
 	static const int NumBands 	= 3;		//Epic stuff, default is 3.
 	realtype StepSize			= 0;
@@ -133,7 +125,6 @@ int main(int argc, char* argv[])
 	{
 		using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 		using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
-		//using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
 	    // construct TChem's kinect model and read reaction mechanism
     	TChem::KineticModelData kmd(chemFile, thermFile);
     	// construct const (read-only) data and move the data to device.
@@ -170,7 +161,7 @@ int main(int argc, char* argv[])
 		problem2.SetAdvDiffReacPow(0, 0, 0, 1, 0);//Additional set up.
 		problem2.kmd			= kmd;
 		void *UserData 			= &problem2;
-		int MaxKrylovIters 		= 500; //max(vecLength, 500);//500 is the base
+		int MaxKrylovIters 		= 1000; //max(vecLength, 500);//500 is the base
 		//==================
 		//Create integrators
 		//==================
@@ -188,7 +179,6 @@ int main(int argc, char* argv[])
 		//EPI3V->TestMatMult();
 		cvode_mem= 	CreateCVODE(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, CHEM_COMP_JAC_CVODE_V2, UserData, A,
 				SUPERLS, SUPERNLS, vecLength, y, relTol, absTol, StepSize, UseJac);
-
 		CVodeSetMaxStep			(cvode_mem, maxSS);
 		CVodeSetMaxNumSteps		(cvode_mem, 1e6);
 		CVodeSetMonitorFrequency(cvode_mem, 1);
@@ -208,34 +198,29 @@ int main(int argc, char* argv[])
 		//======================
 		//Endure the ritual herein
 		//======================
+		auto Start=std::chrono::high_resolution_clock::now();//Time integrator
 		if(Method == "EPI3V")
         {
 			cout << BAR <<"\tEPI3V Selected\t\t" << BAR <<endl;
-			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
 			integratorStats = EPI3V->Integrate(StepSize, maxSS,	 	absTol, relTol,
 				0.0, FinalTime, 	NumBands, startingBasisSizes, y);
-			auto Stop=std::chrono::high_resolution_clock::now();
-			auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-			KTime+=Pass.count()/1e9;
+			problem2.t= FinalTime;
         }
 		else if(Method == "CVODEKry")
 		{
-			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
-			//CVode(cvode_mem, TNext, State, &TNextC, CV_NORMAL);
+			cout << BAR <<"\tCVODE Selected\t\t" << BAR <<endl;
 			CVode(cvode_mem, FinalTime, y, &TNextC, CV_NORMAL);
-                        auto Stop=std::chrono::high_resolution_clock::now();
-                        auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-                        KTime+=Pass.count()/1e9;
 			problem2.t = TNextC;
 		}
 		else if(Method == "EPIP2")
 		{
-			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
+			cout << BAR <<"\tEPIP2 Selected\t\t" << BAR <<endl;
 			integratorStats= EPIP2->Integrate(StepSize, 0.0, FinalTime, y, KrylovTol, startingBasisSizes);
-			auto Stop=std::chrono::high_resolution_clock::now();
-			auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-			KTime+=Pass.count()/1e9;
+			problem2.t = FinalTime;
 		}
+		auto Stop=std::chrono::high_resolution_clock::now();
+		auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+		KTime+=Pass.count()/1e9;
 		//=======================================
 		//End rites
 		//Enscribe upon thyn tablet the results
@@ -262,6 +247,7 @@ int main(int argc, char* argv[])
 		SUNLinSolFree(SUPERLS);
 		SUNNonlinSolFree(SUPERNLS);
         CVodeFree(&cvode_mem);
+		delete EPIP2;
   	}//end local kokkos scope.
   	Kokkos::finalize();	/// Kokkos finalize checks any memory leak that are not properly deallocated.
 	cout << BAR << "\tExiting without error\t" << BAR <<endl;
@@ -339,50 +325,6 @@ int TrackProgress(realtype FinalTime, realtype TNext, realtype PercentDone, int 
 	return PercentDone;
 }
 
-void TrackSlowDown(IntegratorStats * integratorStats, int * SlowDown, int StepsTaken, int * OldIters,
-		realtype *SlowTime, realtype TNow, int * MaxIter)
-{
-	int CurrIters= (integratorStats->krylovStats->numIterations) - *OldIters;
-	if(CurrIters >= integratorStats->krylovStats->maxIterations)
-	{//if New iterations is greater than the old average, we are slowing down
-		*SlowDown = 1;
-		*SlowTime = TNow;			//Mark the slowdown time
-		*MaxIter= CurrIters;
-	}
-	*OldIters = CurrIters;
-	*OldIters = integratorStats->krylovStats->numIterations;
-}
-
-void TrackCVODEKryIters(SUNLinearSolver LS, realtype * SlowDownTime, realtype TNow, int * OldIters,
-			int * MaxIters, int * TotalIters)
-{
-	if(  *OldIters <= SUNLinSolNumIters(LS)  )
-	{
-		*SlowDownTime=TNow;
-		*MaxIters = SUNLinSolNumIters(LS);
-	}
-	*OldIters = SUNLinSolNumIters(LS);
-	*TotalIters += *OldIters;				//Tracks all iters
-}
-
-void CheckNanBlowUp(N_Vector State, int vecLength)
-{
-	realtype * DATA = N_VGetArrayPointer(State);
-	for( int i = 0 ; i < vecLength; i ++)
-	{
-		if(isnan(DATA[i]) || abs(DATA[i]) >1e5)
-		{
-			if( isnan(DATA[i]) )
-				std :: cout << "Data has NaN: " <<  i << DATA[i] << "\n";
-			if(abs(DATA[i]) > 1e5)
-				std :: cout << "Data is out of control: "<< i << DATA[i] <<"\n";
-			exit(EXIT_FAILURE);
-
-		}
-	}
-
-
-}
 
 void PrintProfilingToFile(ofstream & myfile, IntegratorStats* integratorStats, int Profiling, string Method,
 				string Bar, void* cvode_mem)
@@ -420,97 +362,6 @@ void postProcess(N_Vector solution)
 	int len 		= N_VGetLength(solution);
 	for (int i = 0; i < len; i ++ )
 	{
-		data[i] = std::max(1e-9, data[i]);
+		data[i] = std::max(1e-10, data[i]);
 	}
 }
-
-
-//     _______
-//   //       \
-//  ||  R.I.P  |
-//  || the old |
-//  ||  Code   |
-//  ||         |
-//  nmmnmYnmxYvmnmnm
-/*
-int WrapCvodeRHS(realtype t, N_Vector u, N_Vector du, void * pb)
-{
-	realtype * uData 	= N_VGetArrayPointer(u);
-	int length		= N_VGetLength(u);
-	for( int i = 0 ; i < length ; i ++)			//Over the loop
-		if(uData[i] < 0)				//Check for negative data
-			return 1;				//Yes? Throw an error.
-	CHEM_RHS_TCHEM_V2(t, u, du, pb);
-	return 0;
-}
-
-int WrapCvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void* pb, N_Vector tmp)
-{
-	realtype * uData	= N_VGetArrayPointer(u);
-	int length		= N_VGetLength(u);
-	for( int i =0; i < length; i++)
-		if(uData[i] < 0)
-			return(1);
-	return 0;
-}
-*/
-
-
-                 /*
-243                 else
-244                 {
-245                         cout <<"[";
-246                         cout.flush();
-247                         while(TNext<FinalTime)
-248                         {
-249                                 TNow= StepCount*maxSS;
-250                                 TNext=TNow + maxSS;
-251                                 TNextC = TNext;
-252                                 //Integrate
-253                                 auto Start=std::chrono::high_resolution_clock::now();//Time integrator
-254                                 //cout << "In loop\n";
-255                                 //===============
-256                                 //Integrator gate
-257                                 //===============
-258                                 if(Method == "CVODEKry")//This appears to be bugged for the full problem
-259                                         CVode(cvode_mem, TNext, y, &TNextC, CV_NORMAL);//CV_NORMAL/CV_ONE_STEP
-260                                 auto Stop=std::chrono::high_resolution_clock::now();
-261                                 auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-262                                 KTime+=Pass.count()/1e9;
-263                                 if( TNext != TNextC)
-264                                 {
-265                                         cout << "CVODE step failure\n";
-266                                         exit(EXIT_FAILURE);
-267                                 }
-268                                 //Error check
-269                                 CheckNanBlowUp(y, vecLength);
-270
-271                                 //Clean
-272                                 Clean(vecLength, data);
-273
-274                                 if(Profiling == 1)
-275                                 {
-276                                         if(Method != "CVODEKry")
-277                                                 TrackSlowDown(integratorStats, &SlowDown, StepCount,
-278                                                         &OldIters, &SlowTime, TNext, & MaxIters);
-279                                         if(Method == "CVODEKry")
-280                                                 TrackCVODEKryIters(SUPERLS, &SlowTime,TNext, &OldIters,
-281                                                         &MaxIters, &TotalIters);
-282                                 }
-283
-284                                 //Track Progress
-285                                 ProgressDots=TrackProgress(FinalTime, TNext, PercentDone, ProgressDots);
-286
-287                                 if(Movie ==1 ) //Use if we want a time-series plot
-288                                 {
-289                                         PrintDataToFile(myfile, data,vecLength, absTol, BAR, MyFile, TNext);
-290                                         //PrintDataToFile(myfile, N_VGetArrayPointer(problem2.Vel), num_pts+1,
-291                                         //      0, BAR, MyFile, 0);
-292                                 }
-293                                 StepCount++;
-294                         }//End integration loop
-295                         TNow=TNext;
-296                         cout << "]100%\n" ;
-297                         problem2.t=TNow;
-298			}
-*/

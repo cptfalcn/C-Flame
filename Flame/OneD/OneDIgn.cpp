@@ -46,9 +46,7 @@ void PrintBanner();
 
 //Misc functions
 int CheckStep(realtype, realtype);
-int SetInteriorSize(realtype);
 int TrackProgress(realtype, realtype, realtype, int);
-void ErrorCheck(ofstream &, N_Vector, realtype *, int, int, realtype);
 void TrackSlowDown(IntegratorStats *, int *,  int, int *, realtype *, realtype, int*);
 void TrackCVODEKryIters(SUNLinearSolver, realtype *, realtype, int *, int*, int*);
 void ReadData(N_Vector, string);
@@ -71,7 +69,7 @@ int main(int argc, char* argv[])
 	int MaxIters	= 0,	OldIters	= 0,	CurrStepIters	 = 0, TotalIters = 0;
 	realtype SlowTime		= 0;
 	static realtype FinalTime = 0;			//1.0e-4;//1e-4 seems to be the max
-	static const int NumBands = 3;			//Epic stuff, default is 3.
+	static const int NumBands = 3;			//Epic stuff, default is 3, but unused.
 	realtype StepSize		= 0;
 	realtype KTime			= 0;
 	int ProgressDots		= 0; 			//From 0 to 100; only care about percentage
@@ -89,14 +87,16 @@ int main(int argc, char* argv[])
 	int Profiling			= 0;			//default to no profiling, need to edit profiling
 	int number_of_equations	= 0;
 	int NumScalarPoints 	= 0;
-	realtype Delx 			= 1e-5;
-	realtype absTol 		= 1e-8;
-    realtype relTol 		= 1e-8;
+	realtype Delx 			= 1e-5;			//10 micrometer discretization
+	realtype absTol 		= 1e-8;			//tight defaults 
+    realtype relTol 		= 1e-8;			//tight default 
 	int startingBasisSizes[]= {10, 10};		//{3,3}
-	int VelUp 				= 1;
+	int VelUp 				= 1;			//Do we update Velocity, refactor to be yes always
 	int Movie				= 0;
+	int Restart				= 0;			//NULL implementation
+	string InitialData		= "InitialData.txt";	// ""
 
-	realtype ADV 			= 1.0;
+	realtype ADV 			= 1.0;			//Fixed defaults for RHS
 	realtype DIFF 			= 1.0;
 	realtype CHEM 			= 1.0;
 	realtype POW			= 0.0;
@@ -107,9 +107,6 @@ int main(int argc, char* argv[])
 	std::string chemFile("chem.inp");
  	std::string thermFile("therm.dat");
  	/// parse command line arguments --chemfile=user-chemfile.inp --thermfile=user-thermfile.dat
-	/// --Stepsize=1e-8  --FinalTime=1e-2  --MyFile="Filename"  --KrylovTole=1e-14
-	//  --UseJac=0 --SampleNum={1,2,3}, --Method="Integrator name"
-	//  --Experiment={0,1,2}, Profiling = {0,1}, Delx = SpatialDisc
  	TChem::CommandLineParser opts("This example computes reaction rates with a given state vector");
  	opts.set_option<std::string>("chemfile", "Chem file name e.g., chem.inp", &chemFile);
  	opts.set_option<std::string>("thermfile", "Therm file name e.g., therm.dat", &thermFile);
@@ -132,6 +129,7 @@ int main(int argc, char* argv[])
 	opts.set_option<int>("VelUp", "Do we do velocity up?", &VelUp);
 	opts.set_option<int>("NumPts", "Interior points for each grid", &NumScalarPoints);
 	opts.set_option<int>("Movie", "Generate a data set at every step", &Movie);
+	opts.set_option<int>("Restart", "Restart from text file?", &Restart);
 
 	const bool r_parse = opts.parse(argc, argv);
 	if (r_parse)
@@ -190,19 +188,22 @@ int main(int argc, char* argv[])
 		N_Vector State 		= N_VNew_Serial(vecLength);	//State vector
 		N_Vector StateDot	= N_VNew_Serial(vecLength);	//State Derivative RHS vector
 		N_Vector y 			= N_VNew_Serial(num_eqs);	//intial conditions.
-		N_Vector State0 	= N_VClone(State);			//For testing purposes
 		N_VScale(0.0 , y, y);							//Zero out the y vector.
 		N_VScale(0.0, State, State);					//Zero out the State vector.
 		N_VScale(0.0, StateDot, StateDot);				//Zero out the StateDot vector.
-		N_VScale(1.0, State, State0);					//Copy State
 		realtype *data 		= NV_DATA_S(y);				//Set the y data pointer.
 		realtype *StateData = NV_DATA_S(State);			//Set the State data pointer.
 
-		//Initial Conditions sub-block
-		SetIntCons(Experiment, SampleNum, data);		//Set Initial Conditions
-		SetSuperInitCons(data, StateData, num_eqs, num_pts);//Copy IC to State.
-		TestingInitCons(SampleNum, num_pts, num_eqs, vecLength, Delx, data, StateData);//Keep until final version
-		N_VScale(1.0, State, State0);
+		//Do an if statement read in here.
+		if(Restart == 1)
+			ReadData(State, InitialData);
+		else
+		{
+			//Initial Conditions sub-block
+			SetIntCons(Experiment, SampleNum, data);		//Set Initial Conditions
+			SetSuperInitCons(data, StateData, num_eqs, num_pts);//Copy IC to State.
+			TestingInitCons(SampleNum, num_pts, num_eqs, vecLength, Delx, data, StateData);//Keep until final version
+		}
 		//===================================================
 		//Set TChem
 		//===================================================
@@ -217,14 +218,15 @@ int main(int argc, char* argv[])
 		problem2.SetGhostPVel(y, Experiment, SampleNum, 0);	//Do additional set up.
 		problem2.SetAdvDiffReacPow(ADV, DIFF, CHEM, POW, VelUp);//Additional set up.
 		problem2.kmd = kmd;
-		if(problem2.NumGridPts>1)		//If there are more than 1 point we need the transport data
-		{
-			ReadData(problem2.CPPoly,		"Cp_fT.txt");
-			ReadData(problem2.TempTable,	"Tf.txt");
-			ReadData(problem2.RhoTable, 	"rho_fT.txt");
-			ReadData(problem2.DiffTable,	"Diff_fT.txt");
-			//problem2.VerifyTempTable(State);
-		}
+
+		//read in data
+		ReadData(problem2.CPPoly,		"Cp_fT.txt");
+		ReadData(problem2.TempTable,	"Tf.txt");
+		ReadData(problem2.RhoTable, 	"rho_fT.txt");
+		ReadData(problem2.DiffTable,	"Diff_fT.txt");
+		//problem2.VerifyTempTable(State);
+
+		
 		void *UserData = &problem2;
 		int MaxKrylovIters = 500; //max(vecLength, 500);//500 is the base
 		//==================
@@ -232,13 +234,13 @@ int main(int argc, char* argv[])
 		//==================
 		//CVODE
 		void * cvode_mem;
-		SUNMatrix A					= SUNDenseMatrix(vecLength, vecLength);
-		SUNLinearSolver SUPERLS 	= SUNLinSol_SPGMR(State, PREC_NONE, 20);
-		SUNNonlinearSolver SUPERNLS = SUNNonlinSol_Newton(State);
+		SUNMatrix A							= SUNDenseMatrix(vecLength, vecLength);
+		SUNLinearSolver SUPERLS 			= SUNLinSol_SPGMR(State, PREC_NONE, 20);
+		SUNNonlinearSolver SUPERNLS 		= SUNNonlinSol_Newton(State);
 		//Set EPI_KIOPS methods
-		Epi2_KIOPS	*Epi2			= NULL;
-		Epi3_KIOPS 	*Epi3			= NULL;
-		EpiRK4SC_KIOPS	*EpiRK4		= NULL;
+		Epi2_KIOPS	*Epi2					= NULL;
+		Epi3_KIOPS 	*Epi3					= NULL;
+		EpiRK4SC_KIOPS	*EpiRK4				= NULL;
 		IntegratorStats *integratorStats 	= NULL;
 		//===================================================
 		//Parse the experiment cases and make the integrators
@@ -309,7 +311,7 @@ int main(int argc, char* argv[])
 			Clean(vecLength, StateData);
 
 			//Vel Update
-			if(VelUp==1 && (StepCount%10==0) && StepCount!=0 )
+			if(VelUp==1)
 				problem2.UpdateOneDVel(State);
 
 			//Check heating
@@ -321,8 +323,7 @@ int main(int argc, char* argv[])
 			if(Movie ==1 ) //Use if we want a time-series plot
 			{
 				PrintDataToFile(myfile, StateData,vecLength, absTol, BAR, MyFile, TNext);
-				PrintDataToFile(myfile, N_VGetArrayPointer(problem2.Vel), num_pts+1,
-						0, BAR, MyFile, 0);
+				PrintDataToFile(myfile, N_VGetArrayPointer(problem2.Vel), num_pts+1, 0, BAR, MyFile, 0);
 			}
             StepCount++;
         }//End integration loop
@@ -331,7 +332,7 @@ int main(int argc, char* argv[])
 		//=======================================
 		//Various testing
 		//=======================================
-		problem2.VerifyHeatingExp(State, State0, FinalTime);
+		//problem2.VerifyHeatingExp(State, State0, FinalTime);
 		//=======================================
     	//Console Output
     	//=======================================
@@ -352,12 +353,15 @@ int main(int argc, char* argv[])
 			cout << "\nTotal integration time: " << KTime << " sec " << endl;
 			cout << "Total time spent in rhs: " << problem2.rhsTime << " sec" << endl;
 			cout << "\t Diff rhs: " <<problem2.rhs_Diff << " sec\n";
+			cout << "\t\t LookupTime: " << problem2.rhsDiffLookTime << " sec\n";
 			cout << "\t Adv rhs: " << problem2.rhs_Adv << " sec\n";
 			cout << "\t Chem rhs: " << problem2.rhs_Chem << " sec\n";
 			cout << "Total time spent in jtv: " << problem2.jacTime << " sec" << endl;
 			cout << "\t Diff jtv: " <<problem2.jtv_Diff << " sec\n";
+			cout << "\t\t LookupTime: " << problem2.jtvDiffLookTime << " sec\n";
 			cout << "\t Adv jtv: " << problem2.jtv_Adv << " sec\n";
         	cout << "\t Chem jtv: " << problem2.jtv_Chem << " sec\n";
+			cout << "\t\t Move time: " << problem2.dataMoveTime << " sec\n";
 			cout << "Total time spent in jacMake: " << problem2.jacMakeTime << " sec\n";
 		}
 		//if(problem2.NumGridPts > 1)
@@ -372,7 +376,6 @@ int main(int argc, char* argv[])
 		N_VDestroy_Serial(y);
 		N_VDestroy_Serial(State);
 		N_VDestroy_Serial(StateDot);
-		N_VDestroy_Serial(State0);
 		SUNMatDestroy(A);
 		SUNLinSolFree(SUPERLS);
 		SUNNonlinSolFree(SUPERNLS);
@@ -413,33 +416,6 @@ int CheckStep(realtype FinalTime, realtype StepSize)
                 cout<<"Cannot perform non-integer number of steps!!\n";
                 exit(EXIT_FAILURE);
         }
-}
-
-
-//=======================================================
-//RHS Error Check
-//realtype* y 		y Data ptr
-//realtype* rhs		rhs Data ptr
-//int num_eqs		number of equations in the system
-//========================================================
-void ErrorCheck(ofstream & myfile, N_Vector y, realtype * data, int number_of_equations, int num_pts,
-			realtype TNext)
-{
-	realtype MassError=abs( N_VL1NormLocal(y)/num_pts -data[0] -1.0);
-	if(MassError>.1 || abs(data[0])>1e5 )
-	{
-		//PrintDataToFile(myfile, data, number_of_equations, TNext);
-                cout<<"\n===============!!!Critical error!!!================\n";
-                if(MassError>.1)//originally .1
-                {
-                        cout<<"Severe mass loss detected. Check output file for details.\n";
-                   	myfile <<"Mass fraction error : " << abs( N_VL1NormLocal(y)-data[0]-1.0)<< endl;
-              	}
-             	if(abs(data[0])>1e5)
-            		cout<<"Temperature instability detected. Check output file for details.\n";
-             	cout<<"\nFailed computing during time: "<< TNext<<endl;
-              	exit(EXIT_FAILURE);
-	}
 }
 
 
@@ -513,7 +489,6 @@ void CheckNanBlowUp(N_Vector State, int vecLength)
 
 
 }
-
 
 //Currently writing, uncompiled.
 void ReadData(N_Vector target, string fileName)

@@ -34,19 +34,19 @@ using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_t
 //Prototypes & Classes
 //=====================
 //Add an additional class elements to pass to epic.
-
+//ZeroD class
 class myPb : public TCHEMPB{
         public:
         //members
         ordinal_type  num_equations;
         N_Vector Jac;
 };
-
+//OneD class
 class myPb2{
 	public:
 	TCHEMPB pb;
 	ordinal_type	num_equations;
-	realtype	TubeLength;
+	realtype		TubeLength;			//Marked for removal
 	int 		NumGridPts;
 	int 		vecLength;
 	realtype 	delx;
@@ -56,7 +56,7 @@ class myPb2{
 	SUNMatrix	Mat;
 	myPb2(ordinal_type, real_type_1d_view_type, WORK, int, N_Vector, realtype);
 	~myPb2();//destructor
-	void PrintGuts(void);
+	void PrintGuts(void);				//Marked for removal
 	void PrintJac();
 	void SetGhost(N_Vector);
 	void ScaleP(int, int);
@@ -72,9 +72,9 @@ class myPb2{
 	void SetAdvDiffReacPow(realtype, realtype, realtype, realtype, bool);
 	void TempGradient(N_Vector State, N_Vector Gradient);
 
-	int		dumpJac;				//Do we want to dump the Jacobian
+	int			dumpJac;				//Do we want to dump the Jacobian
 	std :: string	dumpJacFile;				//Where to dump it
-	int		Movie;					//Do you want a movie?Y/n
+	int			Movie;					//Do you want a movie?Y/n
 	//Timers
 	realtype	dataMoveTime;
 	realtype	jacTime;
@@ -85,7 +85,13 @@ class myPb2{
 	realtype	rhs_Chem;
 	realtype	rhs_Adv;
 	realtype	rhs_Diff;
-	realtype        jacMakeTime;
+	realtype	jacMakeTime;
+	//Lookup table timers
+	realtype	rhsDiffLookTime;
+	realtype	rhsChemLookTime;
+	realtype	jtvDiffLookTime;
+	realtype	jtvChemLookTime;
+	//total integration time
 	realtype	integrateTime;
 	//Timestep data
 	realtype	MaxStepTaken;
@@ -154,10 +160,10 @@ int GetCP	(realtype, N_Vector, N_Vector, void *);
 	//RHS Functions
 	int SUPER_RHS			(realtype, N_Vector, N_Vector, void *);
 	int SUPER_CHEM_RHS_TCHEM	(realtype, N_Vector, N_Vector, void *);
-	int SUPER_RHS_DIFF		(realtype, N_Vector, N_Vector, void *);
-	int SUPER_RHS_DIFF_NL		(realtype, N_Vector, N_Vector, void *);
+	//int SUPER_RHS_DIFF		(realtype, N_Vector, N_Vector, void *);
+	//int SUPER_RHS_DIFF_NL		(realtype, N_Vector, N_Vector, void *);
 	int SUPER_RHS_DIFF_CP		(realtype, N_Vector, N_Vector, void *);
-	int SUPER_RHS_ADV		(realtype, N_Vector, N_Vector, void *);
+	//int SUPER_RHS_ADV		(realtype, N_Vector, N_Vector, void *);
 	int SUPER_RHS_ADV_VEL		(realtype, N_Vector, N_Vector, void *);
 	int SUPER_RHS_HEATING		(realtype, N_Vector, N_Vector, void *);
 
@@ -168,15 +174,15 @@ int GetCP	(realtype, N_Vector, N_Vector, void *);
 	//JtV functions
 	int SUPER_JTV			(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 	int SUPER_CHEM_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
-	int SUPER_DIFF_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
-	int SUPER_ADV_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+	//int SUPER_DIFF_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+	//int SUPER_ADV_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 	int SUPER_ADV_VEL_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
-	int SUPER_DIFF_NL_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+	//int SUPER_DIFF_NL_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 	int SUPER_DIFF_CP_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 
 
 //One-D helpers
-int CleverMatVec(int, int, int, realtype*, realtype *, realtype *);
+//int CleverMatVec(int, int, int, realtype*, realtype *, realtype *);
 int SUPER_2_VEC(int, realtype *, realtype *, int, int);
 int VEC_2_SUPER(int, realtype *, realtype *, int , int);
 
