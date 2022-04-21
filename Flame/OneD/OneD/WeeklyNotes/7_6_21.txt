@@ -1,7 +1,0 @@
-ToDo this week
-
-1) Get precision (time vs accuraccy)
-
-2) Run the simulations on a longer interval before ignition
-
-3) Prepare an email to Sandia regarding the timing nature of these experiments.

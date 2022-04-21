@@ -1,4 +1,0 @@
-Known bugs:
-Epirk4 bugged,  Krylov bugged, experiment 0, Multigrid bugged
-
-Rewrite the code.
