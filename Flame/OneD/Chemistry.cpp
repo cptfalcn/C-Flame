@@ -189,15 +189,16 @@ void myPb2::UpdateOneDVel(N_Vector State)
 
 	//New Derivative and flame front position.
 	//Set grad(T)(x)
-	this->TempGradient(State, TempGrad);				//Call the method to set TempGrad
+	SUPER_RHS_DIFF_CP(0, State, this->Tmp, this);
+	//this->TempGradient(State, TempGrad);				//Call the method to set TempGrad
 	N_VScale(this->Diff, TempGrad, TempGrad);			//Scale TempGrad by Diff setting, 0 or 1 
 	for(int i = 0; i < this->NumGridPts; i++)			//Loop over Temp indices.
 	{
-		TInd 	= this->TempTableLookUp(SD[i], this->TempTable);	//Find Temp lookup value
-		TG[i]	= LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  ) * TG[i]/SD[i];//Divide by the temperature.
+		//TInd 	= this->TempTableLookUp(SD[i], this->TempTable);	//Find Temp lookup value
+		VTempData[i]	+=	TmpD[i]/SD[i];							//New
+		//TG[i]	= LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  ) * TG[i]/SD[i];//Divide by the temperature.
 	}
-	//TG[End+1]	= TG[End]/SD[End-1];
-	TG[End+1]	= TG[End];
+	//TG[End+1]	= TG[End];
 
 	//Heating component
 	//This will turn on/off depending on Temperature max value or time.
@@ -206,9 +207,9 @@ void myPb2::UpdateOneDVel(N_Vector State)
 		SUPER_RHS_HEATING(0, State, this->Tmp, this);			//Calculate heating
 		N_VScale(this->Power, this->Tmp, this->Tmp);			//Scale on/off
 		this->HeatingRightGhost	= this->HeatingOn *
-				this->Power*this->HeatingRightGhost;	//Scale on/off the ghost point
+			this->Power*this->HeatingRightGhost;	//Scale on/off the ghost point
 		for( int i =0 ; i < this->NumGridPts; i ++)
-			VTempData[i] 	+= TmpD[i]/SD[i];
+			VTempData[i] 	+= TmpD[i]/SD[i];		
 		//Set boundaries
 		LeftTemp += 0;											//Should always be zero
 		RightTemp+= this->HeatingRightGhost/SD[End];			//Call the end boundary.
@@ -220,7 +221,7 @@ void myPb2::UpdateOneDVel(N_Vector State)
 	this->VelIntegrate(VTempData, State, LeftTemp, RightTemp);
 	//V(x) = Integral( omega/(rho T c_p) ,[0,x] ) + V(0);		See VelIntegrate function
 	N_VLinearSum(1.0, this->Vel, 1.0, TempGrad, this->Vel);		//V+=Grad(T)(x)
-	N_VAddConst(this->Vel, -1.0*TG[0], this->Vel);				//V-=Grad(T)(0)
+	//N_VAddConst(this->Vel, -1.0*TG[0], this->Vel);				//V-=Grad(T)(0)
 	this->SetVelAve();											//Modify VelAve
 	if(N_VMin(this->Vel)<0  &&  abs(N_VMin(this->Vel)>1e-1) )
 		std :: cout << "Warning: negative vel @" << this->t <<"\n";
@@ -672,7 +673,6 @@ int SUPER_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
 
 	myPb2 * pb{static_cast<myPb2 *> (UserData)};//Recast
 	int Length 			= N_VGetLength(State);
-	//N_VScale(0.0, pb->OMEGA, pb->OMEGA);				//Clean Omega
 	realtype * TmpData 	= NV_DATA_S(pb->Tmp);
 	realtype * SDD 		= NV_DATA_S(StateDot);
 
@@ -706,7 +706,8 @@ int SUPER_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
     	pb->rhs_Diff+=PassDiff.count()/1e9;							//Finish timing Diff
 
 		auto StartAdv=std::chrono::high_resolution_clock::now();	//Start timing Adv
-		SUPER_RHS_ADV_VEL(t,State,pb->Tmp,UserData);				//Centered Adv call into tmp
+		//SUPER_RHS_ADV_VEL(t,State,pb->Tmp,UserData);				//Centered Adv call into tmp
+		SUPER_RHS_ADV_UPW(t,State,pb->Tmp,UserData);				//Centered Adv call into tmp
 		N_VLinearSum(pb->Adv, pb->Tmp, 1.0, StateDot, StateDot);	//Add Adv (tmp) to StateDot
 		auto StopAdv=std::chrono::high_resolution_clock::now();
 		auto PassAdv = std::chrono::duration_cast<std::chrono::nanoseconds>(StopAdv-StartAdv);
@@ -774,27 +775,106 @@ int SUPER_CHEM_RHS_TCHEM(realtype t, N_Vector State, N_Vector StateDot, void * p
 int SUPER_RHS_ADV_VEL(realtype t, N_Vector State, N_Vector StateDot, void * userData)
 {
 	myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
-	realtype delx 		= 1.0 / (problem->NumGridPts);
-	realtype divisor 	= -1.0 / (2 * delx);
-	realtype * uData   	= N_VGetArrayPointer(State);
+	realtype divisor 		= -1.0 / (2 * problem->delx);
+	realtype * uData   		= N_VGetArrayPointer(State);
 	realtype * resultData   = N_VGetArrayPointer(StateDot);
-	realtype * Ghost 	= NV_DATA_S(problem->Ghost);
-	realtype * VAD		= N_VGetArrayPointer(problem->VelAve);
-	problem->SetVelAve();
-	int numPts 			= problem->NumGridPts;
-	int vecLength 		= problem->num_equations * numPts;
-	int Grid 			= 0;
-	int FI 				= 0;
-	for (int i = 0; i < vecLength ; i++)
+	realtype * Ghost 		= NV_DATA_S(problem->Ghost);
+	realtype * VAD			= N_VGetArrayPointer(problem->VelAve);
+	int numPts 				= problem->NumGridPts;
+	int Grid 				= 0;
+	int FI 					= 0;
+	for (int i = 0; i < problem->vecLength ; i++)
 	{
 		Grid = floor(i/problem->NumGridPts);
-		FI   =	i % numPts;
-		if( i % numPts == 0) //left boundary
-			resultData[i] = divisor * VAD[FI]* (uData[i + 1]- Ghost[Grid]); //fix boundary condition here
-		else if( i % numPts == (numPts-1) )//right boundary
-			resultData[i] = divisor * VAD[FI] * (uData[i] - uData[i - 1]);
+		FI   =	i % numPts;						//First grid index
+		if( FI == 0 ) 							//left boundary
+			resultData[i] = divisor * VAD[FI]* ( uData[i + 1] - Ghost[Grid] );
+		else if( FI == (numPts - 1) )				//right boundary was -1
+			resultData[i] = divisor * VAD[FI] * ( uData[i] - uData[i - 1] );
 		else
-			resultData[i] = divisor * VAD[FI] * (uData[i + 1] - uData[i - 1]);
+			resultData[i] = divisor * VAD[FI] * ( uData[i + 1] - uData[i - 1] );
+	}
+	return 0;
+}
+//==================================
+//Super Adv Upwind:  Option 2
+//==================================
+int SUPER_RHS_ADV_UPW(realtype t, N_Vector State, N_Vector StateDot, void * userData)
+{
+	myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
+	realtype divisor 		= -1.0 / (problem->delx);
+	realtype * uData   		= N_VGetArrayPointer(State);
+	realtype * resultData   = N_VGetArrayPointer(StateDot);
+	realtype * Ghost 		= NV_DATA_S(problem->Ghost);
+	realtype * VAD			= N_VGetArrayPointer(problem->VelAve);
+	int numPts 				= problem->NumGridPts;
+	int Grid 				= 0;
+	int FI 					= 0;
+	double ap 				= 0;				//a^+ for upwind
+	double am 				= 0;				//a^- for upwind
+	double vp 				= 0;				//v^+ for the scheme
+	double vm 				= 0;				//v^- for the scheme
+	for (int i = 0; i < problem->vecLength ; i++)
+	{
+		Grid 	= floor(i/problem->NumGridPts);
+		FI  	= i % numPts;						//First grid index
+		if(VAD[FI] > 0.0)
+			ap = VAD[FI];
+		else
+			ap = 0.0;
+		if(VAD[FI] < 0.0)
+			am = VAD[FI];
+		else
+			am = 0.0;
+		// //First order
+		// if( FI == 0 ) 							//left boundary
+		// {
+		// 	vp = (uData[i+1] - uData[ i ] );
+		// 	vm = (uData[ i ] - Ghost[Grid]);
+		// 	resultData[i] = divisor * (ap * vm + am * vp);
+		// 	//resultData[i] = divisor * VAD[FI]* ( uData[i + 1] - Ghost[Grid] );
+		// }
+		// else if( FI == (numPts - 1) )				//right boundary was -1
+		// {
+		// 	vp = 0;
+		// 	vm = (uData[ i ] - uData[i-1]);
+		// 	resultData[i] = divisor * (ap * vm + am * vp);
+		// 	//resultData[i] = divisor * VAD[FI] * ( uData[i] - uData[i - 1] );
+		// }
+		// else
+		// {
+		// 	vp = (uData[i+1] - uData[ i ] );
+		// 	vm = (uData[ i ] - uData[i-1]);
+		// 	resultData[i] = divisor * (ap * vm + am * vp);
+		// 	//resultData[i] = divisor * VAD[FI] * ( uData[i + 1] - uData[i - 1] );
+		// }
+		//Second order method
+		if( FI == 0 ) 							//left boundary
+		{
+			vp = (-3 * uData[i] + 4 * uData[i+1] - uData[i+2])/2.0;
+			vm = ( 3 * uData[i] - 3 * Ghost[Grid] )/2.0;		//uData[i-2] = uData[i-1] = Ghost
+		}
+		else if( FI == 1)							//Next to left
+		{
+			vp = (-3 * uData[i] + 4 * uData[i+1] - uData[ i +2 ])/2.0;
+			vm = ( 3 * uData[i] - 4 * uData[i-1] + Ghost[ Grid ])/2.0;		//uData[i-2] = Ghost
+		}
+		else if( FI == (numPts - 2) ) 				//next to right boundary
+		{
+			vp = (-3 * uData[i] + 3 * uData[i+1])/2.0;					//uData[i+2] = uData[i+1]
+			vm = ( 3 * uData[i] - 4 * uData[i-1] + uData[i-2])/2.0;
+		}
+		else if( FI == (numPts - 1) )				//right boundary
+		{
+			vp = 0;
+			vm = (3*uData[i] -4 * uData[i-1] + uData[i-2])/2.0;
+		}
+		else
+		{
+			vp = (-3 * uData[i] + 4 * uData[i+1] - uData[i+2])/2.0;
+			vm = (3 * uData[i] -4 * uData[i-1] + uData[i-2])/2.0;
+		}
+		resultData[i] = divisor * (ap * vm + am * vp);
 	}
 	return 0;
 }
@@ -816,42 +896,40 @@ int SUPER_RHS_DIFF_CP(realtype t, N_Vector u, N_Vector uDot, void * userData)
 	realtype * LookupDiff	= N_VGetArrayPointer(problem->DiffTable);
 	realtype * LookupRho	= N_VGetArrayPointer(problem->RhoTable);
     int numPts 				= problem->NumGridPts;
-	realtype L				= problem->Lambda;
-    realtype delx           = problem->delx;
-    realtype divisor        = 1.0/(delx * delx);
+    realtype divisor        = 1.0/(problem->delx * problem->delx);
     int grid 				= 0;
     int tempInd 			= 0;
 	int TI					= 0;
     realtype T  			= 1;
-	int TInd 				= 0; 
+	int TInd 				= 0;
     realtype * Ghost 		= NV_DATA_S(problem->Ghost);
     int vecLength 			= problem->num_equations * problem->NumGridPts;
-    realtype c 				= 1.0 * divisor;
 	//Start main loop
 	for (int i = 0; i < vecLength; i++)
 	{
-		tempInd = i%numPts;
-		TI 	= tempInd;
-		grid = floor(i/problem->NumGridPts);
+		TI		= i % numPts;
+		grid 	= floor(i/problem->NumGridPts);
+
 		auto Start=std::chrono::high_resolution_clock::now();
 		TInd = problem->TempTableLookUp(uData[TI], problem->TempTable);
 		auto Stop=std::chrono::high_resolution_clock::now();
 		auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
 		problem->rhsDiffLookTime+=Pass.count()/1e9;
-		//TInd = problem->TempTableLookUp(uData[TI], problem->TempTable);
+
 		if(i < numPts)//If we are looking at temp
 			T = LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  );
 		else
 			T = LookupDiff[ grid * 500 + TInd];	
+		
 		//Set the result
         if(i% numPts == 0)//left
-        	resultData[i] = T * c * (Ghost[grid] - 2*uData[i] + uData[i+1]);
+        	resultData[i] = T * divisor * (Ghost[grid] - 2*uData[i] + uData[i+1]);
         else if (i % numPts == (numPts - 1) )//right 0 neumann
-            resultData[i] = T * c * ( uData[i-1] - uData[i] );
+            resultData[i] = T * divisor * ( uData[i-1] - uData[i] );
         else
-            resultData[i] = T * c * (uData[i-1] - 2*uData[i] + uData[i+1]);
+            resultData[i] = T * divisor * (uData[i-1] - 2*uData[i] + uData[i+1]);
     }
-        return 0;
+    return 0;
 }
 
 
@@ -889,7 +967,8 @@ int SUPER_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 	{//Adv Diff
 		// Adv
 		auto StartAdv=std::chrono::high_resolution_clock::now();
-		SUPER_ADV_VEL_JTV(v, tmp, t, v, fu, pb, tmp);
+		//SUPER_ADV_VEL_JTV(v, tmp, t, u, fu, pb, tmp);
+		SUPER_ADV_UPW_JTV(v, tmp, t, u, fu, pb, tmp);
 		N_VLinearSum(pbPtr->Adv, tmp , 1.0, Jv, Jv);
 		auto StopAdv=std::chrono::high_resolution_clock::now();
 		auto PassAdv = std::chrono::duration_cast<std::chrono::nanoseconds>(StopAdv-StartAdv);
@@ -924,29 +1003,109 @@ int SUPER_ADV_VEL_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector 
 	realtype delx           = problem->delx;
 	realtype divisor        = -1.0 / (2 * delx);
 	realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
+	realtype * vData		= NV_DATA_S(v);//call from here
 	realtype * resultData   = NV_DATA_S(Jv);//stuff goes in here.
-	//realtype * Ghost        = NV_DATA_S(problem->Ghost);
 	realtype * VAD          = N_VGetArrayPointer(problem->VelAve);
-	problem->SetVelAve();
+	//problem->SetVelAve();
 	int numPts              = problem->NumGridPts;
 	int vecLength = problem->num_equations * problem->NumGridPts;
 	int Grid = 0;
 	int FI 	= 0;
-        for (int i = 0; i < vecLength; i++)
-        {
-        	Grid = floor(i/problem->NumGridPts);
-			FI = i % numPts;
-			if( i % numPts == 0) //left boundary
-				resultData[i] = divisor * VAD[FI] * uData[i + 1]; //fix boundary condition here
-			else if( i % numPts == (numPts-1) )//right boundary
-				resultData[i] = divisor * VAD[FI] * (uData[i] - uData[i - 1]);
-			else
-				resultData[i] = divisor * VAD[FI] * (uData[i + 1] - uData[i - 1]);
-        }
-        return 0;
+	for (int i = 0; i < vecLength; i++)
+	{//changed to vData from u data
+		Grid = floor(i/problem->NumGridPts);
+		FI = i % numPts;
+		if( i % numPts == 0) //left boundary
+			resultData[i] = divisor * VAD[FI] * vData[i + 1]; //fix boundary condition here
+		else if( i % numPts == (numPts - 1) )//right boundary was -1
+			resultData[i] = divisor * VAD[FI] * (vData[i] - vData[i - 1]);
+		else
+			resultData[i] = divisor * VAD[FI] * (vData[i + 1] - vData[i - 1]);
+	}
+	return 0;
 }
 
+int SUPER_ADV_UPW_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void* userData, N_Vector tmp)
+{
+	myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
+	realtype divisor 		= -1.0 / (problem->delx);
+	realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
+	realtype * vData		= NV_DATA_S(v);//call from here
+	realtype * resultData   = NV_DATA_S(Jv);//stuff goes in here.
+	realtype * VAD			= N_VGetArrayPointer(problem->VelAve);
+	int numPts 				= problem->NumGridPts;
+	int Grid 				= 0;
+	int FI 					= 0;
+	double ap 			= 0;				//a^+ for upwind
+	double am 			= 0;				//a^- for upwind
+	double vp 			= 0;				//v^+ for the scheme
+	double vm 			= 0;				//v^- for the scheme
+	for (int i = 0; i < problem->vecLength ; i++)
+	{
+		Grid 	= floor(i/problem->NumGridPts);
+		FI  	= i % numPts;						//First grid index
+		//Do max(VAD[i],0)
+		if(VAD[FI] > 0.0)
+			ap = VAD[FI];
+		else
+			ap = 0.0;
 
+		//Do min(VAD[i], 0)
+		if(VAD[FI] < 0.0)
+			am = VAD[FI];
+		else
+			am = 0.0;
+		//First order
+		// if( FI == 0 ) 							//left boundary
+		// {
+		// 	vp = (vData[i+1] - vData[ i ] );
+		// 	vm = (vData[ i ]);
+		// 	resultData[i] = divisor * (ap * vm + am * vp);
+		// }
+		// else if( FI == (numPts - 1) )				//right boundary
+		// {
+		// 	vp = 0;
+		// 	vm = (vData[ i ] - vData[i-1]);
+		// }
+		// else
+		// {
+		// 	vp = (vData[i+1] - vData[ i ] );
+		// 	vm = (vData[ i ] - vData[i-1]);
+		// }
+		//Second order.
+		if( FI == 0 ) 							//left boundary
+		{
+			vp = (-3 * vData[i] + 4 * vData[i+1] - vData[i+2])/2.0;
+			vm = ( 3 * vData[i] )/2.0;								//vData[i-1] & vData[i-2] drops off
+			resultData[i] = divisor * (ap * vm + am * vp);
+		}
+		else if( FI == 1)							//Next to left
+		{
+			vp = (-3 * vData[i] + 4 * vData[i+1] - vData[i+2])/2.0;
+			vm = ( 3  *vData[i] - 4 * vData[i-1])/2.0;				//vData[i-2] drops off
+			resultData[i] = divisor * (ap * vm + am * vp);
+		}
+		else if( FI == (numPts - 2) ) 				//next to right boundary
+		{
+			vp = (-3 * vData[i] + 3 * vData[i+1])/2.0;			//vData[i+2] vanishes
+			vm = (3*vData[i] -4 * vData[i-1] + vData[i-2])/2.0;
+			resultData[i] = divisor * (ap * vm + am * vp);
+		}
+		else if( FI == (numPts - 1) )				//right boundary
+		{
+			vp = (3 * vData[i])/2.0;									
+			vm = (3 * vData[i] -4 * vData[i-1] + vData[i-2])/2.0;
+			resultData[i] = divisor * (ap * vm + am * vp);
+		}
+		else
+		{
+			vp = (-3 * vData[i] + 4 * vData[i+1] - vData[i+2])/2.0;
+			vm = (3*vData[i] -4 * vData[i-1] + vData[i-2])/2.0;
+			resultData[i] = divisor * (ap * vm + am * vp);
+		}
+	}
+	return 0;
+}
 
 //===============================
 //  ____    __   _____   _____
@@ -977,8 +1136,8 @@ int SUPER_DIFF_CP_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector 
     realtype * Ghost        = NV_DATA_S(problem->Ghost);
     realtype T              = 0;					//Diff term
     int vecLength           = problem->vecLength;
-    realtype c              = divisor;
-	for (int i = 0; i < vecLength; i++)
+    //realtype c              = divisor;
+	for (int i = 0; i < problem->vecLength; i++)
 	{
 		TI   = i%numPts;
 		grid = floor(i/numPts);
@@ -989,27 +1148,17 @@ int SUPER_DIFF_CP_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector 
 		problem->jtvDiffLookTime+=Pass.count()/1e9;
 		//Set Coefficient for step
 		if(i < numPts)						//Parse if we are in Temp or not
-		{//In this case we need to get lambda/rhoCp for this temp
-			T 	= LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  );
-		}
-		else
-		{//We need to get DT for species i
-			T 	= LookupDiff[ grid * 500 + TInd];
-		}
+			T 	= LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  ); //get lambda/rhoCp for this temp
+		else 
+			T 	= LookupDiff[ grid * 500 + TInd];								//We need to get DT for species i
 		//End parse Thermal lookup
 		//Main if
-		if(i% numPts == 0)					//left
-        {
-			resultData[i] = c * T * (-2*vData[i] + vData[i+1]);
-        }
-    	else if (i % numPts == (numPts - 1) )			//right 0 neumann
-        {
-            resultData[i] = c * T * ( vData[i-1] - vData[i] );
-        }
+		if(i% numPts == 0)														//left
+			resultData[i] = divisor * T * (-2*vData[i] + vData[i+1]);
+    	else if (i % numPts == (numPts - 1) )									//right 0 neumann
+            resultData[i] = divisor * T * ( vData[i-1] - vData[i] );
         else
-        {
-        	resultData[i] = c * T * (vData[i-1] - 2*vData[i] + vData[i+1]);
-        }
+        	resultData[i] = divisor * T * (vData[i-1] - 2*vData[i] + vData[i+1]);
     }
     return 0;
 }
@@ -1175,34 +1324,35 @@ int Clean(int length, realtype * Data)
 //==================================
 int SUPER_RHS_HEATING(realtype t, N_Vector u, N_Vector uDot, void * userData)
 {
-	myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
-	realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
-	realtype * resultData   = NV_DATA_S(uDot);//stuff goes in here.
-	N_VScale(0.0, uDot, uDot);		//Clean, new
+	myPb2 * problem{static_cast<myPb2 *> (userData)};		//Recast
+	realtype * uData        = NV_DATA_S(u);					//Stuff comes from here.
+	realtype * resultData   = NV_DATA_S(uDot);				//stuff goes in here.
+	N_VScale(0.0, uDot, uDot);								//Clean, new
 	int numPts 				= problem->NumGridPts;
 	realtype delx           = problem->delx;
 	realtype * Ghost 		= NV_DATA_S(problem->Ghost);
-	int vecLength 			= problem->NumGridPts;//Only march through temp
+	int vecLength 			= problem->NumGridPts;			//Only march through temp
 	realtype x 				= 0;
 	realtype OffSet 		= 0;
-	//realtype xEnd			= vecLength*delx+delx/2;
 	realtype * LookupTemp	= N_VGetArrayPointer(problem->TempTable);
 	realtype * LookupCp		= N_VGetArrayPointer(problem->CPPoly);
 	realtype * LookupDiff	= N_VGetArrayPointer(problem->DiffTable);
 	realtype * LookupRho	= N_VGetArrayPointer(problem->RhoTable);
 	int TInd				= 0;
 
-	if(problem->HeatingOn==1 )//t<1e-5 && N_VMaxNorm(u) <  2200)//2000 originally
+	if(problem->HeatingOn==1 )
 	{
 		OffSet = delx*(round(0.9*problem->NumGridPts) - 0.5);	//Set 1/10 to left
+		//OffSet = 0.000895;
         for (int i = 0; i < numPts; i++) //Only Heat the Temp
 		{
 			TInd = problem->TempTableLookUp(uData[i], problem->TempTable);
-			x = i*delx + delx/2;
+			x = i*delx + delx/2; 											// x = delx*( i + 0.5)
 			// a exp( - 1/(2* rad^2) * (x-center)^2)  !!Need to divide by rho CP at everypoint!!
+			//resultData[i] = 5e10 * exp( -1*pow((x - OffSet)/(1e-4), 2) )/(LookupCp[TInd]*LookupRho[TInd]);
 			resultData[i] = 5e10 * exp( -1e8 * pow(x - OffSet, 2) )/(LookupCp[TInd]*LookupRho[TInd]);
 		}//Changed below from +delx/2
-		problem->HeatingRightGhost=5e10 * exp( -1e8 * pow(x+delx - OffSet, 2) )/(LookupCp[TInd]*LookupRho[TInd]);//Changing this to 5d8 breaks boundary
+		problem->HeatingRightGhost=5e10 * exp( -1e8 * pow(x+delx - OffSet, 2) )/(LookupCp[TInd]*LookupRho[TInd]);
 	}
 	return 0;
 }
@@ -1230,7 +1380,6 @@ void myPb2::CheckHeating(N_Vector State, realtype t)
 		//if(N_VMaxNorm(State)> 2600 && t > 1e-6)//2600 originally//usually 2100
 			this->HeatingOn = 0;
 			std :: cout <<"x";
-			//std :: cout << "Heating off \n";
 		}
 
 }

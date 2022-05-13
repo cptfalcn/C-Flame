@@ -126,7 +126,7 @@ int main(int argc, char* argv[])
 	opts.set_option<realtype>("Diff", "Diffusion coefficient", &DIFF);
 	opts.set_option<realtype>("Chem", "Chemistry coefficient", &CHEM);
 	opts.set_option<realtype>("Pow", "Power coefficient", &POW);
-	opts.set_option<int>("VelUp", "Do we do velocity up?", &VelUp);
+	opts.set_option<int>("VelUp", "Do we do velocity up?", &VelUp);			//In final version remove this to make it fixed
 	opts.set_option<int>("NumPts", "Interior points for each grid", &NumScalarPoints);
 	opts.set_option<int>("Movie", "Generate a data set at every step", &Movie);
 	opts.set_option<int>("Restart", "Restart from text file?", &Restart);
@@ -219,7 +219,7 @@ int main(int argc, char* argv[])
 		problem2.SetAdvDiffReacPow(ADV, DIFF, CHEM, POW, VelUp);//Additional set up.
 		problem2.kmd = kmd;
 
-		//read in data
+		//read in data, error if files do not exist
 		ReadData(problem2.CPPoly,		"Cp_fT.txt");
 		ReadData(problem2.TempTable,	"Tf.txt");
 		ReadData(problem2.RhoTable, 	"rho_fT.txt");

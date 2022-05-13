@@ -14,7 +14,6 @@
 #include <chrono>
 #include <string>
 
-
 #include "TChem_Impl_ReactionRates.hpp"
 
 #include "TChem_NetProductionRatePerMass.hpp"
@@ -165,6 +164,7 @@ int GetCP	(realtype, N_Vector, N_Vector, void *);
 	int SUPER_RHS_DIFF_CP		(realtype, N_Vector, N_Vector, void *);
 	//int SUPER_RHS_ADV		(realtype, N_Vector, N_Vector, void *);
 	int SUPER_RHS_ADV_VEL		(realtype, N_Vector, N_Vector, void *);
+	int SUPER_RHS_ADV_UPW		(realtype, N_Vector, N_Vector, void *);
 	int SUPER_RHS_HEATING		(realtype, N_Vector, N_Vector, void *);
 
 	//Jacobian function
@@ -177,6 +177,7 @@ int GetCP	(realtype, N_Vector, N_Vector, void *);
 	//int SUPER_DIFF_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 	//int SUPER_ADV_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 	int SUPER_ADV_VEL_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+	int SUPER_ADV_UPW_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 	//int SUPER_DIFF_NL_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 	int SUPER_DIFF_CP_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 

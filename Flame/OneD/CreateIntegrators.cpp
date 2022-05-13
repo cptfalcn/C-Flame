@@ -305,36 +305,36 @@ void *		SelectIntegrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, CVLsJacFn Jac, v
 		return integrator;
 }
 //Marked for removal
-IntegratorStats * IntegrateWrapper(int UseJac, realtype StepSize, realtype TNow, realtype TNext,
-				int NumBands, N_Vector y, realtype KrylovTol, int startingBasisSizes[],
-				void * pbptr, void * ProtoInt, void * cvode_mem,string Method,
-				IntegratorStats *  IntStats, CVLsJacFn JacFn)
-{
-	N_Vector StateDot = N_VClone(y);
-	int Length = N_VGetLength(y);
-	myPb2 * pbPtr{static_cast<myPb2 *> (pbptr)};
-	realtype * STATEDATA = NV_DATA_S(y);
-	if(UseJac==1 && Method != "CVODEKry")
-		JacFn(TNow, y, StateDot, pbPtr->Mat, pbPtr, StateDot, StateDot, StateDot);
-        if(Method=="EPI2")
-        {
-		Epi2_KIOPS * integrator{static_cast<Epi2_KIOPS *> (ProtoInt)};
-               	IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol,	startingBasisSizes);
-        }else if(Method == "EPI3")
-        {
-		Epi3_KIOPS * integrator{static_cast<Epi3_KIOPS *> (ProtoInt)};
-               	IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
-        }else if(Method =="EPIRK4")
-        {
-		EpiRK4SC_KIOPS * integrator{static_cast<EpiRK4SC_KIOPS *> (ProtoInt)};
-               	IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
-        }else if(Method=="CVODEKry")
-        {
-               	CVode(cvode_mem, TNow, y, &TNext, CV_NORMAL);
-               	//CVode(cvode_mem, TNow, y, &TNext, CV_ONE_STEP);
-        }
-	return  IntStats;
-}
+// IntegratorStats * IntegrateWrapper(int UseJac, realtype StepSize, realtype TNow, realtype TNext,
+// 				int NumBands, N_Vector y, realtype KrylovTol, int startingBasisSizes[],
+// 				void * pbptr, void * ProtoInt, void * cvode_mem,string Method,
+// 				IntegratorStats *  IntStats, CVLsJacFn JacFn)
+// {
+// 	N_Vector StateDot = N_VClone(y);
+// 	int Length = N_VGetLength(y);
+// 	myPb2 * pbPtr{static_cast<myPb2 *> (pbptr)};
+// 	realtype * STATEDATA = NV_DATA_S(y);
+// 	if(UseJac==1 && Method != "CVODEKry")
+// 		JacFn(TNow, y, StateDot, pbPtr->Mat, pbPtr, StateDot, StateDot, StateDot);
+//         if(Method=="EPI2")
+//         {
+// 		Epi2_KIOPS * integrator{static_cast<Epi2_KIOPS *> (ProtoInt)};
+//                	IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol,	startingBasisSizes);
+//         }else if(Method == "EPI3")
+//         {
+// 		Epi3_KIOPS * integrator{static_cast<Epi3_KIOPS *> (ProtoInt)};
+//                	IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
+//         }else if(Method =="EPIRK4")
+//         {
+// 		EpiRK4SC_KIOPS * integrator{static_cast<EpiRK4SC_KIOPS *> (ProtoInt)};
+//                	IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
+//         }else if(Method=="CVODEKry")
+//         {
+//                	CVode(cvode_mem, TNow, y, &TNext, CV_NORMAL);
+//                	//CVode(cvode_mem, TNow, y, &TNext, CV_ONE_STEP);
+//         }
+// 	return  IntStats;
+// }
 
 
 //======================================================

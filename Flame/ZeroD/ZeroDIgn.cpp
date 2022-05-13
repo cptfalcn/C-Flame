@@ -474,7 +474,7 @@ int CheckStep(realtype FinalTime, realtype StepSize)
 	//  (_  _)| \| |(_  _)(_  _)      / _)
 	//    ||  |  \ |  ||    ||   _   / /
 	//   _||_ | |  | _||_   ||  (_)  \ \_
-	//  (____)|_|\_|(____)  []	      \__)
+	//  (____)|_|\_|(____)  [|	  	  \__)
 	//======================================================
 
 //====================================================
@@ -619,12 +619,12 @@ int RHS_TCHEM(realtype t, N_Vector u, N_Vector udot, void * pb)
 	/// we use std vector mimicing users' interface
 	using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 	using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
-        // output rhs vector and x via a kokkos wrapper.
+    // output rhs vector and x via a kokkos wrapper.
 	real_type_1d_view_type x(y,	number_of_equations);
 	real_type_1d_view_type f(dy,	number_of_equations);
-        //=================================
-        // Compute right hand side vector
-        //=================================
+	// =================================
+	// Compute right hand side vector
+	// =================================
 	auto member =  Tines::HostSerialTeamMember();
 	g_timer.reset();
 	pbPtr->computeFunction(member, x ,f);
@@ -788,8 +788,8 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 	//======================================
 	//Set the necessary vectors and pointers
 	//======================================
-        realtype *y= NV_DATA_S(u);
-        realtype *JacD= NV_DATA_S(pbPtr->Jac);
+	realtype *y= NV_DATA_S(u);
+	realtype *JacD= NV_DATA_S(pbPtr->Jac);
 	realtype *JV=NV_DATA_S(Jv);
 	realtype *TMP=NV_DATA_S(tmp);
 	//=============================================

@@ -3,7 +3,7 @@
  * This is serial implementation.
  * ===========================================================================================
  */
-
+//This implementation is soon to be depreciated
 #include <stdio.h>
 #include <math.h>
 #include "Epic.h"
@@ -173,6 +173,7 @@ int main(int argc, char* argv[])
 		real_type_1d_view_type work("workspace", problem_workspace_size);
 
 		myPb2 problem2(num_eqs, work, kmcd, num_pts, y, Delx);	//Construct new Problem.
+		std :: cout << problem2.NumGridPts << std :: endl;
 		problem2.SetAdvDiffReacPow(0, 0, 1, 0, 0);//Additional set up.
 		problem2.kmd 		= kmd;
 		void *UserData 		= &problem2;
@@ -191,14 +192,14 @@ int main(int argc, char* argv[])
 		Epi3_KIOPS 	*Epi3					= NULL;
 		EpiRK4SC_KIOPS	*EpiRK4				= NULL;
 		IntegratorStats *integratorStats 	= NULL;
+		//ToDo: Figure out why the code is acting strange when using "Super" versions
+		Epi2 = 	new Epi2_KIOPS(CHEM_RHS_TCHEM, CHEM_JTV_V2, UserData,MaxKrylovIters, y,vecLength);
 
-		Epi2 = 	new Epi2_KIOPS(CHEM_RHS_TCHEM_V2,CHEM_JTV_V2,UserData,MaxKrylovIters, y,vecLength);
+		Epi3 = 	new Epi3_KIOPS(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2,UserData,MaxKrylovIters, y,vecLength);
 
-		Epi3 = 	new Epi3_KIOPS(SUPER_RHS,SUPER_JTV,UserData,MaxKrylovIters, y,vecLength);
+		//EpiRK4=	new EpiRK4SC_KIOPS(SUPER_RHS,SUPER_JTV, UserData, MaxKrylovIters, y,vecLength);
 
-		EpiRK4=	new EpiRK4SC_KIOPS(SUPER_RHS,SUPER_JTV, UserData, MaxKrylovIters, y,vecLength);
-
-		cvode_mem= CreateCVODE(SUPER_RHS, SUPER_JTV, SUPER_CHEM_JAC_TCHEM, UserData, A,
+		cvode_mem= CreateCVODE(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, SUPER_CHEM_JAC_TCHEM, UserData, A,
 					SUPERLS, SUPERNLS, vecLength, y, relTol, absTol, StepSize, 1);
 		CVodeSetMaxNumSteps     (cvode_mem, 1e6);
 
@@ -306,7 +307,7 @@ int main(int argc, char* argv[])
 		//==========================
 		delete Epi2;
 		delete Epi3;
-		delete EpiRK4;
+		//delete EpiRK4;
 		N_VDestroy_Serial(y);
 		SUNMatDestroy(A);
 		SUNLinSolFree(SUPERLS);

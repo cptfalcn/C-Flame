@@ -11,7 +11,7 @@
 #include "Epic.h"
 #include "Epi3_KIOPS.h"
 #include "Epi3SC_KIOPS.h"
-#include "EpiP2_KIOPS.h"
+//#include "EpiP2_KIOPS.h"
 #include <nvector/nvector_serial.h>
 #include <sundials/sundials_nvector.h>
 #include <iostream>
@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
     	Epi2_KIOPS *integrator 	= new Epi2_KIOPS(RHS, Jtv, userData, MaxKrylovIters, y, NEQ);
 	Epi3_KIOPS * Epi3 	= new Epi3_KIOPS(RHS, Jtv, userData, MaxKrylovIters, y, NEQ);
 	Epi3SC_KIOPS * Epi3SC  	= new Epi3SC_KIOPS(RHS, Jtv, userData, MaxKrylovIters, y, NEQ);
-	EpiP2_KIOPS * EpiP2 	= new EpiP2_KIOPS(RHS,Jtv, userData, MaxKrylovIters, y, NEQ, 3, 0, &postProcess);
+	//EpiP2_KIOPS * EpiP2 	= new EpiP2_KIOPS(RHS,Jtv, userData, MaxKrylovIters, y, NEQ, 3, 0, &postProcess);
 	//========================
 	// Set integrator parameters
 	//========================
@@ -133,12 +133,12 @@ int main(int argc, char* argv[])
 	}
 	else if(opt == "EPIP2")
 	{
-		auto Start=std::chrono::high_resolution_clock::now();
-		Stats= EpiP2->Integrate(StepSize, 0.0, FinalTime, y, KrylovTol, startingBasis);
-		auto Stop=std::chrono::high_resolution_clock::now();
-		auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-		KTime+=Pass.count()/1e9;
-		TNow = FinalTime;
+		// auto Start=std::chrono::high_resolution_clock::now();
+		// Stats= EpiP2->Integrate(StepSize, 0.0, FinalTime, y, KrylovTol, startingBasis);
+		// auto Stop=std::chrono::high_resolution_clock::now();
+		// auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+		// KTime+=Pass.count()/1e9;
+		// TNow = FinalTime;
 	}
 
 	
@@ -176,12 +176,7 @@ int main(int argc, char* argv[])
 		}
 		else if(opt == "EPIP2")
 		{
-			auto Start=std::chrono::high_resolution_clock::now();
-			Stats= EpiP2->Integrate(StepSize, TNow, TNext, y,
-						KrylovTol, startingBasis);
-			auto Stop=std::chrono::high_resolution_clock::now();
-						auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-						KTime+=Pass.count()/1e9;
+			break;
 		}
 		else
 		{
@@ -296,7 +291,7 @@ int main(int argc, char* argv[])
    	 // Clean up the integrator
     delete integrator;
 	delete Epi3SC;
-	delete EpiP2;
+	//delete EpiP2;
 
 
 
