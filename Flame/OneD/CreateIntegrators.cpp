@@ -9,101 +9,6 @@
 // |  >> |  |\   >>   |  >>   |  |_
 // |__>> |__| \__>>   |__>>   |____>>
 //
-
-//=====================
-//Create a EPI2 Pointer
-//=====================
-Epi2_KIOPS* CreateEPI2Integrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, int MaxKrylovIters,
-                                N_Vector y, const int number_of_equations, int UseJac)
-{
-                switch(UseJac)
-                {
-                case 0:{
-			/*
-                        Epi2_KIOPS *integrator = new Epi2_KIOPS(RHS, pbptr,
-                                MaxKrylovIters, y, number_of_equations);
-			*/
-			/**/
-			unique_ptr<Epi2_KIOPS> EPI2_PTR (	new Epi2_KIOPS(RHS, pbptr,
-					MaxKrylovIters, y, number_of_equations));//Smart Pointer
-			/**/
-                        cout<< BAR <<"\tEPI2 w/o JtV\t\t"<< BAR << endl;
-                        //return integrator;
-			return EPI2_PTR.release();
-                        break;}
-                case 1:{
-                        Epi2_KIOPS *integrator = new Epi2_KIOPS(RHS, JtV, pbptr,
-                                MaxKrylovIters, y, number_of_equations);
-
-                        cout<< BAR << "\tEPI2 JtV\t\t"<< BAR << endl;
-                        return integrator;
-                        break;}
-                default:
-                        cout<< BAR <<"\t Invalid EPI2 Jacobian Option\t"<< BAR << endl;;
-                        exit(EXIT_FAILURE);
-                }
-        return 0;
-}
-
-//======================
-//Create an EPI3 Pointer
-//======================
-Epi3_KIOPS* CreateEPI3Integrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr,
-		int MaxKrylovIters, N_Vector y, const int number_of_equations, int UseJac)
-{
-                switch(UseJac)
-                {
-                case 0:{
-                        Epi3_KIOPS *integrator = new Epi3_KIOPS(RHS, pbptr,
-                                MaxKrylovIters, y, number_of_equations);
-
-                        cout<< BAR <<"\tEPI3 w/o JtV\t\t"<< BAR << endl;
-                        return integrator;
-                        break;}
-                case 1:{
-                        Epi3_KIOPS *integrator = new Epi3_KIOPS(RHS, JtV, pbptr,
-				MaxKrylovIters, y, number_of_equations);
-
-                        cout<< BAR <<"\tEPI3 JtV\t\t"<< BAR << endl;
-                        return integrator;
-                        break;}
-                default:
-                        cout<<"===============EPI3 Jacobian  Option Invalid============\n";
-                        exit(EXIT_FAILURE);
-                }
-        return 0;
-}
-
-
-//==========================
-//Create an EPIRK4SC Pointer
-//==========================
-EpiRK4SC_KIOPS * CreateEPIRK4SCIntegrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr,
-		 int MaxKrylovIters, N_Vector y, const int number_of_equations, int UseJac)
-{
-                switch(UseJac)
-                {
-                case 0:{
-                        EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS,pbptr,
-                                MaxKrylovIters, y, number_of_equations);
-
-                        cout<< BAR <<"\tEPIRK4 w/o JtV\t\t"<< BAR << endl;
-                        return integrator;
-                        break;}
-                case 1:{
-                        EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS, JtV, pbptr,
-                                MaxKrylovIters, y, number_of_equations);
-
-                        cout<< BAR <<"\tEPIRK4 JtV\t\t"<< BAR << endl;
-                        return integrator;
-                        break;}
-                default:
-                        cout<< BAR << "EPIRK4 Jacobian  Option Invalid" << BAR << endl;
-                        exit(EXIT_FAILURE);
-                }
-        return 0;
-}
-
 //======================================================
 //General Cvode with general RHS and Jacobian functions.
 //======================================================
@@ -138,17 +43,17 @@ void * CreateCVODE(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, CVLsJacFn JAC,  void *
         retVal = CVodeSetNonlinearSolver(cvode_mem, NLS);
         if (UseJac==1)
         {
-		retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
-		retVal = CVodeSetLSetupFrequency(cvode_mem, 1); //Remove because also stupid.
-		retVal = CVodeSetJacEvalFrequency(cvode_mem, 1);//Remove becuase this is stupid.
-                retVal = CVodeSetJacFn(cvode_mem, JAC);		//Error if removed .
-                retVal = CVodeSetMaxNumSteps(cvode_mem, 500);
+			retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
+			retVal = CVodeSetLSetupFrequency(cvode_mem, 1); //Remove because also stupid.
+			retVal = CVodeSetJacEvalFrequency(cvode_mem, 1);//Remove becuase this is stupid.
+			retVal = CVodeSetJacFn(cvode_mem, JAC);		//Error if removed .
+			retVal = CVodeSetMaxNumSteps(cvode_mem, 500);
         }
         N_VDestroy_Serial(AbsTol);
         return cvode_mem;
 }
 
-
+//Marked for deletion in next release
 //===============================
 //Set-up an Adaptive CVODE solver
 //High max steps
@@ -225,117 +130,13 @@ void * CreateCVODEKrylov(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, void * pbptr, SU
 	retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
 	if (UseJac==1)
 	{
-	retVal = CVodeSetJacFn(cvode_mem, SUPER_CHEM_JAC_TCHEM);//Updated Version
-	//retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
-			retVal = CVodeSetMaxNumSteps(cvode_mem, max(500,num_eqs*num_eqs*num_eqs));
+		retVal = CVodeSetJacFn(cvode_mem, SUPER_CHEM_JAC_TCHEM);//Updated Version
+		//retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV);
+		retVal = CVodeSetMaxNumSteps(cvode_mem, max(500,num_eqs*num_eqs*num_eqs));
 	}
 	N_VDestroy_Serial(AbsTol);
 	return cvode_mem;
 }
-
-//========================
-//Integrate: Marked for removal
-//========================
-IntegratorStats* Integrate(int UseJac, realtype StepSize, realtype TNow, realtype TNext, int NumBands,
-				N_Vector y, realtype KrylovTol, int startingBasisSizes[], void * pbptr,
-				void * cvode_mem, string Method, Epi2_KIOPS * integrator,
-				Epi3_KIOPS * integrator2, EpiRK4SC_KIOPS * integrator3,
-				IntegratorStats *  IntStats)
-{
-	if(UseJac==1 && Method != "CVODEKry")
-		CHEM_COMP_JAC(y,pbptr);
-	if(Method=="EPI2")
-	{
-		IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y,
-				KrylovTol, startingBasisSizes);
-	}else if(Method == "EPI3")
-        {
-		IntStats = integrator2->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol,
-				startingBasisSizes);
-	}else if(Method =="EPIRK4")
-        {
-		IntStats = integrator3->Integrate(StepSize, TNow, TNext, NumBands, y,
-				KrylovTol, startingBasisSizes);
-     	}else if(Method=="CVODEKry")
-	{
-		CVode(cvode_mem, TNow, y, &TNext, CV_NORMAL);
-		//CVode(cvode_mem, TNow, y, &TNext, CV_ONE_STEP);
-	}
-	return IntStats;
-}
-
-//=======================================================
-//  ___  _  _  ___  ___  ___
-// / __/| || || _ \|  _|| _ \
-// \__ \| || ||  _/|  _||   <
-// /___/ \__/ |_|  |___||_|_|
-//
-//========================================================
-//Create the void integrator: Marked for removal
-//=====================================
-void *		SelectIntegrator(CVRhsFn RHS, CVSpilsJacTimesVecFn JtV, CVLsJacFn Jac, void * pbptr,
-				void * integrator, int MaxKrylovIters, N_Vector y, const int num_eqs,
-				int UseJac, string Method, SUNMatrix A, SUNLinearSolver LS,
-				SUNNonlinearSolver NLS, realtype absTol, realtype relTol, realtype StepSize)
-{
-		realtype TNext= 1e-6;
-		int startingBasisSizes[] ={3,3};
-		IntegratorStats * IntStats = NULL;
-		if(Method=="EPI2")
-		{
-		integrator = reinterpret_cast<void *>
-				(CreateEPI2Integrator(RHS, JtV, pbptr, MaxKrylovIters, y, num_eqs, UseJac));
-		}
-		else if(Method == "EPI3")
-		{
-		integrator = reinterpret_cast<void *>
-				( CreateEPI3Integrator(RHS, JtV, pbptr, MaxKrylovIters, y, num_eqs, UseJac));
-		}
-		else if(Method == "EPIRK4")
-		{
-		integrator = reinterpret_cast<void *>
-			( CreateEPIRK4SCIntegrator(RHS, JtV, pbptr, MaxKrylovIters, y, num_eqs, UseJac));
-		}else//create CVODE
-		{
-			integrator = CreateCVODE(RHS, JtV, Jac, pbptr, A, LS, NLS , num_eqs, y,
-						relTol, absTol, StepSize, UseJac);
-			//integrator = CreateCVODEKrylov(RHS, JtV, pbptr, A, LS, NLS,
-			//			num_eqs,y,relTol, absTol, StepSize, UseJac);
-		}
-		return integrator;
-}
-//Marked for removal
-// IntegratorStats * IntegrateWrapper(int UseJac, realtype StepSize, realtype TNow, realtype TNext,
-// 				int NumBands, N_Vector y, realtype KrylovTol, int startingBasisSizes[],
-// 				void * pbptr, void * ProtoInt, void * cvode_mem,string Method,
-// 				IntegratorStats *  IntStats, CVLsJacFn JacFn)
-// {
-// 	N_Vector StateDot = N_VClone(y);
-// 	int Length = N_VGetLength(y);
-// 	myPb2 * pbPtr{static_cast<myPb2 *> (pbptr)};
-// 	realtype * STATEDATA = NV_DATA_S(y);
-// 	if(UseJac==1 && Method != "CVODEKry")
-// 		JacFn(TNow, y, StateDot, pbPtr->Mat, pbPtr, StateDot, StateDot, StateDot);
-//         if(Method=="EPI2")
-//         {
-// 		Epi2_KIOPS * integrator{static_cast<Epi2_KIOPS *> (ProtoInt)};
-//                	IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol,	startingBasisSizes);
-//         }else if(Method == "EPI3")
-//         {
-// 		Epi3_KIOPS * integrator{static_cast<Epi3_KIOPS *> (ProtoInt)};
-//                	IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
-//         }else if(Method =="EPIRK4")
-//         {
-// 		EpiRK4SC_KIOPS * integrator{static_cast<EpiRK4SC_KIOPS *> (ProtoInt)};
-//                	IntStats = integrator->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
-//         }else if(Method=="CVODEKry")
-//         {
-//                	CVode(cvode_mem, TNow, y, &TNext, CV_NORMAL);
-//                	//CVode(cvode_mem, TNow, y, &TNext, CV_ONE_STEP);
-//         }
-// 	return  IntStats;
-// }
-
 
 //======================================================
 //  __    __   __    ______    ____     ____    ____
@@ -359,6 +160,51 @@ Epi3VChem_KIOPS::Epi3VChem_KIOPS(CVRhsFn f, CVSpilsJacTimesVecFn jtv, void *user
 {
     	this->f = f;
     	this->jtv = jtv;
+    	this->userData = userData;
+
+    	krylov = new Kiops(MaxPhiOrder1 + 2, maxKrylovIters, tmpl, NEQ);//Originally MaxPhiOrder1+1
+    	integratorStats = new IntegratorStats(NumProjectionsPerStep);
+
+
+        realtype hMax=0;
+    	fy = N_VClone(tmpl);
+        Y1 = N_VClone(tmpl);
+        fY1 = N_VClone(tmpl);
+    	hfy = N_VClone(tmpl);
+    	hb1 = N_VClone(tmpl);
+    	hb2 = N_VClone(tmpl);
+    	r1 = N_VClone(tmpl);
+        r2=N_VClone(tmpl);
+        r3=N_VClone(tmpl);
+        Remainder = N_VClone(tmpl);
+        Scratch1  = N_VClone(tmpl);
+    	tmpVec = N_VClone(tmpl);
+    	zeroVec = N_VClone(tmpl);
+    	// Zero out zeroVec by using the trusted vector tmpl.
+    	// If zeroVec has random data in it, it may have NAN values.
+    	// zeroVec = 0.0 * zeroVec may accidentally be the calculation
+    	// 0.0 * NAN = NAN, and zeroVec will not end up zero.
+    	// Instead zeroVec = 0.0 * templ, since templ is trusted
+    	// to have no NAN values in it.
+    	N_VConst(0, fy);
+    	N_VConst(0, Y1);
+    	N_VConst(0, fY1);
+    	N_VConst(0, hfy);
+    	N_VConst(0, hb1);
+    	N_VConst(0, hb2);
+    	N_VConst(0, r1);
+    	N_VConst(0, zeroVec);
+    	N_VConst(0, r2);
+    	N_VConst(0, r3);
+        N_VConst(0, Scratch1);
+}
+
+Epi3VChem_KIOPS::Epi3VChem_KIOPS(CVRhsFn f, CVSpilsJacTimesVecFn jtv, CVLsJacFn jacf, void *userData, int maxKrylovIters,
+					N_Vector tmpl, const int vecLength) : NEQ(vecLength)
+{
+    	this->f = f;
+    	this->jtv = jtv;
+		this->jacf = jacf;
     	this->userData = userData;
 
     	krylov = new Kiops(MaxPhiOrder1 + 2, maxKrylovIters, tmpl, NEQ);//Originally MaxPhiOrder1+1
@@ -441,6 +287,8 @@ Epi3VChem_KIOPS::Epi3VChem_KIOPS(CVRhsFn f, void *userData, int maxKrylovIters, 
 
 }
 
+
+
 //==========
 //Destructor
 //==========
@@ -474,7 +322,8 @@ IntegratorStats *Epi3VChem_KIOPS::Integrate(const realtype hStart, const realtyp
 	realtype PercentDone	= 0;
 	int PercentDots		= 0;
 	int ProgressDots	= 0;
-	myPb2 * pb{static_cast<myPb2 *> (userData)};    //Recast
+	//myPb2 * pb{static_cast<myPb2 *> (userData)};    //Recast
+	myPb * pb{static_cast<myPb *> (userData)};    //Recast
 	ofstream myfile;
 	pb->MaxStepTaken		= 0;
 	pb->MinStepTaken		= 1;
@@ -523,7 +372,8 @@ IntegratorStats *Epi3VChem_KIOPS::Integrate(const realtype hStart, const realtyp
 				// f is RHS function from the problem; y = u_n
 				f(t, y, fy, userData); 							// f(t, y) = fy
 				N_VScale(h, fy, hfy); 							//Scale f(y);
-				SUPER_CHEM_JAC_TCHEM(t, y, y,     pb->Mat, this->userData, y,y,y);
+				this->jacf(t, y, y,     pb->Mat, this->userData, y,y,y);
+				//SUPER_CHEM_JAC_TCHEM(t, y, y,     pb->Mat, this->userData, y,y,y);
 				JTimesV jtimesv(jtv, f, delta, t, y, fy, userData, tmpVec);
 
 				//Mayya's new method//
@@ -595,8 +445,7 @@ IntegratorStats *Epi3VChem_KIOPS::Integrate(const realtype hStart, const realtyp
 
 			this->Clean(y, N_VGetLength(y));		//Clean the data
 			//this->CheckNanBlowUp(y, N_VGetLength(y));		//Check for errors
-			t = t + h;                              		//Advance the time
-			myPb2 * pb{static_cast<myPb2 *> (userData)};	//Recast
+			t = t + h;                              		//Advance the time 
 
 			//Check curret stepsize against mins and maxes
 			if(h > pb->MaxStepTaken)

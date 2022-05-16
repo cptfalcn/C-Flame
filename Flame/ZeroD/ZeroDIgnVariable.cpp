@@ -71,6 +71,7 @@ int CheckStep(realtype, realtype);
 void PrintFromPtr(realtype *,  int);
 void ErrorCheck(ofstream &, N_Vector, realtype *, int, realtype);
 void PrintDataToFile(ofstream &, realtype *,int, realtype);
+void PrintToFile(ofstream &, realtype *, int, realtype, realtype, realtype, realtype, realtype, realtype);
 
 
 //Used in Jtv
@@ -212,10 +213,10 @@ int main(int argc, char* argv[])
 		problem.num_equations		= number_of_equations;
 		problem.Jac					= N_VNew_Serial(number_of_equations*number_of_equations);//Make the Jacobian
 		const int MaxKrylovIters 	= 1000;//500
-		// problem.MaxStepTaken		= 0;
-		// problem.MinStepTaken		= 0;
-		// problem.ignTime				= 0;
-		// problem.Movie				= 0;
+		problem.MaxStepTaken		= 0;
+		problem.MinStepTaken		= 0;
+		problem.ignTime				= 0;
+		problem.Movie				= 0;
 
 		//==============================================
 		//Create integrators
@@ -278,7 +279,7 @@ int main(int argc, char* argv[])
 		PrintSuperVector(data, Experiment, 1, BAR);
 		cout << "Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
 		PrintProfiling(integratorStats, Profiling, Method,  BAR, cvode_mem);
-
+		PrintToFile(myfile, data, number_of_equations, problem.t, relTol, absTol, KTime, KrylovTol, problem.ignTime);
 		if (Profiling ==1){//Invalid for experiment 0
 			ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
 			cout << "Integrator CPU time: "<<KTime<<" seconds\n";
@@ -589,6 +590,18 @@ void ErrorCheck(ofstream & myfile, N_Vector y, realtype * data, int number_of_eq
 
 }
 
+
+void PrintToFile(ofstream & myfile, realtype * data, int length, realtype t, realtype rel_tol, realtype abs_tol,
+			realtype run_time, realtype kry_tol, realtype ignTime)
+{
+	for (int i=0; i < length; i++)
+        {
+                myfile<<setprecision(20)<<fixed <<data[i] <<"\t\t";
+        }
+	myfile << "\t\t" << t << "\t\t" << run_time << "\t\t" << rel_tol << "\t\t" << abs_tol;
+	myfile << "\t\t" << kry_tol << "\t\t" << ignTime << endl;
+
+}
 
 
 void PrintBanner()

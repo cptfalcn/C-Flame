@@ -22,35 +22,54 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 	this->pb._work	= work;
 	this->pb._kmcd 	= kmcd;
 	//End TChem problem
+	//Critical parameters 
 	this->NumGridPts= GridPts;
 	this->vecLength = num_eqs * GridPts;
 	sunindextype Block = this->vecLength * this->vecLength;
 	real_type_1d_view_type fac("fac", 2*vecLength);
 	this->pb._fac   = fac;
+	this->delx 		= Delx;
+	this->LeftDiff	= 0;
+
+	//Large N_Vectors
 	this->Jac		= N_VNew_Serial(Block);
 	this->Mat		= SUNDenseMatrix(num_eqs*GridPts,num_eqs*GridPts);
-	this->Vel 		= N_VNew_Serial( (GridPts+1));		//This is staggered bigger
-	this->Ghost 	= N_VNew_Serial(num_eqs);
+	this->Ghost 	= N_VNew_Serial(num_eqs);			//One hanging ghost NEQ
+	//Set the ghost
 	N_VScale(1.0 , y, this->Ghost);						//Use y to get the ghost points.
-	this->Tmp 		= N_VNew_Serial(vecLength);
-	this->OMEGA		= N_VNew_Serial(vecLength);
-	this->delx 		= Delx;
+
+	//Velocity data
 	this->VelAve	= N_VNew_Serial(GridPts);			//Averaged velocity
-	this->LeftDiff	= 0;
-	this->SmallScrap= N_VNew_Serial(GridPts);			//Used for any small grid
-	this->VelScrap	= N_VNew_Serial(GridPts+1);			//Used for any velocity grid
-	this->SmallChem	= N_VNew_Serial(num_eqs);
-	this->HeatingOn = 1;
-	this->Scrap 	= N_VNew_Serial(vecLength);			//Temp storage, clean before accessing.
-	this->CP		= N_VNew_Serial(vecLength);			//Needs editing
-	this->Lambda	= 6.17e-2;							//Refactor in an input later.
-	this->RHO		= N_VNew_Serial(vecLength);			//Stores the density, needs editing
-	this->dumpJac	= 0;								//Do we dump the Jac for visualization
+	this->Vel 		= N_VNew_Serial(GridPts+1);		//This is staggered bigger
 	//Data Tables:	All fixed sizes
 	this->CPPoly	= N_VNew_Serial(500);				//CP table
 	this->TempTable	= N_VNew_Serial(500);				//Temperature reference table
 	this->RhoTable	= N_VNew_Serial(500);				//Rho table
 	this->DiffTable	= N_VNew_Serial(500*num_eqs);		//Each scalar has its own table
+	//Scratch work vectors
+	this->SmallScrap= N_VNew_Serial(GridPts);			//Used for any small grid
+	this->VelScrap	= N_VNew_Serial(GridPts+1);			//Used for any velocity grid
+	this->SmallChem	= N_VNew_Serial(num_eqs);			//Used for a single point of chem
+	this->Tmp 		= N_VNew_Serial(vecLength);			//TempScratch vector of full size
+	this->Scrap 	= N_VNew_Serial(vecLength);			//Temp storage, clean before accessing.
+	//Options
+	this->HeatingOn = 1;
+	this->dumpJac	= 0;								//Do we dump the Jac for visualization
+	//Transport grids
+	this->CpGrid	= N_VNew_Serial(GridPts);		//The value of Cp based on grid position.
+	this->RhoGrid	= N_VNew_Serial(GridPts);		//The value of Rho based on grid position.
+	this->DiffGrid	= N_VNew_Serial(vecLength);			//Diffusion coefficient based on grid position.
+	this->MolarWeights = N_VNew_Serial(GridPts-1);		//Only grab the species molar wieghts;
+	// !!!This kills the 0-D problem!!!
+	// realtype * 			MolarWeightsPtr =	NV_DATA_S(MolarWeights);
+	// real_type_1d_view_type SpeciesMolecularWeights(MolarWeightsPtr   ,   GridPts-1);
+	// SpeciesMolecularWeights = Kokkos::create_mirror_view(this->pb._kmcd.sMass);
+	// Kokkos::deep_copy(SpeciesMolecularWeights, this->pb._kmcd.sMass);
+	
+	// //std :: cout << kmcd.sMass << std :: endl;
+	// //const auto SpeciesMolecularWeights = Kokkos::create_mirror_view(kmcd.sMass);
+	// std::setprecision(17);
+	// std :: cout << MolarWeightsPtr[0] << " zero-th mass entry?" << std :: endl;
 }
 
 void myPb2::SetAdvDiffReacPow(realtype adv, realtype diff, realtype reac, realtype pow, bool up)
@@ -80,13 +99,14 @@ myPb2::~myPb2()
 	N_VDestroy_Serial(this->SmallChem);
 	N_VDestroy_Serial(this->SmallScrap);//Problematic line?
 	N_VDestroy_Serial(this->VelScrap);
-	N_VDestroy_Serial(this->OMEGA);
 	N_VDestroy_Serial(this->Scrap);
-	N_VDestroy_Serial(this->CP);
 	N_VDestroy_Serial(this->TempTable);
 	N_VDestroy_Serial(this->RhoTable);
 	N_VDestroy_Serial(this->CPPoly);
 	N_VDestroy_Serial(this->DiffTable);
+	N_VDestroy_Serial(this->CpGrid);
+	N_VDestroy_Serial(this->RhoGrid);
+	N_VDestroy_Serial(this->DiffGrid);
 }
 
 //==============================
@@ -143,6 +163,7 @@ void myPb2::TempGradient(N_Vector State, N_Vector Gradient)
 //Called by the main function in the integration loop
 //===================================================
 //Awaiting final test clear
+//DoTo:  Clean up extra memory allocations, use existing data
 //===================================================
 void myPb2::UpdateOneDVel(N_Vector State)
 {
@@ -189,16 +210,22 @@ void myPb2::UpdateOneDVel(N_Vector State)
 
 	//New Derivative and flame front position.
 	//Set grad(T)(x)
-	SUPER_RHS_DIFF_CP(0, State, this->Tmp, this);
-	//this->TempGradient(State, TempGrad);				//Call the method to set TempGrad
+	/*
+	this->TempGradient(State, TempGrad);				//Call the method to set TempGrad
 	N_VScale(this->Diff, TempGrad, TempGrad);			//Scale TempGrad by Diff setting, 0 or 1 
 	for(int i = 0; i < this->NumGridPts; i++)			//Loop over Temp indices.
 	{
-		//TInd 	= this->TempTableLookUp(SD[i], this->TempTable);	//Find Temp lookup value
-		VTempData[i]	+=	TmpD[i]/SD[i];							//New
-		//TG[i]	= LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  ) * TG[i]/SD[i];//Divide by the temperature.
+		TInd 	= this->TempTableLookUp(SD[i], this->TempTable);	//Find Temp lookup value
+		TG[i]	= LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  ) * TG[i]/SD[i];//Divide by the temperature.
 	}
-	//TG[End+1]	= TG[End];
+	TG[End+1]	= TG[End];
+	*/
+	//Set the diffusion term.
+	SUPER_RHS_DIFF_CP(0, State, this->Tmp, this);
+	N_VScale(this->Diff, TempGrad, TempGrad);			//Scale TempGrad by Diff setting, 0 or 1 
+	for(int i = 0; i < this->NumGridPts; i++)			//Loop over Temp indices.
+		VTempData[i]	+=	TmpD[i]/SD[i];				//New, adds the Temp Integral
+	RightTemp+=VTempData[End];							//New, possibly problematic
 
 	//Heating component
 	//This will turn on/off depending on Temperature max value or time.
@@ -221,7 +248,7 @@ void myPb2::UpdateOneDVel(N_Vector State)
 	this->VelIntegrate(VTempData, State, LeftTemp, RightTemp);
 	//V(x) = Integral( omega/(rho T c_p) ,[0,x] ) + V(0);		See VelIntegrate function
 	N_VLinearSum(1.0, this->Vel, 1.0, TempGrad, this->Vel);		//V+=Grad(T)(x)
-	//N_VAddConst(this->Vel, -1.0*TG[0], this->Vel);				//V-=Grad(T)(0)
+	//N_VAddConst(this->Vel, -1.0*TG[0], this->Vel);				//V-=Grad(T)(0), when Grad(T) method is used.
 	this->SetVelAve();											//Modify VelAve
 	if(N_VMin(this->Vel)<0  &&  abs(N_VMin(this->Vel)>1e-1) )
 		std :: cout << "Warning: negative vel @" << this->t <<"\n";
@@ -313,21 +340,18 @@ void myPb2::SetGhostPVel(N_Vector y, int Experiment, int SampleNum, realtype Vel
 
 void myPb2::CheckNaN(N_Vector State, int vecLength)
 {
-        realtype * DATA = N_VGetArrayPointer(State);
-        for( int i = 0 ; i < vecLength; i ++)
-        {
-                if(isnan(DATA[i]) || abs(DATA[i]) >1e5)
-                {
-                        if( isnan(DATA[i]) )
-                                std :: cout << "Data has NaN: " <<  i << DATA[i] << "\n";
-                        if(abs(DATA[i]) > 1e5)
-                                std :: cout << "Data is out of control: "<< i << DATA[i] <<"\n";
-                        exit(EXIT_FAILURE);
-
-                }
-        }
-
-
+	realtype * DATA = N_VGetArrayPointer(State);
+	for( int i = 0 ; i < vecLength; i ++)
+	{
+		if(isnan(DATA[i]) || abs(DATA[i]) >1e5)
+		{
+			if( isnan(DATA[i]) )
+				std :: cout << "Data has NaN: " <<  i << DATA[i] << "\n";
+			if(abs(DATA[i]) > 1e5)
+				std :: cout << "Data is out of control: "<< i << DATA[i] <<"\n";
+			exit(EXIT_FAILURE);
+		}
+	}
 }
 
 //End Class functions
@@ -462,10 +486,12 @@ int CHEM_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void*
 {
         //problem_type problem;
         myPb * pbPtr{static_cast<myPb *> (pb)};//Recast
-        ordinal_type number_of_equations=pbPtr->num_equations;//Get number of equations
+        //ordinal_type number_of_equations=pbPtr->num_equations;//Get number of equations
+		int number_of_equations=pbPtr->num_equations;//Get number of equations
         //======================================
         //Set the necessary vectors and pointers
         //======================================
+		int ulength = 	N_VGetLength(u);
         realtype *y= NV_DATA_S(u);
         realtype *JacD= NV_DATA_S(pbPtr->Jac);
         realtype *JV=NV_DATA_S(Jv);
@@ -491,9 +517,9 @@ int CHEM_JTV_V2(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, vo
         //===================
         //Compute JV
         //===================
-	auto StartChem=std::chrono::high_resolution_clock::now();
+		auto StartChem=std::chrono::high_resolution_clock::now();
         MatrixVectorProduct(number_of_equations, JacD, v, tmp, JV);
-	auto StopChem=std::chrono::high_resolution_clock::now();
+		auto StopChem=std::chrono::high_resolution_clock::now();
         auto PassChem = std::chrono::duration_cast<std::chrono::nanoseconds>(StopChem-StartChem);
         pbPtr->jtv_Chem+=PassChem.count()/1e9;
         return 0;
@@ -756,6 +782,7 @@ int SUPER_CHEM_RHS_TCHEM(realtype t, N_Vector State, N_Vector StateDot, void * p
 		auto member =  Tines::HostSerialTeamMember();
 		pbPtr->pb.computeFunction(member, x ,f);
 		VEC_2_SUPER(i, FDATA, STATEDOTDATA, num_eqs, grid_sz);//Set FDATA into STATEDOTDATA
+		//std :: cout << "Step " << i << " successful\n";
 	}
 	N_VDestroy_Serial(yTemp);
 	N_VDestroy_Serial(fTemp);
@@ -943,7 +970,7 @@ int SUPER_RHS_DIFF_CP(realtype t, N_Vector u, N_Vector uDot, void * userData)
 //\ \| |   | |    \ \/ /
 // \___|   |_|     \__/
 //=============================
-// ______  ______ __  __
+// ______  ______ __   __
 //|_    _||_    _|\ \ / /
 // _|  |    |  |   \   /
 //|____|    |__|    \_/
@@ -953,6 +980,7 @@ int SUPER_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 	myPb2 * pbPtr{static_cast<myPb2 *> (pb)};			//Recast
 	N_VScale(0.0, Jv, Jv);
 	N_VScale(0.0, tmp, tmp);
+	pbPtr->SetTransportGrid(u);
 	auto Start=std::chrono::high_resolution_clock::now();
 	if(pbPtr->React>0){//Get Chem
 		//Chem
@@ -1207,6 +1235,7 @@ int SUPER_CHEM_JTV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu,
 		auto Stop2=std::chrono::high_resolution_clock::now();
 		auto Pass2 = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
 		pbPtr->dataMoveTime+=Pass2.count()/1e9;
+		//std :: cout << "Step i successful\n";
 	}
 	N_VDestroy_Serial(SmallJac);
 	N_VDestroy_Serial(SmallTmp);
@@ -1349,7 +1378,6 @@ int SUPER_RHS_HEATING(realtype t, N_Vector u, N_Vector uDot, void * userData)
 			TInd = problem->TempTableLookUp(uData[i], problem->TempTable);
 			x = i*delx + delx/2; 											// x = delx*( i + 0.5)
 			// a exp( - 1/(2* rad^2) * (x-center)^2)  !!Need to divide by rho CP at everypoint!!
-			//resultData[i] = 5e10 * exp( -1*pow((x - OffSet)/(1e-4), 2) )/(LookupCp[TInd]*LookupRho[TInd]);
 			resultData[i] = 5e10 * exp( -1e8 * pow(x - OffSet, 2) )/(LookupCp[TInd]*LookupRho[TInd]);
 		}//Changed below from +delx/2
 		problem->HeatingRightGhost=5e10 * exp( -1e8 * pow(x+delx - OffSet, 2) )/(LookupCp[TInd]*LookupRho[TInd]);
@@ -1465,4 +1493,27 @@ int myPb2::TempTableLookUp(realtype Temp, N_Vector TempTable)
 		}
 	}
 	return TempInd;
+}
+
+void myPb2::SetTransportGrid(N_Vector State)
+{
+	int index				= 0;
+	realtype * LookupTemp	= NV_DATA_S(this->TempTable);
+	realtype * LookupCp		= N_VGetArrayPointer(this->CPPoly);
+	realtype * LookupDiff	= N_VGetArrayPointer(this->DiffTable);
+	realtype * LookupRho	= N_VGetArrayPointer(this->RhoTable);
+	realtype * CpData		= NV_DATA_S(this->CpGrid);
+	realtype * RhoData		= NV_DATA_S(this->RhoGrid);
+	realtype * DiffData 	= NV_DATA_S(this->DiffGrid);
+	realtype * data 		= NV_DATA_S(State);
+	for(int i = 0 ; i < this->NumGridPts ; i ++ )
+	{
+		index 				= this->TempTableLookUp(data[i], this->TempTable);
+		CpData[i]			= LookupCp[index];
+		RhoData[i]			= LookupRho[index];
+		for( int j = 0 ; j < this->num_equations; j ++)
+		{
+			DiffData[j*this->num_equations + i] = LookupDiff[j*500 + index];
+		}
+	}
 }

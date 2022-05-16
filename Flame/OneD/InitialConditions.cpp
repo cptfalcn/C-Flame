@@ -178,33 +178,85 @@ void IntConGri30(realtype * data, int SampleNum)
 		break;
 	case 4: //Aditya's case, runs at three ATM
 		data[0] 	=  800;//Temp
-                data[14]	=  0.0392661; //CH4
-                data[4] 	=  0.2237715;//O2
-                data[48]	=  0.736962400000000; //N2
+        data[14]	=  0.0392661; //CH4
+        data[4] 	=  0.2237715;//O2
+        data[48]	=  0.736962400000000; //N2
 		cout << BAR << "Gri Sample: Hi Pressure" << BAR << endl;
 		break;
 	case 5: //High temp setup
 		data[0]  =  1300;
 		data[14] =  5.483858845025559731e-02;//CH4
-                data[4]  =  2.187578062376045740e-01;//O2
-                data[48] =  7.137587863547695255e-01;//N2
-                data[49] =  1.264481895737025810e-02;//AR
-                cout << BAR <<"GRI Experiment Sample 2\t" << BAR <<endl;
+        data[4]  =  2.187578062376045740e-01;//O2
+        data[48] =  7.137587863547695255e-01;//N2
+        data[49] =  1.264481895737025810e-02;//AR
+        cout << BAR <<"GRI Experiment Sample 2\t" << BAR <<endl;
 		break;
 	case 6: //Low temp long burn
 		cout << BAR << "GRI Experiment: Long burn" << BAR << endl;
 		data[0] =   810.0;//use 1000 for base
-                data[14] =  5.483858845025559731e-02;//CH4
-                data[4]  =  2.187578062376045740e-01;//O2
-                data[48] =  7.137587863547695255e-01;//N2
-                data[49] =  1.264481895737025810e-02;//AR
-                cout << BAR <<"GRI Experiment Sample 1\t" << BAR <<endl;
-                break;
+        data[14] =  5.483858845025559731e-02;//CH4
+        data[4]  =  2.187578062376045740e-01;//O2
+        data[48] =  7.137587863547695255e-01;//N2
+        data[49] =  1.264481895737025810e-02;//AR
+        cout << BAR <<"GRI Experiment Sample 1\t" << BAR <<endl;
+        break;
+	case 60:
+		cout << BAR << "Gri Sample: Hi-Argon" << BAR << endl;
+		data[0] 	= 1300;
+		data[14] 	= 5e-2;//CH4
+		data[4]		= 2e-1;//O2
+		data[48] 	= 7e-1;//N2
+		data[49] 	= 5e-2;//AR
+		break;
+	case 61:
+		cout << BAR << "Gri Sample: Super-Argon" << BAR << endl;
+		data[0] 	= 1300;
+		data[14] 	= 5e-2;//CH4
+		data[4]		= 2e-1;//O2
+		data[48] 	= 5e-2;//N2
+		data[49] 	= 7e-1;//AR
+		break;
+	case 62:
+		cout << BAR << "Gri Sample: Low-Argon" << BAR << endl;
+		data[0] 	= 1400;
+		data[14] 	= 3e-1;//CH4
+		data[4]		= 5e-1;//O2
+		data[48] 	= 1e-1;//N2
+		data[49] 	= 1e-1;//AR
+		break;		
 	case 69:
 		cout << BAR << "Gri Sample: 1e-4 Hi-P" << BAR << endl;
 		ConditionsFromFile(data, "GriIgnition.txt");
 		break;
-        }
+	case 70:
+		cout << BAR << "Gri Sample: Hi-Fuel" << BAR << endl;
+		data[0] 	= 1400;
+		data[14] 	= 8e-2;//CH4
+		data[4]		= 1.2e-1;//O2
+		data[48] 	= 8e-1;//N2
+		break;
+	case 71:
+		cout << BAR << "Gri Sample: Super-Fuel" << BAR << endl;
+		data[0] 	= 1300;
+		data[14] 	= 1e-1;//CH4
+		data[4]		= 1e-1;//O2
+		data[48] 	= 8e-1;//N2
+		break;
+	case 80:
+		cout << BAR << "Gri Sample: Hydrogen Burn" << BAR << endl;
+		data[0] 	= 1300;
+		data[2] 	= 1e-1;//H
+		data[4]		= 1e-1;//O2
+		data[48] 	= 8e-1;//N2
+		break;
+	case 81:
+		cout << BAR << "Gri Sample: Hydrogen Burn low phi" << BAR << endl;
+		data[0] 	= 1300;
+		data[2] 	= 1e-2;//H
+		data[4]		= 1.8e-1;//O2
+		data[48] 	= 8e-1;//N2
+		break;
+    }
 }
 
 

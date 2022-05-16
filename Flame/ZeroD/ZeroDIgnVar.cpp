@@ -50,7 +50,7 @@ int TrackProgress(realtype, realtype, realtype, int);
 void ReadData(N_Vector, string);
 void PrintProfilingToFile(ofstream &, IntegratorStats* , int , string, string, void*);
 void PrintToFile(ofstream &, realtype *, int, realtype, realtype, realtype, realtype, realtype, realtype);
-int CVODEMonitorFunction(N_Vector State);
+//int CVODEMonitorFunction(N_Vector State);
 void postProcess(N_Vector);
 //=====================
 //Namespaces and globals
@@ -84,7 +84,7 @@ int main(int argc, char* argv[])
 	int number_of_equations		= 0;		//Varies on problem
 	realtype absTol 			= 1e-8;
 	realtype relTol 			= 1e-8;
-	int startingBasisSizes[]	= {10, 10};	//{3,3}
+	int startingBasisSizes[]	= {10, 10};	//{3,3} //2855.4227227129413 Ten is the normal number
 	int Movie					= 0;
 	realtype maxSS				= 1e-3;		//Default value.
 	int UseJac					= 1;
@@ -145,6 +145,10 @@ int main(int argc, char* argv[])
 		N_Vector y 			= N_VNew_Serial(vecLength);	//intial conditions/Data
 		N_VScale(0.0 , y, y);						//Zero out the y vector.
 		realtype *data 		= N_VGetArrayPointer(y);	//Set the y data pointer.
+		//N_Vector Test		= N_VClone(y);
+		//N_Vector Temp		= N_VClone(y);
+		//N_Vector TestJac	= N_VNew_Serial(vecLength*vecLength);
+		//N_VScale(0.0, Test, Test);
 		//Initial Conditions sub-block
 		SetIntCons(Experiment, SampleNum, data);		//Set Initial Conditions
 		PrintSuperVector(data, Experiment, 1, BAR);
@@ -162,6 +166,16 @@ int main(int argc, char* argv[])
 		problem2.kmd			= kmd;
 		void *UserData 			= &problem2;
 		int MaxKrylovIters 		= 1000; //max(vecLength, 500);//500 is the base
+
+		//Test Data
+		// CHEM_RHS_TCHEM_V2(0, y, Test, UserData);
+		// N_VPrint_Serial(Test);
+		// CHEM_COMP_JAC_V2(y, UserData);
+		// std :: cout << endl;
+		// CHEM_JTV_V2(y, Test, 0, y, y, UserData, Temp);
+		// //MatrixVectorProduct(number_of_equations, N_VGetArrayPointer(problem2.Jac), y, Temp, N_VGetArrayPointer(Test));
+		// N_VPrint_Serial(Test);
+
 		//==================
 		//Create integrators
 		//==================
@@ -170,18 +184,25 @@ int main(int argc, char* argv[])
 		SUNMatrix A					= SUNDenseMatrix(vecLength, vecLength);
 		SUNLinearSolver SUPERLS 	= SUNLinSol_SPGMR(y, PREC_NONE, 20);
 		SUNNonlinearSolver SUPERNLS = SUNNonlinSol_Newton(y);
+		
 
 		//Set EPIxx_KIOPS methods
 		IntegratorStats *integratorStats 	= NULL;
-		Epi3VChem_KIOPS * EPI3V = new Epi3VChem_KIOPS(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, UserData,
-				MaxKrylovIters, y, vecLength);
+		Epi3VChem_KIOPS * EPI3V = new Epi3VChem_KIOPS(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, 
+					SUPER_CHEM_JAC_TCHEM, UserData, MaxKrylovIters, y, vecLength);
+		//The old way.
+		// Epi3VChem_KIOPS * EPI3V = new Epi3VChem_KIOPS(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, UserData,
+		// 		MaxKrylovIters, y, vecLength);
 
 		//EPI3V->TestMatMult();
+		//This sets Jac evaluation to every step
 		cvode_mem= 	CreateCVODE(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, CHEM_COMP_JAC_CVODE_V2, UserData, A,
 				SUPERLS, SUPERNLS, vecLength, y, relTol, absTol, StepSize, UseJac);
 		CVodeSetMaxStep			(cvode_mem, maxSS);
 		CVodeSetMaxNumSteps		(cvode_mem, 1e6);
-		CVodeSetMonitorFrequency(cvode_mem, 1);
+		CVodeSetMaxOrd			(cvode_mem, 2);
+
+		//CVodeSetMonitorFrequency(cvode_mem, 1);
 
 		//EPIP2 method, with post processing
 		EpiP2_KIOPS * EPIP2 = new EpiP2_KIOPS(CHEM_RHS_TCHEM_V2, CHEM_JTV_V2, UserData, MaxKrylovIters,
@@ -202,8 +223,7 @@ int main(int argc, char* argv[])
 		if(Method == "EPI3V")
         {
 			cout << BAR <<"\tEPI3V Selected\t\t" << BAR <<endl;
-			integratorStats = EPI3V->Integrate(StepSize, maxSS,	 	absTol, relTol,
-				0.0, FinalTime, 	NumBands, startingBasisSizes, y);
+			integratorStats = EPI3V->Integrate(StepSize, maxSS, absTol, relTol,0.0, FinalTime, NumBands, startingBasisSizes, y);
 			problem2.t= FinalTime;
         }
 		else if(Method == "CVODEKry")
@@ -362,6 +382,6 @@ void postProcess(N_Vector solution)
 	int len 		= N_VGetLength(solution);
 	for (int i = 0; i < len; i ++ )
 	{
-		data[i] = std::max(1e-10, data[i]);
+		//data[i] = std::max(1e-10, data[i]);
 	}
 }

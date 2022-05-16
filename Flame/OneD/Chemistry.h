@@ -34,11 +34,29 @@ using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_t
 //=====================
 //Add an additional class elements to pass to epic.
 //ZeroD class
+// class myPb : public TCHEMPB{
+//         public:
+//         //members
+//         ordinal_type  num_equations;
+//         N_Vector Jac;
+// };
 class myPb : public TCHEMPB{
-        public:
-        //members
-        ordinal_type  num_equations;
-        N_Vector Jac;
+	public:
+	//members
+	ordinal_type  num_equations;
+	N_Vector Jac;
+	realtype t;
+	realtype MaxStepTaken;
+	realtype MinStepTaken;
+	realtype ignTime;
+	SUNMatrix	Mat;
+	int 			Movie;
+	std :: string	dumpJacFile;
+	//functions
+	ordinal_type	get_num_equations(void)
+	{
+		return this->num_equations;
+	}
 };
 //OneD class
 class myPb2{
@@ -52,6 +70,11 @@ class myPb2{
 	N_Vector 	Ghost;
 	N_Vector 	Jac;
 	N_Vector 	Tmp;
+	//New grids for transport
+	N_Vector	CpGrid;
+	N_Vector	RhoGrid;
+	N_Vector	DiffGrid;
+
 	SUNMatrix	Mat;
 	myPb2(ordinal_type, real_type_1d_view_type, WORK, int, N_Vector, realtype);
 	~myPb2();//destructor
@@ -70,6 +93,7 @@ class myPb2{
 	void SetGhostPVel(N_Vector y, int Experiment, int SampleNum, realtype VelVal);
 	void SetAdvDiffReacPow(realtype, realtype, realtype, realtype, bool);
 	void TempGradient(N_Vector State, N_Vector Gradient);
+	void SetTransportGrid(N_Vector State);
 
 	int			dumpJac;				//Do we want to dump the Jacobian
 	std :: string	dumpJacFile;				//Where to dump it
@@ -111,6 +135,7 @@ class myPb2{
 	realtype	PMultiplier;
 	realtype	LeftDiff;
 	N_Vector	SmallChem;
+	N_Vector	MolarWeights;
 	//Parameter selectors
 	realtype	Adv;
 	realtype	Diff;
@@ -119,51 +144,48 @@ class myPb2{
 	realtype	t;
 	realtype	ignTime;
 	bool		VelUp;
-	int		FlameFrontLocation;
+	int			FlameFrontLocation;
 	realtype	HeatingRightGhost;
 	int 		HeatingOn;
-	realtype	Lambda;
+	//realtype	Lambda;
 	KineticModelData	kmd;
 
 	void VerifyHeatingExp(N_Vector State, N_Vector State0, realtype tElapsed);
 	void CheckNaN(N_Vector, int);				//Checks the vector for NaN
 	realtype ComputeCpTemp(N_Vector y);
-	void FetchTherm(N_Vector State);			//Sets cp and cpmm(the wanted quantity).
+	//void FetchTherm(N_Vector State);			//Sets cp and cpmm(the wanted quantity).
 	void VerifyTempTable(N_Vector State);			//Verify Read in and run a temperature test.
 	int  TempTableLookUp(realtype Temp, N_Vector TempTable);//Lookup a table
 };
 
 //End class stuff
 //Definitions
+//Old Prototype functions, where they are called is uncertain
 int CHEM_RHS_TCHEM(realtype , N_Vector , N_Vector, void *);
-int CHEM_RHS_TCHEM_V2(realtype , N_Vector , N_Vector, void *);
 int CHEM_COMP_JAC(N_Vector u, void* pb);
-int CHEM_COMP_JAC_V2(N_Vector u, void * pb);
 int CHEM_COMP_JAC_CVODE(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector, N_Vector, N_Vector);
-int CHEM_COMP_JAC_CVODE_V2(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector, N_Vector, N_Vector);
-int CHEM_JAC_VOID(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector, N_Vector, N_Vector);
-
-
-int CHEM_JTV_V2(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 int CHEM_JTV(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+//Zero-D Functions
+int CHEM_RHS_TCHEM_V2(realtype , N_Vector , N_Vector, void *); 	//Rename required
+int CHEM_COMP_JAC_V2(N_Vector u, void * pb);
+int CHEM_COMP_JAC_CVODE_V2(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector, N_Vector, N_Vector); //Rename required
+int CHEM_JAC_VOID(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector, N_Vector, N_Vector);
+int CHEM_JTV_V2(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector); //Rename required
 
 
+//Kapila problem functions
 int RHS_KAPPA(realtype , N_Vector , N_Vector, void *);
 int Jtv_KAPPA(N_Vector , N_Vector , realtype , N_Vector , N_Vector , void * , N_Vector);
-void MatrixVectorProduct(int, realtype *, N_Vector, N_Vector, realtype *);
 
-int GetOmegaCP	(realtype, N_Vector, N_Vector, void *);
-int GetCP	(realtype, N_Vector, N_Vector, void *);
+//Helpers
+void MatrixVectorProduct(int, realtype *, N_Vector, N_Vector, realtype *);
 
 //One-D versions
 	//RHS Functions
 	int SUPER_RHS			(realtype, N_Vector, N_Vector, void *);
 	int SUPER_CHEM_RHS_TCHEM	(realtype, N_Vector, N_Vector, void *);
-	//int SUPER_RHS_DIFF		(realtype, N_Vector, N_Vector, void *);
-	//int SUPER_RHS_DIFF_NL		(realtype, N_Vector, N_Vector, void *);
 	int SUPER_RHS_DIFF_CP		(realtype, N_Vector, N_Vector, void *);
-	//int SUPER_RHS_ADV		(realtype, N_Vector, N_Vector, void *);
-	int SUPER_RHS_ADV_VEL		(realtype, N_Vector, N_Vector, void *);
+	int SUPER_RHS_ADV_VEL		(realtype, N_Vector, N_Vector, void *); //Depreciated
 	int SUPER_RHS_ADV_UPW		(realtype, N_Vector, N_Vector, void *);
 	int SUPER_RHS_HEATING		(realtype, N_Vector, N_Vector, void *);
 
@@ -172,13 +194,10 @@ int GetCP	(realtype, N_Vector, N_Vector, void *);
 						N_Vector, N_Vector);
 
 	//JtV functions
-	int SUPER_JTV			(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
-	int SUPER_CHEM_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
-	//int SUPER_DIFF_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
-	//int SUPER_ADV_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+	int SUPER_JTV				(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+	int SUPER_CHEM_JTV			(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 	int SUPER_ADV_VEL_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 	int SUPER_ADV_UPW_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
-	//int SUPER_DIFF_NL_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 	int SUPER_DIFF_CP_JTV		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 
 
