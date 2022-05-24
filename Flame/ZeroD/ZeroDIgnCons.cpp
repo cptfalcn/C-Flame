@@ -218,7 +218,9 @@ int main(int argc, char* argv[])
 		real_type_1d_view_type work("workspace", problem_workspace_size);
 	    /// set problem
 		myPb problem;
+		myPb2 problem2(number_of_equations, work, kmcd, 1, y, 0);
 		void *pbptr= &problem;
+		void *pbptr2=&problem2;
 
       	/// initialize problem
 		const real_type pressure(101325);//Constant pressure
@@ -264,13 +266,18 @@ int main(int argc, char* argv[])
 		retVal = CVodeSetLSetupFrequency(cvode_mem, 1); //Remove because also stupid.
 		retVal = CVodeSetJacEvalFrequency(cvode_mem, 1);//Remove becuase this is stupid.
 		retVal = CVodeSetJacFn(cvode_mem, CVodeComputeJacWrapper);		//Error if removed .
-		retVal = CVodeSetMaxNumSteps(cvode_mem, 500);
+		retVal = CVodeSetMaxNumSteps(cvode_mem, 2);
+		retVal = CVodeSetMaxOrd(cvode_mem, 1);
         N_VDestroy_Serial(AbsTol);
 
 
 		//Experiment 0 cannot be run with this code.
 		Epi2_KIOPS * Epi2 	= new Epi2_KIOPS(RHS_TCHEM, Jtv_TCHEM, pbptr,
 								MaxKrylovIters, y, number_of_equations);
+
+		// Epi2_KIOPS * Epi2 	= new Epi2_KIOPS(CHEM_RHS_TCHEM, CHEM_JTV_V2, pbptr2,
+		// 						MaxKrylovIters, y, number_of_equations);
+
 
 		Epi3_KIOPS * Epi3 	= new Epi3_KIOPS(RHS_TCHEM, Jtv_TCHEM, pbptr,
 								MaxKrylovIters, y, number_of_equations);
@@ -299,7 +306,7 @@ int main(int argc, char* argv[])
 			}
 			else if(Method == "CVODEKry")
 			{
-				CVode(cvode_mem, TNext, y, &TNext, CV_NORMAL);//CV_NORMAL/CV_ONE_STEP
+				CVode(cvode_mem, TNext, y, &TNext, CV_ONE_STEP);//CV_NORMAL/CV_ONE_STEP
 			}
 			//Clock the time spent in the integrator
 			auto Stop=std::chrono::high_resolution_clock::now();
@@ -614,7 +621,6 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 	realtype *y= NV_DATA_S(u);
 	realtype *JacD= NV_DATA_S(pbPtr->Jac);
 	realtype *JV=NV_DATA_S(Jv);
-	realtype *TMP=NV_DATA_S(tmp);
 	//===================
 	//Compute JV
 	//===================

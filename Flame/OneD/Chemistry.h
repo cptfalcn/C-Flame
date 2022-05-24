@@ -68,6 +68,7 @@ class myPb2{
 	int 		vecLength;
 	realtype 	delx;
 	N_Vector 	Ghost;
+	std::vector<N_Vector> Jacs;
 	N_Vector 	Jac;
 	N_Vector 	Tmp;
 	//New grids for transport
@@ -94,6 +95,7 @@ class myPb2{
 	void SetAdvDiffReacPow(realtype, realtype, realtype, realtype, bool);
 	void TempGradient(N_Vector State, N_Vector Gradient);
 	void SetTransportGrid(N_Vector State);
+	void SetGradient(N_Vector Input, N_Vector GradientVec, realtype Ghost);
 
 	int			dumpJac;				//Do we want to dump the Jacobian
 	std :: string	dumpJacFile;				//Where to dump it
@@ -136,6 +138,12 @@ class myPb2{
 	realtype	LeftDiff;
 	N_Vector	SmallChem;
 	N_Vector	MolarWeights;
+	//Gradients
+	N_Vector	CpGrad;
+	N_Vector	RhoGrad;
+	N_Vector	DiffGrad;
+	N_Vector	TempGrad;
+
 	//Parameter selectors
 	realtype	Adv;
 	realtype	Diff;

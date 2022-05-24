@@ -240,7 +240,6 @@ int main(int argc, char* argv[])
 		//Set EPI_KIOPS methods
 		Epi2_KIOPS	*Epi2					= NULL;
 		Epi3_KIOPS 	*Epi3					= NULL;
-		EpiRK4SC_KIOPS	*EpiRK4				= NULL;
 		IntegratorStats *integratorStats 	= NULL;
 		//===================================================
 		//Parse the experiment cases and make the integrators
@@ -248,8 +247,6 @@ int main(int argc, char* argv[])
 		Epi2 = 	new Epi2_KIOPS(SUPER_RHS,SUPER_JTV,UserData,MaxKrylovIters,State,vecLength);
 
 		Epi3 = 	new Epi3_KIOPS(SUPER_RHS,SUPER_JTV,UserData,MaxKrylovIters,State,vecLength);
-
-		EpiRK4=	new EpiRK4SC_KIOPS(SUPER_RHS,SUPER_JTV, UserData, MaxKrylovIters, State,vecLength);
 
 		cvode_mem= CreateCVODE(SUPER_RHS, SUPER_JTV, SUPER_CHEM_JAC_TCHEM, UserData, A,
 					SUPERLS, SUPERNLS, vecLength, State, relTol, absTol, StepSize, 1);
@@ -277,9 +274,6 @@ int main(int argc, char* argv[])
 					State, KrylovTol, startingBasisSizes);
 			else if(Method == "EPI3")
 				integratorStats =Epi3->Integrate(StepSize, TNow, TNext, NumBands,
-					State, KrylovTol, startingBasisSizes);
-			else if(Method == "EPIRK4")
-				integratorStats =EpiRK4->Integrate(StepSize, TNow, TNext, NumBands,
 					State, KrylovTol, startingBasisSizes);
 			else if(Method == "CVODEKry")
 				CVode(cvode_mem, TNext, State, &TNextC, CV_NORMAL);//CV_NORMAL/CV_ONE_STEP
@@ -372,7 +366,6 @@ int main(int argc, char* argv[])
 		//==========================
 		delete Epi2;
 		delete Epi3;
-		delete EpiRK4;
 		N_VDestroy_Serial(y);
 		N_VDestroy_Serial(State);
 		N_VDestroy_Serial(StateDot);

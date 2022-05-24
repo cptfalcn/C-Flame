@@ -42,17 +42,8 @@
 //=====================
 //Prototypes & Classes
 //=====================
-// class myPb : public TCHEMPB{
-// 	public:
-// 	//members
-// 	ordinal_type  num_equations;
-// 	N_Vector Jac;
-// 	//functions
-// 	ordinal_type	get_num_equations(void)
-// 		return this->num_equations;
-// };
+// class myPb : public TCHEMPB{};
 //See Chemistry.h
-
 
 //Banner
 void PrintBanner();
@@ -67,7 +58,6 @@ int RHS_TCHEM(realtype, N_Vector, N_Vector, void *);
 int Jtv_TCHEM(N_Vector , N_Vector ,realtype, N_Vector, N_Vector , void* , N_Vector );
 
 //Misc functions
-int CheckStep(realtype, realtype);
 void PrintFromPtr(realtype *,  int);
 void ErrorCheck(ofstream &, N_Vector, realtype *, int, realtype);
 void PrintDataToFile(ofstream &, realtype *,int, realtype);
@@ -116,7 +106,7 @@ int main(int argc, char* argv[])
 	static realtype KrylovTol	= 1e-14;
 	int UseJac					= 1; //will we use the Jacobian or not
 	int SampleNum				= 0;
-	int Experiment				= 1; //default is hydrogen, set to 0 for kapila
+	int Experiment				= 1; //default is hydrogen, 2 for Gri3.0
 	int Profiling				= 0;//default to no profiling
 	int number_of_equations		= 0;
 	int startingBasisSizes[] 	= {10, 10};
@@ -160,8 +150,7 @@ int main(int argc, char* argv[])
 	//==========================
 	//Start Kokkos
 	//==========================
-	/// all Kokkos varialbes are reference counted objects. 
-	//  they are deallocated within this local scope.
+	//Kokkos variables are reference counted objects and are deallocated in this local scope.
 	Kokkos::initialize(argc, argv);
 	{//begin local scope
 		//=====================================
@@ -185,15 +174,17 @@ int main(int argc, char* argv[])
 		//Set number of equations
 		number_of_equations=problem_type::getNumberOfEquations(kmcd);
 
-		//Declare the state variable locally
-		N_Vector y = N_VNew_Serial(number_of_equations); //The data y
-		N_VScale(0.0 , y, y);						//Zero out the y vector.
-		//set the pointer to the state
-		realtype *data = NV_DATA_S(y);
-		SetIntCons(Experiment, SampleNum, data);
+		//==================================================
+		//Prep/Set state and intial conditions
+		//==================================================
+		N_Vector y 		= N_VNew_Serial(number_of_equations); 	//The data y
+		N_VScale(0.0 , y, y);									//Zero out the y vector.
+
+		realtype *data 	= NV_DATA_S(y);							//y pointer
+		SetIntCons(Experiment, SampleNum, data);				//Set initial conditions
 		/// TChem does not allocate any workspace internally.workspace should be explicitly given from users.
-		/// you can create the work space using NVector, std::vector or real_type_1d_view_type (Kokkos view)
-		/// here we use kokkos view
+		/// we create work space using NVector, std::vector or real_type_1d_view_type
+		/// here we use kokkos view real_type_1d_view_type
 		//Set up an ignition problem and the workspace.
 		const ordinal_type problem_workspace_size = problem_type::getWorkSpaceSize(kmcd);
 		real_type_1d_view_type work("workspace", problem_workspace_size);
@@ -335,50 +326,14 @@ int main(int argc, char* argv[])
 // |  _)| | ||   |/ _)(. .)[_]/ _ \|   |( .)
 // |_|  |___||_|_|\__) |_| |_|\___/|_|_|(`_)
 //===========================================
-*/
-
-//===========================================
-//Check the number of steps
-//FinalTime
-//StepSize
-//===========================================
-int CheckStep(realtype FinalTime, realtype StepSize)
-{
-	cout << BAR << "\t Step Check\t\t" << BAR << endl ;
-	cout<<"Checking the proposed number of steps...\n";
-	cout<<std::setprecision(17);
-	cout<<FinalTime/StepSize << " steps proposed...";
-	if(floor( FinalTime/StepSize ) == FinalTime/StepSize )
-	{
-		static const int Steps= FinalTime/StepSize;
-		cout << " accepted...\n";
-		return Steps;
-	}
-	else if (abs(round(FinalTime/StepSize))-FinalTime/StepSize <1e-6 )
-	{
-		static const int Steps= round (FinalTime/StepSize);
-		cout << Steps << " steps approximated...\n";
-		return Steps;
-	}
-	else
-	{
-		cout<<"Cannot perform non-integer number of steps!!\n";
-		exit(EXIT_FAILURE);
-	}
-}
-
-
-
-	//====================================================
-	//  ___    _   _   ___
-	// |   \  | | | | /   \
-	// | |) ) | |_| | \ \\/
-	// |   <  |  _  |  \ \
-	// | |\	\ | | | | /\\ \
-	// |_| \_\|_| |_| \___/
-	//====================================================
-
-/*
+//====================================================
+//  ___    _   _   ___
+// |   \  | | | | /   \
+// | |) ) | |_| | \ \\/
+// |   <  |  _  |  \ \
+// | |\	\ | | | | /\\ \
+// |_| \_\|_| |_| \___/
+//====================================================
  * ===========================================================================================
  *
  * Function RHS
@@ -422,13 +377,13 @@ int RHS_TCHEM(realtype t, N_Vector u, N_Vector udot, void * pb)
 	return 0;
 }
 
-	//===============================================================
-	//   _____   ___     ____   ___    _____   _____    ___   __   _
-	//  |__ __| /   \   / ___) / _ \  |     \ |__ __|  /   \ |  \ | |
-	//  _ | |  | (x) | | /    / / \ \ |  x  /   | |   | (x) ||   \| |
- 	// / (| |  |  n  | | \___ \ \_/ / |  x  \  _| |   |  n  || |\   |
-	// \____/  |_| |_|  \____) \___/  |_____/ |_____| |_| |_||_| \__|
-	//===============================================================
+//===============================================================
+//   _____   ___     ____   ___    _____   _____    ___   __   _
+//  |__ __| /   \   / ___) / _ \  |     \ |__ __|  /   \ |  \ | |
+//  _ | |  | (x) | | /    / / \ \ |  x  /   | |   | (x) ||   \| |
+// / (| |  |  n  | | \___ \ \_/ / |  x  \  _| |   |  n  || |\   |
+// \____/  |_| |_|  \____) \___/  |_____/ |_____| |_| |_||_| \__|
+//===============================================================
 
 int ComputeJac(N_Vector u, void* pb)
 {
@@ -473,13 +428,13 @@ int CVodeComputeJacWrapper(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
 }
 
 
-	//==============================//
-	//	  	  | |    _				//
-	//	      | |  _| |_  __    __	//
-	//     _  | | (_   _) \ \  / /	//
-	//    ( (_| |   | |    \ \/ /	//
-	//     \___/    |_|     \__/	//
-	//==============================//
+//==============================//
+//	  	  | |    _				//
+//	      | |  _| |_  __    __	//
+//     _  | | (_   _) \ \  / /	//
+//    ( (_| |   | |    \ \/ /	//
+//     \___/    |_|     \__/	//
+//==============================//
 /*
  * ===========================================================================================
  *

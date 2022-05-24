@@ -32,8 +32,9 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 	this->LeftDiff	= 0;
 
 	//Large N_Vectors
-	this->Jac		= N_VNew_Serial(Block);
-	this->Mat		= SUNDenseMatrix(num_eqs*GridPts,num_eqs*GridPts);
+	this->Jac		= N_VNew_Serial(Block);				//Remove this
+	//this->Mat		= SUNDenseMatrix(num_eqs*GridPts,num_eqs*GridPts);//Change to some tiny number
+	this->Mat		= SUNDenseMatrix(1,1);				//Hard code to a small number
 	this->Ghost 	= N_VNew_Serial(num_eqs);			//One hanging ghost NEQ
 	//Set the ghost
 	N_VScale(1.0 , y, this->Ghost);						//Use y to get the ghost points.
@@ -60,6 +61,20 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 	this->RhoGrid	= N_VNew_Serial(GridPts);		//The value of Rho based on grid position.
 	this->DiffGrid	= N_VNew_Serial(vecLength);			//Diffusion coefficient based on grid position.
 	this->MolarWeights = N_VNew_Serial(GridPts-1);		//Only grab the species molar wieghts;
+	//Gradient Grids
+	this->CpGrad	= N_VClone(this->CpGrid);
+	this->RhoGrad	= N_VClone(this->RhoGrid);
+	this->DiffGrad	= N_VClone(this->DiffGrid);
+	this->TempGrad	= N_VClone(this->CpGrid);
+
+	//Jacobian Array and prototype
+	N_Vector LittleJac	= N_VNew_Serial(num_eqs*num_eqs);//JacArray Prototype
+
+	for(int i = 0; i < GridPts; i ++)
+	{
+		this->Jacs.push_back(N_VClone(LittleJac));
+	}
+
 	// !!!This kills the 0-D problem!!!
 	// realtype * 			MolarWeightsPtr =	NV_DATA_S(MolarWeights);
 	// real_type_1d_view_type SpeciesMolecularWeights(MolarWeightsPtr   ,   GridPts-1);
@@ -107,6 +122,8 @@ myPb2::~myPb2()
 	N_VDestroy_Serial(this->CpGrid);
 	N_VDestroy_Serial(this->RhoGrid);
 	N_VDestroy_Serial(this->DiffGrid);
+	for( int i = 0 ; i < this->NumGridPts; i ++)
+		N_VDestroy(Jacs[i]);
 }
 
 //==============================
@@ -156,6 +173,20 @@ void myPb2::TempGradient(N_Vector State, N_Vector Gradient)
 	//Loop
 	GradD[0]=(SD[0]-GD[0])/this->delx;				// Boundary
 	for( int i = 1 ; i < End; i ++)
+		GradD[i] = ( SD[i] - SD[i - 1])/this->delx;
+}
+
+void myPb2::SetGradient(N_Vector Input, N_Vector GradientVec, realtype Ghost)
+{
+	//Declare
+	realtype * SD		= N_VGetArrayPointer(Input);
+	realtype * GD		= N_VGetArrayPointer(this->Ghost);
+	realtype * GradD	= N_VGetArrayPointer(GradientVec);
+	int	End				= this->NumGridPts;
+	N_VScale(0.0, GradientVec, GradientVec);				//Zero out
+	//Loop
+	GradD[0]=(SD[0]-Ghost)/this->delx;				// Boundary
+	for( int i = 1 ; i < End-1; i ++)
 		GradD[i] = ( SD[i] - SD[i - 1])/this->delx;
 }
 
@@ -526,13 +557,15 @@ int CHEM_JTV_V2(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, vo
 }
 
 
-//Empty implementation
+//Empty implementation-- marked for Deletion
 int CHEM_JAC_VOID(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
                void * pb, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3)
 {
 	return 0;
 }
 
+
+//Marked for replacement
 int CHEM_COMP_JAC_CVODE(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
                void * pb, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3)
 {
@@ -574,7 +607,7 @@ int CHEM_COMP_JAC_CVODE(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
 }
 
 
-
+//Marked for deletion
 int CHEM_COMP_JAC_CVODE_V2(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
                void * pb, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3)
 {
@@ -1506,6 +1539,8 @@ void myPb2::SetTransportGrid(N_Vector State)
 	realtype * RhoData		= NV_DATA_S(this->RhoGrid);
 	realtype * DiffData 	= NV_DATA_S(this->DiffGrid);
 	realtype * data 		= NV_DATA_S(State);
+	realtype * GhostP		= NV_DATA_S(this->Ghost);
+	//Set the temperature based grids
 	for(int i = 0 ; i < this->NumGridPts ; i ++ )
 	{
 		index 				= this->TempTableLookUp(data[i], this->TempTable);
@@ -1516,4 +1551,33 @@ void myPb2::SetTransportGrid(N_Vector State)
 			DiffData[j*this->num_equations + i] = LookupDiff[j*500 + index];
 		}
 	}
+	//Set the gradients
+	//Declare
+	index				= this->TempTableLookUp(GhostP[0], this->TempTable);//Ghost temp
+	realtype * GradT	= NV_DATA_S(this->TempGrad);
+	realtype * GradRho	= NV_DATA_S(this->RhoGrad);
+	realtype * GradCp	= NV_DATA_S(this->CpGrad);
+	realtype * GradDiff	= NV_DATA_S(this->DiffGrad);
+
+	GradT	[0]	=	(data[0]-GhostP[0])/this->delx;				// Boundary GradT
+	GradRho	[0]	=	(RhoData[0] - LookupRho[index])/this->delx;// Boundary GradRho
+	GradCp	[0] = 	(CpData[0]- LookupCp[index])/this->delx;	// Boundary Cp
+	for(int i = 0 ; i < this->num_equations; i ++)
+		GradDiff[this->num_equations*i] =	LookupDiff[i*500 + index];
+
+
+	//Loop
+	for( int i = 1 ; i < this->NumGridPts-1; i ++)
+	{
+		GradT[i] 	= ( data[i] - data[i - 1])/this->delx;
+		GradRho[i]	= ( RhoData[i] - RhoData[i-1])/this->delx;
+		GradCp[i]	= ( CpData[i] - CpData[i-1])/this->delx;
+		for( int j = 0; j < this->num_equations ; j ++)
+		{
+			GradDiff[j*this->num_equations + i] = 
+					(DiffData[j*this->num_equations+ i] - DiffData[j*this->num_equations+ i - 1 ])/this->delx;
+		}
+	}
+	//N_VPrint_Serial(TempGrad);
+	//N_VPrint_Serial(DiffGrad);
 }
