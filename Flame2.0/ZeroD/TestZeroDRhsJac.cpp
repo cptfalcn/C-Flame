@@ -145,8 +145,8 @@ main(int argc, char* argv[])
 
       /// change the layout from row major to column major
       for (ordinal_type j=0;j<number_of_equations;++j)
-	for (ordinal_type i=0;i<j;++i)
-	  std::swap(J(i,j), J(j,i));
+        for (ordinal_type i=0;i<j;++i)
+	        std::swap(J(i,j), J(j,i));
     }
 
     ///
