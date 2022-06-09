@@ -259,6 +259,31 @@ void IntConGri30(realtype * data, int SampleNum)
     }
 }
 
+void IntConIsoOct(realtype * data, int SampleNum)
+{
+	switch(SampleNum)
+	{
+	case 1:
+		data[0] 	=  800.0;//use 1000 for base
+		data[742] 	=  1.654852956820578869e-01;//IC8H18 
+		data[4]  	=  1.931486027241477166e-01;//O2
+		data[7] 	=  6.302015669181122437e-01;//N2
+		data[10] 	=  1.116453467568208867e-02;//AR
+		cout << BAR <<"Iso-Oct Experiment Sample 1\t" << BAR << endl;
+		break;
+	case 2:
+		data[0]		= 1300.0;//use 1300 for hot gas
+		data[742]	= 1.654852956820578869e-01;//IC8H18
+		data[4]		= 1.931486027241477166e-01;//O2
+		data[7] 	=  6.302015669181122437e-01;//N2
+		data[10] 	=  1.116453467568208867e-02;//AR
+		cout << BAR << "Iso-Oct Experiment Sample 2\t" << BAR << endl;
+	}
+
+
+}
+
+
 
 void SetIntCons(int Experiment, int Sample, realtype* data)
 {
@@ -269,11 +294,14 @@ void SetIntCons(int Experiment, int Sample, realtype* data)
 			break;
 		case 1:
                 	IntConHydro(data, Sample);
-                        break;
-             	case 2:
+					break;
+		case 2:
                 	IntConGri30(data, Sample);
-                        break;
-    	}
+                    break;
+		case 3:
+					IntConIsoOct(data, Sample);
+					break;
+    }
 }
 
 

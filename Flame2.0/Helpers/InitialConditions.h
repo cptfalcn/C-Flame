@@ -15,6 +15,7 @@ void 	SetIntCons(int, int, realtype*);
 void	IntConKappa(realtype *, realtype);
 void	IntConHydro(realtype *, int);
 void	IntConGri30(realtype *, int);
+void    IntConIsoOct(realtype *, int);
 void 	SetSuperInitCons(realtype *, realtype *, int, int);
 
 //Testing

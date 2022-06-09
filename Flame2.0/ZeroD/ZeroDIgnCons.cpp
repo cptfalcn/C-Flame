@@ -3,11 +3,11 @@
  * This is serial implementation.
  * ===========================================================================================
  */
-
 #include <stdio.h>
 #include <math.h>
-//#include "Epic.h"
+#include "Epic.h"
 #include <nvector/nvector_serial.h>
+#include <cvode/cvode.h>
 #include <sundials/sundials_nvector.h>
 #include <sunmatrix/sunmatrix_dense.h> /* access to dense SUNMatrix  */
 #include <sunlinsol/sunlinsol_dense.h> /* access to dense SUNLinearSolver  */
@@ -26,12 +26,11 @@
 //#include "TChem_Impl_NewtonSolver.hpp"
 //#include "TChem_Impl_TrBDF2.hpp"
 #include <chrono>
-//#include "Epi3_KIOPS.h"
 #include "InitialConditions.h"
-//#include "Chemistry.h"
-//#include "CreateIntegrators.h"
-#include <cvode/cvode.h>
-//#include "Print.h"
+
+#include "Print.h"
+
+#include <omp.h>
 
 //New way
 using value_type = Sacado::Fad::SLFad<real_type,100>;
@@ -102,11 +101,12 @@ using namespace std;
 
 int JacCnt=0;
 int RHSCnt=0;
+int JtvCnt=0;
 
 double JacTime=0;
 double RHSTime=0;
 double MatVecTime=0;
-//Kokkos::Impl::Timer g_timer;
+Kokkos::Timer g_timer;
 
 //====================
 //Main
@@ -139,8 +139,9 @@ int main(int argc, char* argv[])
 	int startingBasisSizes[] = {10, 10};
 	realtype relTol	=	1e-10;
 	realtype absTol	=	1e-10;
-	//IntegratorStats *integratorStats = NULL;
-
+	IntegratorStats *integratorStats = NULL;
+	const int MaxKrylovIters 	= 500;//500
+	string inputFile;
 	
 
 	//=====================================================
@@ -167,6 +168,7 @@ int main(int argc, char* argv[])
 	opts.set_option<int>("Profiling", "Output profiling data or not", &Profiling);
 	opts.set_option<realtype>("relTol", "Solver Relative Tol", &relTol);
 	opts.set_option<realtype>("absTol", "Solver Absolulte Tol", &absTol);
+	opts.set_option<string>("Input", "Input TChem file name", &inputFile);
 
 	const bool r_parse = opts.parse(argc, argv);
 	if (r_parse)
@@ -176,14 +178,11 @@ int main(int argc, char* argv[])
 	//Check inputs and output to console for review.
 	//======================================================
 	ofstream myfile(MyFile, std::ios_base::app);
-	std :: cout << FinalTime << std :: endl;
 	int Steps=CheckStep(FinalTime, StepSize);//Checks the number of steps
 	//=====================================================
 	//Kokkos block: working, pruning old code
 	//=====================================================
-
 	Kokkos::initialize(argc, argv);
-	/// all Kokkos varialbes are reference counted objects. they are deallocated within this local scope.
 	{//begin local scope
 		//======================
 		//TChem Setup
@@ -191,7 +190,6 @@ int main(int argc, char* argv[])
 		using TChem::real_type;
 		using TChem::ordinal_type;
 		using value_type = Sacado::Fad::SLFad<real_type,100>;
-
 		/// Kokkos environments - host device type and multi dimensional arrays
 		using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 		using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
@@ -201,26 +199,53 @@ int main(int argc, char* argv[])
 		/// construct TChem's kinect model and read reaction mechanism
 		TChem::KineticModelData kmd(chemFile, thermFile);
 		auto kmcd = TChem::createGasKineticModelConstData<host_device_type>(kmd);
-		/// set workspace and #eqs
+		/// set workspace and #eqs and output information
 		const ordinal_type problem_workspace_size = problem_type::getWorkSpaceSize(kmcd);
 		real_type_1d_view_type work("workspace", problem_workspace_size);
 		number_of_equations=problem_type::getNumberOfEquations(kmcd);
+
+		//New stuff
+		cout << BAR << " Mech and parallel top " << BAR << endl;
+		printf("Number of Species %d \n", kmcd.nSpec);
+		printf("Number of Reactions %d \n", kmcd.nReac);
+		const bool detail = false;
+		TChem::exec_space::print_configuration(std::cout, detail);
+
 		//Declare the state variable locally
 		N_Vector y 		= N_VNew_Serial(number_of_equations, sunctx); //state
+		N_VScale(0.0, y, y);
 		realtype *data 	= NV_DATA_S(y);			//set the pointer to the state
-		SetIntCons(Experiment, SampleNum, data);
-	    /// set problem
+		//======================
+		//Init Cons
+		//=======================
+    	//TChem::host_exec_space::print_configuration(std::cout, detail);
+		int PressMult = 1;
+		if(Experiment == 3)
+		{
+			PressMult = 10;
+			int nBatch= 1;
+			real_type_2d_view_host state_host;
+			const ordinal_type stateVecDim = TChem::Impl::getStateVectorSize(kmcd.nSpec);
+			const auto speciesNames 			= kmcd.speciesNames;
+			const auto SpeciesMolecularWeights 	= kmcd.sMass;
+			TChem::Test::readSample(inputFile, speciesNames, SpeciesMolecularWeights,
+					kmcd.nSpec, stateVecDim, state_host, nBatch);
+		}
+		SetIntCons(Experiment, SampleNum, data);		//Will depreciate?
+	    //=================
+		/// set problem
+		//=================
 		myPb problem;
 		void *pbptr= &problem;
 		const real_type pressure(101325);//Constant pressure
+		cout << pressure*PressMult << endl;
 		real_type_1d_view_type fac("fac", 2*number_of_equations);
-      	problem._p 		= pressure; // pressure
+      	problem._p 		= pressure*PressMult; // pressure
 		problem._fac	= fac;
       	problem._work 	= work;  // problem workspace array
      	problem._kmcd 	= kmcd;  // kinetic model
 		problem.num_equations		= number_of_equations;
 		problem.Jac					= N_VNew_Serial(number_of_equations*number_of_equations, sunctx);//Make the Jacobian
-		//const int MaxKrylovIters 	= 500;//500
 		//==============================================
 		//Create integrators
 		//==============================================
@@ -234,7 +259,7 @@ int main(int argc, char* argv[])
         //realtype tret=0;
         N_Vector AbsTol= N_VNew_Serial(number_of_equations, sunctx);
         for ( int i = 0 ; i < number_of_equations ; i++)
-                NV_Ith_S(AbsTol,i)=absTol;
+			NV_Ith_S(AbsTol,i)=absTol;
         cvode_mem = CVodeCreate (CV_BDF, sunctx);
         //Give CVODE the user problem
         retVal = CVodeSetUserData(cvode_mem, pbptr);
@@ -242,7 +267,7 @@ int main(int argc, char* argv[])
         retVal = CVodeInit(cvode_mem, RHS_TCHEM, 0, y);
         //Set intial stepsize guess
         retVal = CVodeSetInitStep(cvode_mem, StepSize);
-        //Set max stepsize
+        //Set max stepsize 
         retVal = CVodeSetMaxStep(cvode_mem, StepSize);
         //Set tolerances
         retVal = CVodeSVtolerances(cvode_mem, relTol, AbsTol);
@@ -253,21 +278,17 @@ int main(int argc, char* argv[])
 		retVal = CVodeSetLSetupFrequency(cvode_mem, 1); //Remove because also stupid.
 		retVal = CVodeSetJacEvalFrequency(cvode_mem, 1);//Remove becuase this is stupid.
 		retVal = CVodeSetJacFn(cvode_mem, CVodeComputeJacWrapper);		//Error if removed .
-		retVal = CVodeSetMaxNumSteps(cvode_mem, 2);
-		retVal = CVodeSetMaxOrd(cvode_mem, 1);
+		retVal = CVodeSetMaxNumSteps(cvode_mem, 100);
+		retVal = CVodeSetMaxOrd(cvode_mem, 2);
         N_VDestroy_Serial(AbsTol);
 
 
 		// //Experiment 0 cannot be run with this code.
-		// Epi2_KIOPS * Epi2 	= new Epi2_KIOPS(RHS_TCHEM, Jtv_TCHEM, pbptr,
-		// 						MaxKrylovIters, y, number_of_equations);
+		Epi2_KIOPS * Epi2 	= new Epi2_KIOPS(RHS_TCHEM, Jtv_TCHEM, pbptr,
+								MaxKrylovIters, y, number_of_equations);
 
-		// // Epi2_KIOPS * Epi2 	= new Epi2_KIOPS(CHEM_RHS_TCHEM, CHEM_JTV_V2, pbptr2,
-		// // 						MaxKrylovIters, y, number_of_equations);
-
-
-		// Epi3_KIOPS * Epi3 	= new Epi3_KIOPS(RHS_TCHEM, Jtv_TCHEM, pbptr,
-		// 						MaxKrylovIters, y, number_of_equations);
+		PrintPreRun(StepSize, 0.0, Steps, KrylovTol, absTol, relTol, Method, number_of_equations, BAR);
+		PrintSuperVector(data, Experiment, 1, BAR);
 		//=================================
 		// Run the time integrator loop
 		//=================================
@@ -279,23 +300,22 @@ int main(int argc, char* argv[])
 			TNow= StepCount*StepSize;
 			TNext=(StepCount+1)*StepSize;
 			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
-			//ComputeJac(y, pbptr);//Set the Jacobian for this step
-			// if(	Method=="EPI2")
-			// {
-			// 	ComputeJac(y, pbptr);//Set the Jacobian for this step	
-			// 	integratorStats = Epi2->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
-			// }
-			// else if(Method == "EPI3")
-			// {
-			// 	ComputeJac(y, pbptr);//Set the Jacobian for this step
-			// 	integratorStats = Epi3->Integrate(StepSize, TNow, TNext, NumBands, y,
-			// 			KrylovTol, startingBasisSizes);
-			// }
-			// else 
-				if(Method == "CVODEKry")
-				{
-					CVode(cvode_mem, TNext, y, &TNext, CV_ONE_STEP);//CV_NORMAL/CV_ONE_STEP
-				}
+			if(	Method=="EPI2")
+			{
+				ComputeJac(y, pbptr);//Set the Jacobian for this step	
+				integratorStats = Epi2->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
+			}
+			else if(Method == "CVODEKry")
+			{
+				CVode(cvode_mem, TNext, y, &TNext, CV_ONE_STEP);//CV_NORMAL/CV_ONE_STEP
+				// cout << TNext << endl;
+				// cout << StepSize << endl;
+				// if(abs(TNow+StepSize-TNext)>StepSize)
+				// {
+				// 	cout << "CVODE Error\n";
+				// 	exit(EXIT_FAILURE);
+				// }
+			}
 			//Clock the time spent in the integrator
 			auto Stop=std::chrono::high_resolution_clock::now();
 			auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
@@ -304,7 +324,7 @@ int main(int argc, char* argv[])
 			//=======================================
 			//Error checking
 			//=======================================
-			//ErrorCheck(myfile, y, data, number_of_equations, TNext);
+			ErrorCheck(myfile, y, data, number_of_equations, TNext);
 
 			//clean
 			for (int j=0; j<number_of_equations; j++)
@@ -316,17 +336,16 @@ int main(int argc, char* argv[])
 			//=======================
 			//Track the progress
 			//=======================
-			PercentDone=floor(TNext/FinalTime*100);
+			PercentDone=floor((TNext/FinalTime)*100);
+			//cout << PercentDone << endl;
 			for (int k=0; k<PercentDone-ProgressDots;k++)
 			{
 					cout<<":";
 					cout.flush();
 			}
-
 			/*//Use if we want to do timeseries plots
 			if(ProgressDots!=PercentDone)
 				PrintDataToFile(myfile, data, number_of_equations,TNext);*/
-			//integratorStats->PrintStats();
 			ProgressDots=PercentDone;
             StepCount++;
 
@@ -340,49 +359,48 @@ int main(int argc, char* argv[])
 		//=======================================
 		//Profiling output
 		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
-		//PrintExpParam(FinalTime, TNow, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
-		//PrintSuperVector(data, Experiment, 1, BAR);
+		PrintDataToFile(myfile, data, number_of_equations, TNow, BAR, MyFile, KTime);
+		PrintExpParam(FinalTime, TNow, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
+		PrintSuperVector(data, Experiment, 1, BAR);
 		cout << "Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
 		//PrintProfiling(integratorStats, Profiling, Method,  BAR, cvode_mem);
+		if (Profiling ==1){//Invalid for experiment 0
+			cout << BAR << "    Profiling   " << BAR << endl;
+			if(Method == "EPI2")
+				integratorStats->PrintStats();
 
-		// if (Profiling ==1){//Invalid for experiment 0
-		// 	ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
-		// 	cout << "Integrator CPU time: "<<KTime<<" seconds\n";
+			ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
+			cout << "Integrator CPU time: "<<KTime<<" seconds\n";
 	
-		// 	cout << BAR << "Jacobian\t" << BAR << endl;
-		// 	cout << "Jacobian Calls: " << JacCnt;
-		// 	ProFile << JacCnt << "\t" << JacTime << "\t";
-		// 	cout << "\t\tJacobian Time: " << JacTime << " seconds\n";
-		// 	cout << JacTime*100/KTime<<"%\n";
+			cout << BAR << "Jacobian\t" << BAR << endl;
+			cout << "Jacobian calls: " << JacCnt << endl;
+			cout << "Jacobian time:  " << JacTime << endl;
+			ProFile << JacCnt << "\t" << JacTime << "\t";
 
-		// 	//cout << "\t\tAveraged Jac Time cost: " <<JacTime/JacCnt << " seconds\n";
-		// 	cout << "MatVec Time: " << MatVecTime << " seconds\n";
-		// 	cout << MatVecTime*100/KTime <<"%\n";
+			ProFile << RHSCnt << "\t" << RHSTime;
+			cout << BAR << "RHS\t\t" << BAR << endl;
+			cout << "RHS calls: " << RHSCnt << "\n";
+			cout << "RHS time:  " << RHSTime << endl;
 
-		// 	ProFile << RHSCnt << "\t" << RHSTime;
-		// 	cout << BAR << "RHS\t\t" << BAR << endl;
-		// 	cout << "RHS Function calls: " << RHSCnt << "\t\tRHS time: ";
-		// 	cout << RHSTime <<" seconds\n";
-		// 	cout << RHSTime/KTime*100<< "%\n";
-		// 	//cout << "\t\tAveraged RHS Time cost: " << RHSTime/RHSCnt << " seconds\n\n";
-		// 	//cout << "\tRelative cost ratio Jac/RHS: ";
-		// 	//cout << (JacTime/JacCnt)/(RHSTime/RHSCnt) << endl;
+			ProFile << JtvCnt << "\t" << RHSTime;
+			cout << BAR << "Jtv\t\t" << BAR << endl;
+			cout << "Jtv calls: " << JtvCnt << endl;
+			cout << "Jtv time:  " << MatVecTime << endl;
 
-		// 	//integratorStats->PrintStats();
-		// 	ProFile << "\t " << Experiment << "\t" << SampleNum << "\t";
-		// 	ProFile << FinalTime << "\t" << StepSize << endl;
-		// 	ProFile.close();
+			ProFile << "\t " << Experiment << "\t" << SampleNum << "\t";
+			ProFile << FinalTime << "\t" << StepSize << endl;
+			ProFile.close();
 
-		// }//End Profiling
-		// //Take out the trash
-        // myfile.close();
-		// delete Epi2;
-		// delete Epi3;
+		}//End Profiling
+		//Take out the trash
+        myfile.close();
+		delete Epi2;
 		N_VDestroy_Serial(y);
 		SUNMatDestroy(A);
 		SUNLinSolFree(LS);
 		SUNNonlinSolFree(NLS);
 		CVodeFree(&cvode_mem);
+
   	}//end local kokkos scope.
  	/// Kokkos finalize checks any memory leak that are not properly deallocated.
   	Kokkos::finalize();
@@ -407,19 +425,19 @@ int main(int argc, char* argv[])
 int CheckStep(realtype FinalTime, realtype StepSize)
 {
 	cout << BAR << "\t Step Check\t\t" << BAR << endl ;
-	cout<<"Checking the proposed number of steps...\n";
+	cout<<"Checking the proposed number of steps...";
 	cout<<std::setprecision(17);
 	cout<<FinalTime/StepSize << " steps proposed...";
 	if(floor( FinalTime/StepSize ) == FinalTime/StepSize )
 	{
 		static const int Steps= FinalTime/StepSize;
-		cout << " accepted...\n";
+		cout << " accepted!\n";
 		return Steps;
 	}
 	else if (abs(round(FinalTime/StepSize))-FinalTime/StepSize <1e-6 )
 	{
 		static const int Steps= round (FinalTime/StepSize);
-		cout << Steps << " steps approximated...\n";
+		cout << Steps << " steps approximated!\n";
 		return Steps;
 	}
 	else
@@ -431,15 +449,14 @@ int CheckStep(realtype FinalTime, realtype StepSize)
 
 
 
-	//====================================================
-	//  ___    _   _   ___
-	// |   \  | | | | /   \
-	// | |) ) | |_| | \ \\/
-	// |   <  |  _  |  \ \
-	// | |\	\ | | | | /\\ \
-	// |_| \_\|_| |_| \___/
-	//====================================================
-
+// ====================================================
+//  ___    _   _   ___
+// |   \  | | | | /   \
+// | |) ) | |_| | \ \\/
+// |   <  |  _  |  \ \
+// | |\	\ | | | | /\\ \
+// |_| \_\|_| |_| \___/
+// ====================================================
 /*
  * ===========================================================================================
  *
@@ -477,45 +494,19 @@ int RHS_TCHEM(realtype t, N_Vector u, N_Vector udot, void * pb)
 	// Compute right hand side vector
 	// =================================
 	auto member =  Tines::HostSerialTeamMember();
-	//g_timer.reset();
+	g_timer.reset();
 	pbPtr->computeFunction(member, x ,f);
-	//RHSTime+=g_timer.seconds();
+	RHSTime+=g_timer.seconds();
 	RHSCnt++;
 	return 0;
 }
-
-/*
-//Matrix Vector Product
-//=============================================================
-//  __ __    ___   _____      __   __ ___   ___
-// |  V  | ./ _ \.|_   _| ___ \ \ / /| __) / __)
-// | .V. | | (_) |  | |  |___| \ v / | __)( (__
-// |_| |_| |_/ \_|  |_|         \_/  |___) \___)
-//============================================================
-// */
-// void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N_Vector tmp, realtype * JV)
-// {
-// 	realtype * TMP  = NV_DATA_S(tmp);
-// 	for (int i=0; i< number_of_equations; i++)//for each state
-//         {
-//                 for(int j=0; j<number_of_equations; j++)//marches across the column
-//                 {
-//                         TMP[j]=JacD[j+i*number_of_equations];//Stored row major
-//                 }
-//                 JV[i]=N_VDotProd(tmp,x);
-//         }
-// }
-//Copied to Chemistry.cpp
-
-
-	//===============================================================
-	//   _____   ___     ____   ___    _____   _____    ___   __   _
-	//  |__ __| /   \   / ___) / _ \  |     \ |__ __|  /   \ |  \ | |
-	//  _ | |  | (x) | | /    / / \ \ |  x  /   | |   | (x) ||   \| |
- 	// / (| |  |  n  | | \___ \ \_/ / |  x  \  _| |   |  n  || |\   |
-	// \____/  |_| |_|  \____) \___/  |_____/ |_____| |_| |_||_| \__|
-	//===============================================================
-
+//===============================================================
+//   _____   ___     ____   ___    _____   _____    ___   __   _
+//  |__ __| /   \   / ___) / _ \  |     \ |__ __|  /   \ |  \ | |
+//  _ | |  | (x) | | /    / / \ \ |  x  /   | |   | (x) ||   \| |
+// / (| |  |  n  | | \___ \ \_/ / |  x  \  _| |   |  n  || |\   |
+// \____/  |_| |_|  \____) \___/  |_____/ |_____| |_| |_||_| \__|
+//===============================================================
 int ComputeJac(N_Vector u, void* pb)
 {
 	//problem_type problem;
@@ -544,28 +535,29 @@ int ComputeJac(N_Vector u, void* pb)
 	/// Compute Jacobian
 	//===============================
 	auto member =  Tines::HostSerialTeamMember();
-	//g_timer.reset();
+	g_timer.reset();
 	pbPtr->computeJacobian(member, x ,J);
-	//JacTime+=g_timer.seconds();
+	JacTime+=g_timer.seconds();
 	JacCnt++;
 	return 0;
 }
 
+//==============
+//Cvode wrapper
+//==============
 int CVodeComputeJacWrapper(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
                void * pb, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3)
 {
 	ComputeJac(u, pb);
 	return 0;
 }
-
-
-	//==============================//
-	//	  	  | |    _				//
-	//	      | |  _| |_  __    __	//
-	//     _  | | (_   _) \ \  / /	//
-	//    ( (_| |   | |    \ \/ /	//
-	//     \___/    |_|     \__/	//
-	//==============================//
+//==============================//
+//	  	  | |    _				//
+//	      | |  _| |_  __    __	//
+//     _  | | (_   _) \ \  / /	//
+//    ( (_| |   | |    \ \/ /	//
+//     \___/    |_|     \__/	//
+//==============================//
 /*
  * ===========================================================================================
  *
@@ -612,9 +604,10 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 	//===================
 	//Compute JV
 	//===================
-	//g_timer.reset();
+	g_timer.reset();
 	MatrixVectorProduct(number_of_equations, JacD, v, tmp, JV);
-	//MatVecTime+=g_timer.seconds();
+	MatVecTime+=g_timer.seconds();
+	JtvCnt ++;
 	return 0;
 }
 
@@ -627,22 +620,6 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 //		| |  | |  | || |\ |  | |	//
 //		|_|  |_|  |_||_||_|  |_|	//
 //========================================
-
-//==============================================
-//Print from pointer
-//realtype* ptr 	object pointer
-//int num_eqs		number of equations
-//==============================================
-// void PrintFromPtr(realtype * ptr, int num_eqs)
-// {
-// 	cout<<endl;
-// 	for(int i=0; i<num_eqs; i++)
-// 	{
-// 		cout<<ptr[i]<<endl;
-// 	}
-// 	cout<<endl;
-// }
-
 //===================================================
 //Print data to output file
 //myfile:	pointer to the filestream
@@ -650,8 +627,6 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 //number_of_equations
 //t:		time/Stepsize
 //===================================================
-
-
 void PrintDataToFile(ofstream & myfile, realtype * data, int number_of_equations, realtype t)
 {
 	for (int i=0; i<number_of_equations; i++)
@@ -662,8 +637,12 @@ void PrintDataToFile(ofstream & myfile, realtype * data, int number_of_equations
 	myfile.flush();
 
 }
-
-//=======================================================
+//===============================
+//  ___  ___  ___   ___   ___
+// |  _)| _ \| _ \ /   \ | _ \
+// |  _)|   /|   /|  X  ||   /
+// |___)|_\_\|_\_\ \___/ |_\_\
+//===============================
 //RHS Error Check
 //realtype* y 		y Data ptr
 //realtype* rhs		rhs Data ptr
@@ -675,21 +654,19 @@ void ErrorCheck(ofstream & myfile, N_Vector y, realtype * data, int number_of_eq
 	if(MassError>.1 || abs(data[0])>1e5 )
 	{
 		PrintDataToFile(myfile, data, number_of_equations, TNext);
-                cout<<"\n===============!!!Critical error!!!================\n";
-                                if(MassError>.1)
-                                {
-                                        cout<<"Severe mass loss detected. Check output file for details.\n";
-                                        myfile<<"Mass fraction error : " << abs( N_VL1NormLocal(y)-data[0]-1.0)<< endl;
-                                }
-                                if(abs(data[0])>1e5)
-                                        cout<<"Temperature instability detected. Check output file for details.\n";
-
-                                cout<<"\nFailed computing during time: "<< TNext<<endl;
-                                exit(EXIT_FAILURE);
+		cout<<"\n===============!!!Critical error!!!================\n";
+		if(MassError>.1)
+		{
+			cout<<"Severe mass loss detected. Check output file for details.\n";
+			myfile<<"Mass fraction error : " << abs( N_VL1NormLocal(y)-data[0]-1.0)<< endl;
+		}
+		if(abs(data[0])>1e5)
+			cout<<"Temperature instability detected. Check output file for details.\n";
+		cout<<"\nFailed computing during time: "<< TNext<<endl;
+		exit(EXIT_FAILURE);
 	}
 
 }
-
 /*
 //=============================================================
 //  __ __    ___   _____      __   __ ___   ___
