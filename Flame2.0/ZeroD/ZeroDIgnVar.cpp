@@ -25,11 +25,11 @@
 #include "TChem_Impl_IgnitionZeroD_Problem.hpp" // here is where Ignition Zero D problem is implemented
 //#include "TChem_Impl_NewtonSolver.hpp"
 //#include "TChem_Impl_TrBDF2.hpp"
+//#include "CreateIntegrators.h"
 #include <chrono>
 #include "InitialConditions.h"
-
+#include "Epi3V.h"
 #include "Print.h"
-
 #include <omp.h>
 
 //New way
@@ -139,6 +139,7 @@ int main(int argc, char* argv[])
 	int startingBasisSizes[] = {10, 10};
 	realtype relTol	=	1e-10;
 	realtype absTol	=	1e-10;
+	realtype maxSS  = 	1e-1;
 	IntegratorStats *integratorStats = NULL;
 	const int MaxKrylovIters 	= 500;//500
 	string inputFile;
@@ -169,7 +170,7 @@ int main(int argc, char* argv[])
 	opts.set_option<realtype>("relTol", "Solver Relative Tol", &relTol);
 	opts.set_option<realtype>("absTol", "Solver Absolulte Tol", &absTol);
 	opts.set_option<string>("Input", "Input TChem file name", &inputFile);
-
+	opts.set_option<realtype>("maxSS", "Maximum StepSize", &maxSS);
 	const bool r_parse = opts.parse(argc, argv);
 	if (r_parse)
 		return 0; // print help return
@@ -268,7 +269,7 @@ int main(int argc, char* argv[])
         //Set intial stepsize guess
         retVal = CVodeSetInitStep(cvode_mem, StepSize);
         //Set max stepsize 
-        retVal = CVodeSetMaxStep(cvode_mem, StepSize);
+        retVal = CVodeSetMaxStep(cvode_mem, 1e0);
         //Set tolerances
         retVal = CVodeSVtolerances(cvode_mem, relTol, AbsTol);
         //Set linear solver
@@ -278,74 +279,36 @@ int main(int argc, char* argv[])
 		retVal = CVodeSetLSetupFrequency(cvode_mem, 1); //Remove because also stupid.
 		retVal = CVodeSetJacEvalFrequency(cvode_mem, 1);//Remove becuase this is stupid.
 		retVal = CVodeSetJacFn(cvode_mem, CVodeComputeJacWrapper);		//Error if removed .
-		retVal = CVodeSetMaxNumSteps(cvode_mem, 1);
+		retVal = CVodeSetMaxNumSteps(cvode_mem, 1e5);
 		retVal = CVodeSetMaxOrd(cvode_mem, 2);
         N_VDestroy_Serial(AbsTol);
-
-
-		// //Experiment 0 cannot be run with this code.
-		Epi2_KIOPS * Epi2 	= new Epi2_KIOPS(RHS_TCHEM, Jtv_TCHEM, pbptr,
-								MaxKrylovIters, y, number_of_equations);
+		//Set Epi3V
+		Epi3VChem_KIOPS * EPI3V = new Epi3VChem_KIOPS(RHS_TCHEM, Jtv_TCHEM, 
+			CVodeComputeJacWrapper, pbptr, MaxKrylovIters, y, number_of_equations);
 
 		PrintPreRun(StepSize, 0.0, Steps, KrylovTol, absTol, relTol, Method, number_of_equations, BAR);
 		PrintSuperVector(data, Experiment, 1, BAR);
 		//=================================
-		// Run the time integrator loop
+		//Select and run integrator
 		//=================================
-		cout<<"\n[";
-		cout.flush();
-		//auto Begin=std::chrono::high_resolution_clock::now();
-		while(StepCount<Steps)
+		auto Start=std::chrono::high_resolution_clock::now();//Time integrator
+
+		if(Method == "CVODEKry")
+			CVode(cvode_mem, FinalTime, y, &TNext, CV_NORMAL);//CV_NORMAL/CV_ONE_STEP
+		else if(Method == "EPI3V")
 		{
-			TNow= StepCount*StepSize;
-			TNext=(StepCount+1)*StepSize;
-			auto Start=std::chrono::high_resolution_clock::now();//Time integrator
-			if(	Method=="EPI2")
-			{
-				ComputeJac(y, pbptr);//Set the Jacobian for this step	
-				integratorStats = Epi2->Integrate(StepSize, TNow, TNext, NumBands, y, KrylovTol, startingBasisSizes);
-			}
-			else if(Method == "CVODEKry")
-			{
-				CVode(cvode_mem, TNext, y, &TNext, CV_ONE_STEP);//CV_NORMAL/CV_ONE_STEP
-			}
-			//Clock the time spent in the integrator
-			auto Stop=std::chrono::high_resolution_clock::now();
-			auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-			KTime+=Pass.count()/1e9;
+			integratorStats = EPI3V->Integrate(StepSize, maxSS, absTol, relTol, 
+								0.0, FinalTime, NumBands, startingBasisSizes, y);
+		}
+		else
+		{
+			cout << "Invalid integrator selected\n";
+			exit(EXIT_FAILURE);
+		}
+		auto Stop=std::chrono::high_resolution_clock::now();
+		auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+		KTime+=Pass.count()/1e9;
 
-			//=======================================
-			//Error checking
-			//=======================================
-			ErrorCheck(myfile, y, data, number_of_equations, TNext);
-
-			//clean
-			for (int j=0; j<number_of_equations; j++)
-			{
-				if(data[j]<0)
-					data[j]=0;
-			}
-
-			//=======================
-			//Track the progress
-			//=======================
-			PercentDone=floor((TNext/FinalTime)*100);
-			//cout << PercentDone << endl;
-			for (int k=0; k<PercentDone-ProgressDots;k++)
-			{
-					cout<<":";
-					cout.flush();
-			}
-			/*//Use if we want to do timeseries plots
-			if(ProgressDots!=PercentDone)
-				PrintDataToFile(myfile, data, number_of_equations,TNext);*/
-			ProgressDots=PercentDone;
-            StepCount++;
-
-		}//End integration loop
-		TNow=TNext;
-		cout << "]100%\n\n";
-		//Delete all integrators
 		cout << BAR << "\tIntegration complete\t" << BAR <<endl;
 		//=======================================
 		//Console Output
@@ -359,7 +322,7 @@ int main(int argc, char* argv[])
 		//PrintProfiling(integratorStats, Profiling, Method,  BAR, cvode_mem);
 		if (Profiling ==1){//Invalid for experiment 0
 			cout << BAR << "    Profiling   " << BAR << endl;
-			if(Method == "EPI2")
+			if(Method == "EPI3V")
 				integratorStats->PrintStats();
 
 			ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
@@ -387,7 +350,7 @@ int main(int argc, char* argv[])
 		}//End Profiling
 		//Take out the trash
         myfile.close();
-		delete Epi2;
+		//delete Epi2;
 		N_VDestroy_Serial(y);
 		SUNMatDestroy(A);
 		SUNLinSolFree(LS);
