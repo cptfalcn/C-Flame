@@ -16,9 +16,43 @@
 #include <iomanip>
 #include "TChem_Impl_IgnitionZeroD_Problem.hpp" // here is where Ignition Zero D problem is implemented
 
-
 #include <memory>
 #define BAR "===================="
+class NewKiops{
+    public:
+        NewKiops(int maxNumVectors, int m_max, N_Vector templateVector, int vecLength);
+        ~NewKiops();
+        int ComputeKry(const int numVectors, N_Vector* inputVectors, const realtype timePoints[], const int numTimePoints, N_Vector* outputVectors, JTimesV* jtimesv, realtype h, realtype tol, int& m, KrylovStats* krylovStats);
+    private:
+        const int MaxNumInputVectors;
+        const int MaxPhiOrder;
+        const int VecLength;  
+
+        const int M_max;
+        const int M_min;
+
+        const int Orth_len;
+
+        const int MatrixSize;
+        const int PhiMatrixSize;
+
+        N_Vector* V;
+        realtype* V_aug;
+
+        realtype* H;
+        realtype* phiMatrix;
+        realtype* phiMatrixSkipped;
+
+        N_Vector w;
+        realtype* w_aug; 
+
+        N_Vector scratchVector;
+        N_Vector* B;
+
+       ExpPade* expm; 
+};
+
+
 
 class Epi3VChem_KIOPS
 {
@@ -34,7 +68,10 @@ class Epi3VChem_KIOPS
  		IntegratorStats* Integrate(const realtype hStart, const realtype hMax, const realtype absTol,
 			const realtype relTol, const realtype t0, const realtype tFinal,
 			const int numBands, int basisSizes[], N_Vector y);
-		void TestMatMult();
+
+		IntegratorStats* NewIntegrate(const realtype hStart, const realtype hMax, const realtype absTol,
+			const realtype relTol, const realtype t0, const realtype tFinal,
+			int basisSizes[], N_Vector y);
 	private:
     	CVRhsFn f;
     	CVSpilsJacTimesVecFn jtv;
@@ -42,6 +79,7 @@ class Epi3VChem_KIOPS
     	EPICNumJacDelta delta;
     	void *userData;
     	Kiops *krylov;
+		NewKiops *NewKrylov;
     	static const int NumProjectionsPerStep = 1;
     	static const int MaxPhiOrder1 = 2;
     	const int NEQ;
@@ -68,7 +106,10 @@ class Epi3VChem_KIOPS
     	Epi3VChem_KIOPS & operator=(const Epi3VChem_KIOPS &);  // no implementation
         void Clean(N_Vector y, int Length);
 		void CheckNanBlowUp(N_Vector, int);
-		void MatMult(N_Vector R, N_Vector A, N_Vector B, int row, int col);
-		void Phi2(N_Vector Jac, realtype h, N_Vector Result);
+		// void MatMult(N_Vector R, N_Vector A, N_Vector B, int row, int col);
+		// void Phi2(N_Vector Jac, realtype h, N_Vector Result);
 		int TrackProgress(realtype FinalTime, realtype TNext, realtype PercentDone, int ProgressDots);
+		
 };
+
+

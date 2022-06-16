@@ -1,6 +1,6 @@
 /*
  * ===========================================================================================
- * This is serial implementation.
+ * This is allows for openmp in kokkos
  * ===========================================================================================
  */
 #include <stdio.h>
@@ -81,10 +81,12 @@ int RHS_TCHEM(realtype, N_Vector, N_Vector, void *);
 int Jtv_TCHEM(N_Vector , N_Vector ,realtype, N_Vector, N_Vector , void* , N_Vector );
 
 //Misc functions
-int CheckStep(realtype, realtype);
 void PrintFromPtr(realtype *,  int);
 void ErrorCheck(ofstream &, N_Vector, realtype *, int, realtype);
-void PrintDataToFile(ofstream &, realtype *,int, realtype);
+	void PrintDataToFile(ofstream &, realtype *,int, realtype);
+//Main Print function
+void PrintToFile(ofstream &, realtype *, int, realtype, realtype, realtype, realtype, realtype, realtype);
+
 
 
 //Used in Jtv
@@ -93,6 +95,9 @@ int CVodeComputeJacWrapper(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
                void * pb, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
 void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, 
 				N_Vector tmp, realtype * JV);
+
+//monitor function
+int CVODEMonitor(void *cvode_mem, void *user_data);
 
 //=====================
 //Namespaces and globals
@@ -118,30 +123,30 @@ int main(int argc, char* argv[])
 	//====================
 	// Intial Declarations
 	//====================
-	static realtype FinalTime = 0;	//1.0e-4;//1e-4 seems to be the max
-	static const int NumBands = 3;	//Epic stuff, default is 3.
-	realtype StepSize=0;
-	realtype KTime=0;
-	realtype PrintTime=0;
-	int ProgressDots=0; 			//From 0 to 100; only care about percentage
-	int StepCount = 0;
-	realtype PercentDone=0;
-	realtype TNow=0;
-	realtype TNext=0;
-	string MyFile="Default.txt";
-	string Method="EPI2";//This is the default method
-	static realtype KrylovTol=1e-14;
-	int UseJac=1; //will we use the Jacobian or not
-	int SampleNum=0;
-	int Experiment=1; //default is hydrogen, set to 0 for kapila
-	int Profiling=0;//default to no profiling
-	int number_of_equations=0;
-	int startingBasisSizes[] = {10, 10};
-	realtype relTol	=	1e-10;
-	realtype absTol	=	1e-10;
-	realtype maxSS  = 	1e-1;
-	IntegratorStats *integratorStats = NULL;
-	const int MaxKrylovIters 	= 500;//500
+	static realtype FinalTime 	= 0;//1.0e-4;//1e-4 seems to be the max
+	static const int NumBands 	= 3;//Epic stuff, default is 3.
+	realtype StepSize			= 0;
+	realtype KTime				= 0;
+	realtype PrintTime			= 0;
+	int ProgressDots			= 0; //From 0 to 100; only care about percentage
+	int StepCount 				= 0;
+	realtype PercentDone		= 0;
+	realtype TNow				= 0;
+	realtype TNext				= 0;
+	string MyFile				= "Default.txt";
+	string Method				= "EPI2";//This is the default method
+	static realtype KrylovTol	= 1e-14;
+	int UseJac					= 1; //will we use the Jacobian or not
+	int SampleNum				= 0;
+	int Experiment				= 1; //default is hydrogen, 2 for Gri3.0
+	int Profiling				= 0;//default to no profiling
+	int number_of_equations		= 0;
+	int startingBasisSizes[] 	= {10, 10};
+	realtype relTol				= 1e-10;
+	realtype absTol				= 1e-10;
+	realtype maxSS 				= StepSize;
+	int Movie 					= 0;
+	//const int MaxKrylovIters	= 54;//use 1000
 	string inputFile;
 	
 
@@ -172,17 +177,14 @@ int main(int argc, char* argv[])
 	opts.set_option<string>("Input", "Input TChem file name", &inputFile);
 	opts.set_option<realtype>("maxSS", "Maximum StepSize", &maxSS);
 	const bool r_parse = opts.parse(argc, argv);
+
 	if (r_parse)
 		return 0; // print help return
 
-	//======================================================
-	//Check inputs and output to console for review.
-	//======================================================
 	ofstream myfile(MyFile, std::ios_base::app);
-	int Steps=CheckStep(FinalTime, StepSize);//Checks the number of steps
-	//=====================================================
-	//Kokkos block: working, pruning old code
-	//=====================================================
+	//============
+	//Start Kokkos
+	//============
 	Kokkos::initialize(argc, argv);
 	{//begin local scope
 		//======================
@@ -195,15 +197,13 @@ int main(int argc, char* argv[])
 		using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 		using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
 		using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
-		using problem_type = TChem::Impl::IgnitionZeroD_Problem<value_type, host_device_type >;
-		
+		//Kokkos ZeroD problem type
+		using problem_type = TChem::Impl::IgnitionZeroD_Problem<value_type, host_device_type >;	
 		/// construct TChem's kinect model and read reaction mechanism
 		TChem::KineticModelData kmd(chemFile, thermFile);
 		auto kmcd = TChem::createGasKineticModelConstData<host_device_type>(kmd);
 		/// set workspace and #eqs and output information
-		const ordinal_type problem_workspace_size = problem_type::getWorkSpaceSize(kmcd);
-		real_type_1d_view_type work("workspace", problem_workspace_size);
-		number_of_equations=problem_type::getNumberOfEquations(kmcd);
+		real_type_1d_view_type work("workspace", problem_type::getWorkSpaceSize(kmcd));
 
 		//New stuff
 		cout << BAR << " Mech and parallel top " << BAR << endl;
@@ -213,24 +213,26 @@ int main(int argc, char* argv[])
 		TChem::exec_space::print_configuration(std::cout, detail);
 
 		//Declare the state variable locally
-		N_Vector y 		= N_VNew_Serial(number_of_equations, sunctx); //state
+		number_of_equations		= problem_type::getNumberOfEquations(kmcd);
+		N_Vector y 				= N_VNew_Serial(number_of_equations, sunctx); //state
 		N_VScale(0.0, y, y);
 		realtype *data 	= NV_DATA_S(y);			//set the pointer to the state
+		const int MaxKrylovIters= number_of_equations;//use 1000
+		//Print mechanism data
+		// int nBatch= 1;
+		// real_type_2d_view_host state_host;
+		// const ordinal_type stateVecDim = TChem::Impl::getStateVectorSize(kmcd.nSpec);
+		// const auto speciesNames 			= kmcd.speciesNames;
+		// const auto SpeciesMolecularWeights 	= kmcd.sMass;
+		// TChem::Test::readSample(inputFile, speciesNames, SpeciesMolecularWeights,
+		// 		kmcd.nSpec, stateVecDim, state_host, nBatch);
 		//======================
 		//Init Cons
 		//=======================
-    	//TChem::host_exec_space::print_configuration(std::cout, detail);
 		int PressMult = 1;
 		if(Experiment == 3)
 		{
 			PressMult = 10;
-			int nBatch= 1;
-			real_type_2d_view_host state_host;
-			const ordinal_type stateVecDim = TChem::Impl::getStateVectorSize(kmcd.nSpec);
-			const auto speciesNames 			= kmcd.speciesNames;
-			const auto SpeciesMolecularWeights 	= kmcd.sMass;
-			TChem::Test::readSample(inputFile, speciesNames, SpeciesMolecularWeights,
-					kmcd.nSpec, stateVecDim, state_host, nBatch);
 		}
 		SetIntCons(Experiment, SampleNum, data);		//Will depreciate?
 	    //=================
@@ -239,7 +241,6 @@ int main(int argc, char* argv[])
 		myPb problem;
 		void *pbptr= &problem;
 		const real_type pressure(101325);//Constant pressure
-		cout << pressure*PressMult << endl;
 		real_type_1d_view_type fac("fac", 2*number_of_equations);
       	problem._p 		= pressure*PressMult; // pressure
 		problem._fac	= fac;
@@ -250,7 +251,6 @@ int main(int argc, char* argv[])
 		//==============================================
 		//Create integrators
 		//==============================================
-		//CVODE
 		void * cvode_mem;
 		SUNMatrix A						= SUNDenseMatrix(number_of_equations, number_of_equations,sunctx);
 		SUNLinearSolver LS 				= SUNLinSol_SPGMR(y, PREC_NONE, 20,sunctx);
@@ -262,15 +262,10 @@ int main(int argc, char* argv[])
         for ( int i = 0 ; i < number_of_equations ; i++)
 			NV_Ith_S(AbsTol,i)=absTol;
         cvode_mem = CVodeCreate (CV_BDF, sunctx);
-        //Give CVODE the user problem
         retVal = CVodeSetUserData(cvode_mem, pbptr);
-        //Set intial state
         retVal = CVodeInit(cvode_mem, RHS_TCHEM, 0, y);
-        //Set intial stepsize guess
         retVal = CVodeSetInitStep(cvode_mem, StepSize);
-        //Set max stepsize 
-        retVal = CVodeSetMaxStep(cvode_mem, 1e0);
-        //Set tolerances
+        retVal = CVodeSetMaxStep(cvode_mem, maxSS);
         retVal = CVodeSVtolerances(cvode_mem, relTol, AbsTol);
         //Set linear solver
         retVal = CVodeSetLinearSolver(cvode_mem, LS, A);//A might be null, try that
@@ -279,14 +274,23 @@ int main(int argc, char* argv[])
 		retVal = CVodeSetLSetupFrequency(cvode_mem, 1); //Remove because also stupid.
 		retVal = CVodeSetJacEvalFrequency(cvode_mem, 1);//Remove becuase this is stupid.
 		retVal = CVodeSetJacFn(cvode_mem, CVodeComputeJacWrapper);		//Error if removed .
-		retVal = CVodeSetMaxNumSteps(cvode_mem, 1e5);
+		retVal = CVodeSetMaxNumSteps(cvode_mem, 1e6);
 		retVal = CVodeSetMaxOrd(cvode_mem, 2);
-        N_VDestroy_Serial(AbsTol);
+
+		// retVal = CVodeSetMonitorFn(cvode_mem, CVODEMonitor);
+		// retVal = CVodeSetMonitorFrequency(cvode_mem, 1);
+
 		//Set Epi3V
+		IntegratorStats *integratorStats = NULL;
 		Epi3VChem_KIOPS * EPI3V = new Epi3VChem_KIOPS(RHS_TCHEM, Jtv_TCHEM, 
 			CVodeComputeJacWrapper, pbptr, MaxKrylovIters, y, number_of_equations);
 
-		PrintPreRun(StepSize, 0.0, Steps, KrylovTol, absTol, relTol, Method, number_of_equations, BAR);
+
+		//================
+		//Pre-run printing
+		//================
+		cout << "Pressure: " << pressure*PressMult << endl;
+		PrintPreRun(StepSize, 0.0, 0.0, KrylovTol, absTol, relTol, Method, number_of_equations, BAR);
 		PrintSuperVector(data, Experiment, 1, BAR);
 		//=================================
 		//Select and run integrator
@@ -297,8 +301,10 @@ int main(int argc, char* argv[])
 			CVode(cvode_mem, FinalTime, y, &TNext, CV_NORMAL);//CV_NORMAL/CV_ONE_STEP
 		else if(Method == "EPI3V")
 		{
-			integratorStats = EPI3V->Integrate(StepSize, maxSS, absTol, relTol, 
-								0.0, FinalTime, NumBands, startingBasisSizes, y);
+			// integratorStats = EPI3V->Integrate(StepSize, maxSS, absTol, relTol, 
+			// 					0.0, FinalTime, NumBands, startingBasisSizes, y);
+			integratorStats = EPI3V->NewIntegrate(StepSize, maxSS, absTol, relTol, 
+								0.0, FinalTime, startingBasisSizes, y);
 		}
 		else
 		{
@@ -315,11 +321,10 @@ int main(int argc, char* argv[])
 		//=======================================
 		//Profiling output
 		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
-		PrintDataToFile(myfile, data, number_of_equations, TNow, BAR, MyFile, KTime);
 		PrintExpParam(FinalTime, TNow, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
 		PrintSuperVector(data, Experiment, 1, BAR);
+		PrintToFile(myfile, data, number_of_equations, problem.t, relTol, absTol, KTime, KrylovTol, problem.ignTime);
 		cout << "Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
-		//PrintProfiling(integratorStats, Profiling, Method,  BAR, cvode_mem);
 		if (Profiling ==1){//Invalid for experiment 0
 			cout << BAR << "    Profiling   " << BAR << endl;
 			if(Method == "EPI3V")
@@ -350,8 +355,8 @@ int main(int argc, char* argv[])
 		}//End Profiling
 		//Take out the trash
         myfile.close();
-		//delete Epi2;
 		N_VDestroy_Serial(y);
+		N_VDestroy_Serial(AbsTol);
 		SUNMatDestroy(A);
 		SUNLinSolFree(LS);
 		SUNNonlinSolFree(NLS);
@@ -372,38 +377,6 @@ int main(int argc, char* argv[])
 // |_|  |___||_|_|\__) |_| |_|\___/|_|_|(`_)
 //===========================================
 */
-
-//===========================================
-//Check the number of steps
-//FinalTime
-//StepSize
-//===========================================
-int CheckStep(realtype FinalTime, realtype StepSize)
-{
-	cout << BAR << "\t Step Check\t\t" << BAR << endl ;
-	cout<<"Checking the proposed number of steps...";
-	cout<<std::setprecision(17);
-	cout<<FinalTime/StepSize << " steps proposed...";
-	if(floor( FinalTime/StepSize ) == FinalTime/StepSize )
-	{
-		static const int Steps= FinalTime/StepSize;
-		cout << " accepted!\n";
-		return Steps;
-	}
-	else if (abs(round(FinalTime/StepSize))-FinalTime/StepSize <1e-6 )
-	{
-		static const int Steps= round (FinalTime/StepSize);
-		cout << Steps << " steps approximated!\n";
-		return Steps;
-	}
-	else
-	{
-		cout<<"Cannot perform non-integer number of steps!!\n";
-		exit(EXIT_FAILURE);
-	}
-}
-
-
 
 // ====================================================
 //  ___    _   _   ___
@@ -507,6 +480,8 @@ int CVodeComputeJacWrapper(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
 	ComputeJac(u, pb);
 	return 0;
 }
+
+
 //==============================//
 //	  	  | |    _				//
 //	      | |  _| |_  __    __	//
@@ -593,6 +568,20 @@ void PrintDataToFile(ofstream & myfile, realtype * data, int number_of_equations
 	myfile.flush();
 
 }
+
+void PrintToFile(ofstream & myfile, realtype * data, int length, realtype t, realtype rel_tol, realtype abs_tol,
+			realtype run_time, realtype kry_tol, realtype ignTime)
+{
+	for (int i=0; i < length; i++)
+	{
+			myfile<<setprecision(20)<<fixed <<data[i] <<"\t\t";
+	}
+	myfile << "\t\t" << t << "\t\t" << run_time << "\t\t" << rel_tol << "\t\t" << abs_tol;
+	myfile << "\t\t" << kry_tol << "\t\t" << ignTime << endl;
+
+}
+
+
 //===============================
 //  ___  ___  ___   ___   ___
 // |  _)| _ \| _ \ /   \ | _ \
@@ -646,6 +635,16 @@ void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N
 		}
 		JV[i]=N_VDotProd(tmp,x);
 	}
+}
+
+
+
+//Cvode Monitor
+int CVODEMonitor(void *cvode_mem, void *user_data)
+{
+	myPb * pbPtr{static_cast<myPb *> (user_data)};//Recast
+	cout << pbPtr->t << endl;
+	return 0;
 }
 
 void PrintBanner()
