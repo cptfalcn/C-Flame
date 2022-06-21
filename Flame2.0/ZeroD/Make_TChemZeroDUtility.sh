@@ -1,5 +1,6 @@
 echo ====================================Compiling TChemZeroDUtility.cpp================================
-export TP=~/Code/C++/TCHEM3.0
+export TP=~/Code/C++/TCHEM3.0Serial
+echo "Building with $TP"
 #================
 #Build ZeroDVar.o
 #================
@@ -37,7 +38,7 @@ echo =======================================Removing intermediary objects=======
 rm TChemZeroDUtility.o
 #rm ZeroDVar2.o
 # echo ===========================================Built ZeroDIgnCons.x=======================================
-./Run_TChemZerDUtility.sh
+./Run_TChemZeroDUtility.sh
 # Runs a sample
 # inputs=iso-oct
 # #Default settings, build into a new utilty

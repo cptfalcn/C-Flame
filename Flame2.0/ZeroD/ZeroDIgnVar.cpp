@@ -7,6 +7,7 @@
 #include <math.h>
 #include "Epic.h"
 #include <nvector/nvector_serial.h>
+#include <nvector/nvector_openmp.h>
 #include <cvode/cvode.h>
 #include <sundials/sundials_nvector.h>
 #include <sunmatrix/sunmatrix_dense.h> /* access to dense SUNMatrix  */
@@ -33,14 +34,20 @@
 #include <omp.h>
 
 //New way
-using value_type = Sacado::Fad::SLFad<real_type,100>;
+//using value_type = "analytic_Jacobian";
+//using value_type = Sacado::Fad::SLFad<real_type,200>;//This is probably the issue
+using value_type = realtype;
 //need the following hard call in the define.
 //using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 #define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<value_type, Tines::UseThisDevice<TChem::host_exec_space>::type >
 
+
+
+
+//#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem	<TChem::KineticModelConstData<Kokkos::Device<Kokkos::Serial, Kokkos::HostSpace>, Tines::UseThisDevice<TChem::host_exec_space>::type >>	
 //Old way
 //#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<TChem::KineticModelConstData<Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace> >>
-//#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem	<TChem::KineticModelConstData	<Kokkos::Device	<Kokkos::Serial, Kokkos::HostSpace> >	
+//#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem	<TChem::KineticModelConstData<Kokkos::Device<Kokkos::Serial, Kokkos::HostSpace> >>	
 //Change to Serial, this can be changed by altering the TChem master build profile to include OPENMP on or off
 #define BAR "===================="
 
@@ -211,14 +218,19 @@ int main(int argc, char* argv[])
 		printf("Number of Reactions %d \n", kmcd.nReac);
 		const bool detail = false;
 		TChem::exec_space::print_configuration(std::cout, detail);
-
+		//===================================
 		//Declare the state variable locally
+		//===================================
 		number_of_equations		= problem_type::getNumberOfEquations(kmcd);
+		//Trying to use the openmp N_vector
 		N_Vector y 				= N_VNew_Serial(number_of_equations, sunctx); //state
+		//N_Vector y 				= N_VNew_OpenMP(number_of_equations, 1,sunctx); //state
 		N_VScale(0.0, y, y);
 		realtype *data 	= NV_DATA_S(y);			//set the pointer to the state
 		const int MaxKrylovIters= number_of_equations;//use 1000
+
 		//Print mechanism data
+		//only For build tests, comment out otherwise.
 		// int nBatch= 1;
 		// real_type_2d_view_host state_host;
 		// const ordinal_type stateVecDim = TChem::Impl::getStateVectorSize(kmcd.nSpec);
@@ -234,6 +246,7 @@ int main(int argc, char* argv[])
 		{
 			PressMult = 10;
 		}
+		
 		SetIntCons(Experiment, SampleNum, data);		//Will depreciate?
 	    //=================
 		/// set problem
@@ -248,6 +261,8 @@ int main(int argc, char* argv[])
      	problem._kmcd 	= kmcd;  // kinetic model
 		problem.num_equations		= number_of_equations;
 		problem.Jac					= N_VNew_Serial(number_of_equations*number_of_equations, sunctx);//Make the Jacobian
+		//problem.Jac					= N_VNew_OpenMP(number_of_equations*number_of_equations, 1,sunctx);//Make the Jacobian
+
 		//==============================================
 		//Create integrators
 		//==============================================

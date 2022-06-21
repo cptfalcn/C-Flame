@@ -1,5 +1,6 @@
 echo ====================================Compiling ZeroDIgnCons.cpp================================
-export TP=~/Code/C++/TCHEM3.0
+export TP=~/Code/C++/TCHEM3.0Serial
+echo "compiling from $TP"
 #================
 #Build ZeroDCons.o
 #================

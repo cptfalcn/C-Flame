@@ -269,7 +269,7 @@ void IntConIsoOct(realtype * data, int SampleNum)
 		data[4]  	=  1.931486027241477166e-01;//O2
 		data[7] 	=  6.302015669181122437e-01;//N2
 		data[10] 	=  1.116453467568208867e-02;//AR
-		cout << BAR <<"Iso-Oct Experiment Sample 1\t" << BAR << endl;
+		cout << BAR <<"Iso-Oct Experiment Sample 10 atm\t" << BAR << endl;
 		break;
 	case 2:
 		data[0]		= 1250.0;//use 1300 for hot gas
@@ -277,9 +277,25 @@ void IntConIsoOct(realtype * data, int SampleNum)
 		data[4]		= 1.931486027241477166e-01;//O2
 		data[7] 	= 6.302015669181122437e-01;//N2
 		data[10] 	= 1.116453467568208867e-02;//AR
-		cout << BAR << "Iso-Oct Experiment Sample 2\t" << BAR << endl;
+		cout << BAR << "Iso-Oct Experiment Sample 10 atm Hi temp\t" << BAR << endl;
+		break;
+	case 3:
+		data[0] 	=  800.0;//use 1000 for base
+		data[742] 	=  1.654852956820578869e-01;//IC8H18 
+		data[4]  	=  1.931486027241477166e-01;//O2
+		data[7] 	=  6.302015669181122437e-01;//N2
+		data[10] 	=  1.116453467568208867e-02;//AR
+		cout << BAR <<"Iso-Oct Experiment Sample 16 atm\t" << BAR << endl;
+		break;
+	case 4:
+		data[0]		= 1250.0;//use 1300 for hot gas
+		data[742]	= 1.654852956820578869e-01;//IC8H18
+		data[4]		= 1.931486027241477166e-01;//O2
+		data[7] 	= 6.302015669181122437e-01;//N2
+		data[10] 	= 1.116453467568208867e-02;//AR
+		cout << BAR << "Iso-Oct Experiment Sample 16 atm Hi temp\t" << BAR << endl;
+		break;
 	}
-
 
 }
 

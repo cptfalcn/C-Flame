@@ -1,10 +1,13 @@
 #include "Epi3V.h"
 #include <cmath>
 
-using value_type = Sacado::Fad::SLFad<real_type,100>;
+//using value_type = Sacado::Fad::SLFad<real_type,100>;
+using value_type = realtype;
 //need the following hard call in the define.
 //using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 #define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<value_type, Tines::UseThisDevice<TChem::host_exec_space>::type > 
+//#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem	<TChem::KineticModelConstData<Kokkos::Device<Kokkos::Serial, Kokkos::HostSpace>, Tines::UseThisDevice<TChem::host_exec_space>::type >>	
+
 
 using namespace std;
 class myPb : public TCHEMPB{
@@ -510,10 +513,10 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	ofstream    Y;
 	ofstream 	REM;
 
-	hRHS.open("FailedRHS.txt",  std::ios_base::app);
-	hJAC.open("FailedhJac.txt",  std::ios_base::app);
-	Y.open("FailedY.txt", std::ios_base::app);
-	REM.open("FailedRemainder.txt",  std::ios_base::app);
+	hRHS.open("FailedIsoRHS.txt",  std::ios_base::app);
+	hJAC.open("FailedIsohJac.txt",  std::ios_base::app);
+	Y.open("FailedIsoY.txt", std::ios_base::app);
+	REM.open("FailedIsoRemainder.txt",  std::ios_base::app);
 
 	int IgnDelay		= 0;
 	//=======================
@@ -825,8 +828,8 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
 	ofstream Hfile;
 	ofstream Phifile;
 	//Open said filestreams
-	Hfile.open("FailedHMat.txt", std::ios_base::app);
-	Phifile.open("FailedPhiMat.txt", std::ios_base::app);
+	Hfile.open("FailedIsoHMat.txt", std::ios_base::app);
+	Phifile.open("FailedIsoPhiMat.txt", std::ios_base::app);
     // We only allow m to vary between mmin and mmax
     m = max(M_min, min(M_max, m));
 

@@ -128,7 +128,7 @@ TF=1e-1
 ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-4 --FinalTime=1.0e-1 --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=2 --maxSS=5e-2 --absTol=1e-8 --relTol=1e-3 --Movie=0
 ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-4 --FinalTime=1.0e-1 --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=2 --maxSS=5e-2 --absTol=1e-8 --relTol=1e-4 --Movie=0
 ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-4 --FinalTime=1.0e-1 --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=2 --maxSS=5e-2 --absTol=1e-8 --relTol=1e-5 --Movie=0
-mv ./ZeroDVariableSam70EPI3Conv.txt ./SampleOutput/
+mv ./ZeroDVariableSam70EPI3ConvV2.txt ./SampleOutput/
 
 Out="ZeroDVariableSam70CVODEConvV2.txt"
 Method="CVODEKry"
