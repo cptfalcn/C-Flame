@@ -49,7 +49,7 @@ this="$exec --chemfile=$inputs/chem.inp \
             --atol-newton=1e-18 \
             --rtol-newton=1e-8\
             --max-newton-iterations=20 \
-            --tol-time=1e-10 \
+            --tol-time=1e-8 \
             --dtmax=1e-2 \
             --dtmin=1e-10 \
             --tend=5e-2 \

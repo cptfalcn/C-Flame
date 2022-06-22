@@ -614,20 +614,21 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 					Err			= 1000;
 					hNew 		= h/2;
 					ForceRej 	= 0;
-					for (int i = 0; i < N_VGetLength(pb->Jac); i++ )
-						hJAC << jacPtr[i] << endl;
+					//Optional additional printing
+					// for (int i = 0; i < N_VGetLength(pb->Jac); i++ )
+					// 	hJAC << jacPtr[i] << endl;
 					
-					hJAC << endl << endl;
+					// hJAC << endl << endl;
 
-					realtype * hfyData= NV_DATA_S(hfy);
-					for (int i = 0; i < N_VGetLength(y); i++)
-					{
-						hRHS << hfyData[i] << endl;
-						Y   << data[i] << endl;
-						REM << Rem[i] << endl;
-					}
-					hRHS << endl << endl;
-					Y << endl << endl;
+					// realtype * hfyData= NV_DATA_S(hfy);
+					// for (int i = 0; i < N_VGetLength(y); i++)
+					// {
+					// 	hRHS << hfyData[i] << endl;
+					// 	Y   << data[i] << endl;
+					// 	REM << Rem[i] << endl;
+					// }
+					// hRHS << endl << endl;
+					// Y << endl << endl;
 
 				}
 				else
@@ -993,23 +994,22 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
 			//======================
 			if(isnan(err))//New, put a better condition in here
 			{
-				//realtype * PhiMatPtr  	= NV_DATA_S(phiMatrix);
-				cout << "Dumping the phi matrix to PhiMat.txt\n";
-				cout << "Dumping the H matrix to HMat.txt\n"; 
-				std :: cout << "Error State has occurred: Err NaN\n";
-				std :: cout << "Beta: " << beta << "\n";
-				std :: cout << "Phi Mat value: " <<phiMatrix[j-1 + j * (j+1)] << "\n";
-				std :: cout << "H Mat value: " << H[j + (j-1) * MatrixSize] << "\n";
-				cout << expm->Compute(j + 1, phiMatrix) << endl;
-				cout << j << endl;
-				for( int k = 0 ; k < MatrixSize*MatrixSize; k++)
-				{
-					Phifile << phiMatrix[k] << endl;
-					Hfile   << tau*H[k] << endl;
-				}
-				Hfile   << endl << endl;
-				Phifile << endl << endl;
-				cout << "Error: LTE NaN" << endl;
+				// cout << "Dumping the phi matrix to PhiMat.txt\n";
+				// cout << "Dumping the H matrix to HMat.txt\n"; 
+				// std :: cout << "Error State has occurred: Err NaN\n";
+				// std :: cout << "Beta: " << beta << "\n";
+				// std :: cout << "Phi Mat value: " <<phiMatrix[j-1 + j * (j+1)] << "\n";
+				// std :: cout << "H Mat value: " << H[j + (j-1) * MatrixSize] << "\n";
+				// cout << expm->Compute(j + 1, phiMatrix) << endl;
+				// cout << j << endl;
+				// for( int k = 0 ; k < MatrixSize*MatrixSize; k++)
+				// {
+				// 	Phifile << phiMatrix[k] << endl;
+				// 	Hfile   << tau*H[k] << endl;
+				// }
+				// Hfile   << endl << endl;
+				// Phifile << endl << endl;
+				// cout << "Error: LTE NaN" << endl;
 				//exit(EXIT_FAILURE);
 				return 1;
 			}

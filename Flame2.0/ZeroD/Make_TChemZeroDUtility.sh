@@ -5,7 +5,7 @@ echo "Building with $TP"
 #Build ZeroDVar.o
 #================
 #Tons of depreciation warnings, suppressed
-/usr/bin/c++ -g -fopenmp -O0  -w \
+/usr/bin/c++ -g -fopenmp -O3  -w \
 -I $TP/install/tchem/include/tchem \
 -I $TP/install/kokkos/include \
 -I $TP/install/tines/include/tines \
@@ -20,7 +20,7 @@ echo ============================================Linking========================
 #Modern version
 #==============
 /usr/bin/c++ TChemZeroDUtility.o \
--g -O0 -w -fopenmp -DNDEBUG \
+-g -O3 -w -fopenmp -DNDEBUG \
 $TP/install/tchem/lib/libtchem.a \
 $TP/install/tines/lib/libtines.a \
 $TP/install/kokkos/lib/libkokkoscontainers.a \
