@@ -97,17 +97,26 @@ void PrintSuperVector(realtype * data, int Experiment, int num_pts, string BAR)
 			std :: cout <<"\t\t Temp=" <<data[2*num_pts + i];
 		}
 		else if(Experiment==1)
-        	{
-				//Temp H2 O2 O OH H2O H HO2 H2O2
-				std :: cout << "Temp=" << data[i] << "\t\t H2=" << data[num_pts+i];
-				std :: cout <<"\t\t O2=" << data[2*num_pts + i];
-        	}else if (Experiment==2){//Gri
-				std :: cout << "Temp=" << data[i] << "\t\t CH4=" << data[14*num_pts + i];
-				std :: cout <<"\t\t O2=" << data[4*num_pts + i];
-        	}else if (Experiment==3){//Iso-Oct
-				std :: cout << "Temp=" << data[i] << "\t\t Iso-Oct=" << data[742*num_pts + i];
-				std :: cout <<"\t\t O2=" << data[4*num_pts + i] << "\t\t CH4=" << data[14*num_pts + i];
-			}
+		{
+			//Temp H2 O2 O OH H2O H HO2 H2O2
+			std :: cout << "Temp=" << data[i] << "\t\t H2=" << data[num_pts+i];
+			std :: cout <<"\t\t O2=" << data[2*num_pts + i];
+		}else if (Experiment==2){//Gri
+			std :: cout << "Temp=" << data[i] << "\t\t CH4=" << data[14*num_pts + i];
+			std :: cout <<"\t\t O2=" << data[4*num_pts + i];
+		}else if (Experiment==3){//Iso-Oct
+			std :: cout << "Temp=" << data[i] << "\t\t Iso-Oct=" << data[742*num_pts + i];
+			std :: cout <<"\t\t O2=" << data[4*num_pts + i] << "\t\t CH4=" << data[14*num_pts + i];
+		}else if (Experiment==4){//ndodecane
+			std :: cout << "Temp=" << data[i] << "\t\t N-Dode=" << data[67*num_pts + i];
+			std :: cout <<"\t\t O2=" << data[4*num_pts + i];
+		}else if (Experiment==5){//nButane
+			std :: cout << "Temp=" << data[i] << "\t\t N-But=" << data[58*num_pts + i];
+			std :: cout <<"\t\t O2=" << data[11*num_pts + i];
+		}else if (Experiment==6){//nHeptane
+			std :: cout << "Temp=" << data[i] << "\t\t N-Hep=" << data[396*num_pts + i];
+			std :: cout <<"\t\t O2=" << data[4*num_pts + i];
+		}
 		std :: cout << std :: endl;
 	}
 }

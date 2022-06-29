@@ -654,15 +654,15 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 						hNew= 0.01*h;		//throttle
 					if( hNew>hMax)
 						hNew=hMax;
-					if( hNew <= ZERO)
+					if(hNew<1e-15)//if( hNew <= ZERO)
 					{
 						//Perform Data dump
 						printf("There is a possible singularity in the solution\n");
-						// std :: cout << "time stamp: " << t << std :: endl;
-						// std :: cout << "hNew: " << hNew<< std :: endl;
-						// std :: cout << "ErrEst: " << Err << std :: endl;
-						// std :: cout << "y: \n";
-						N_VPrint_Serial(y);
+						std :: cout << "time stamp: " << t << std :: endl;
+						std :: cout << "hNew: " << hNew<< std :: endl;
+						std :: cout << "ErrEst: " << Err << std :: endl;
+						std :: cout << "y: \n";
+						//N_VPrint_Serial(y);
 						exit(EXIT_FAILURE);
 					}
 				}

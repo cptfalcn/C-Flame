@@ -1,7 +1,4 @@
 //Starts the return code version of KIOPS
-//The "new" stuff
-//Super experimental stuff
-//Kiops class
 #include "KiopsRetCode.h"
 int fac(int n) { return (n == 1 || n == 0) ? 1 : fac(n - 1) * n; }
 

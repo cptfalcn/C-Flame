@@ -20,7 +20,7 @@ echo ============================================Linking========================
 #Modern version
 #==============
 /usr/bin/c++ TChemZeroDUtility.o \
--g -O3 -w -fopenmp -DNDEBUG \
+-g -O3 -w -fopenmp \
 $TP/install/tchem/lib/libtchem.a \
 $TP/install/tines/lib/libtines.a \
 $TP/install/kokkos/lib/libkokkoscontainers.a \

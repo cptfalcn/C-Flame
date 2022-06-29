@@ -3,21 +3,12 @@
 #include <math.h>
 #include "Epic.h"
 #include <nvector/nvector_serial.h>
-//#include <cvode/cvode.h>
 #include <sundials/sundials_nvector.h>
-// #include <sunmatrix/sunmatrix_dense.h> /* access to dense SUNMatrix  */
-// #include <sunlinsol/sunlinsol_dense.h> /* access to dense SUNLinearSolver  */
-// #include <sundials/sundials_types.h>   /* defs. of realtype, sunindextype      */
-// #include <sunmatrix/sunmatrix_sparse.h> /* access to sparse SUNMatrix           */
-// #include <sunlinsol/sunlinsol_spgmr.h>  /* SPGMR SUNLinearSolver                */
-// #include <sunlinsol/sunlinsol_spbcgs.h>       /* access to SPBCGS SUNLinearSolver            */
-// #include <sunnonlinsol/sunnonlinsol_newton.h> /* access to Newton SUNNonlinearSolver         */
 #include <iostream>
 #include <fstream>
 #include <iomanip>
-//#include "TChem_Impl_IgnitionZeroD_Problem.hpp" // here is where Ignition Zero D problem is implemented
 #include <memory>
-#define BAR "===================="
+
 class KiopsRetCode{
     public:
         KiopsRetCode(int maxNumVectors, int m_max, N_Vector templateVector, int vecLength);

@@ -242,7 +242,7 @@ int main(int argc, char* argv[])
 		//Init Cons
 		//=======================
 		int PressMult = 1;
-		if(Experiment == 3)
+		if(Experiment == 3 || Experiment==6)
 		{
 			PressMult = 10;
 		}
@@ -268,7 +268,7 @@ int main(int argc, char* argv[])
 		//==============================================
 		void * cvode_mem;
 		SUNMatrix A						= SUNDenseMatrix(number_of_equations, number_of_equations,sunctx);
-		SUNLinearSolver LS 				= SUNLinSol_SPGMR(y, PREC_NONE, 20,sunctx);
+		SUNLinearSolver LS 				= SUNLinSol_SPGMR(y, PREC_NONE, number_of_equations,sunctx);
 		SUNNonlinearSolver NLS 			= SUNNonlinSol_Newton(y, sunctx);
 
 		int retVal = 0;
@@ -281,6 +281,8 @@ int main(int argc, char* argv[])
         retVal = CVodeInit(cvode_mem, RHS_TCHEM, 0, y);
         retVal = CVodeSetInitStep(cvode_mem, StepSize);
         retVal = CVodeSetMaxStep(cvode_mem, maxSS);
+		retVal = CVodeSetMinStep(cvode_mem, 1e-20);
+		retVal = CVodeSetMaxErrTestFails(cvode_mem, 200);
         retVal = CVodeSVtolerances(cvode_mem, relTol, AbsTol);
         //Set linear solver
         retVal = CVodeSetLinearSolver(cvode_mem, LS, A);//A might be null, try that
@@ -336,7 +338,7 @@ int main(int argc, char* argv[])
 		//=======================================
 		//Profiling output
 		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
-		PrintExpParam(FinalTime, TNow, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
+		PrintExpParam(FinalTime, FinalTime, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
 		PrintSuperVector(data, Experiment, 1, BAR);
 		PrintToFile(myfile, data, number_of_equations, problem.t, relTol, absTol, KTime, KrylovTol, problem.ignTime);
 		cout << "Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;

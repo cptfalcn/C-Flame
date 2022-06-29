@@ -299,6 +299,48 @@ void IntConIsoOct(realtype * data, int SampleNum)
 
 }
 
+void IntConNDodec(realtype * data, int SampleNum)
+{
+	switch(SampleNum)
+	{
+		case 1:
+		data[0] 	= 1200;
+		data[4]		= 2.169982215727128128e-01;	 //O2
+		data[7] 	= 7.080176471629753276e-01;  //N2
+		data[67]	= 6.244102126951704690e-02;  //NC12H26
+		break;
+	}
+
+
+}
+
+void IntConNButane(realtype * data, int SampleNum)
+{
+	switch(SampleNum)
+	{
+		case 1:
+		data[0] 	= 1200;
+		data[11]	= 2.173895119224689421e-01;	 //O2
+		data[155] 	= 7.092943418325631244e-01;  //N2
+		data[154] 	= 1.256572768198739760e-02;  //AR
+		data[58]	= 6.075041856298054460e-02;  //C4H10
+		break;
+	}	
+}
+
+void IntConNHeptane(realtype * data, int SampleNum)
+{//10 atm
+	switch(SampleNum)
+	{
+		case 1:
+		data[0] 	= 800;
+		data[4]		= 2.171425680562193705e-01;	 //O2
+		data[7] 	= 7.084886181086718082e-01;  //N2
+		data[10] 	= 1.255145362916586065e-02;  //AR
+		data[396]	= 6.181736020594310460e-02;  //C4H10
+		break;
+	}
+}
 
 
 void SetIntCons(int Experiment, int Sample, realtype* data)
@@ -309,14 +351,23 @@ void SetIntCons(int Experiment, int Sample, realtype* data)
 			IntConKappa(data, 1e-2);
 			break;
 		case 1:
-                	IntConHydro(data, Sample);
-					break;
+			IntConHydro(data, Sample);
+			break;
 		case 2:
-                	IntConGri30(data, Sample);
-                    break;
+			IntConGri30(data, Sample);
+			break;
 		case 3:
-					IntConIsoOct(data, Sample);
-					break;
+			IntConIsoOct(data, Sample);
+			break;
+		case 4:
+			IntConNDodec(data, Sample);
+			break;
+		case 5:
+			IntConNButane(data, Sample);
+			break;
+		case 6:
+			IntConNHeptane(data, Sample);
+			break;
     }
 }
 

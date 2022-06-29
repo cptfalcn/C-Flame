@@ -13,4 +13,4 @@ Mech=iso-oct
 ./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=1e-4 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=3 --maxSS=1e-2 --absTol=1e-10 --relTol=5e-4 --Movie=0
 ./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=1e-4 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=3 --maxSS=1e-2 --absTol=1e-10 --relTol=2e-4 --Movie=0
 ./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=1e-4 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=3 --maxSS=1e-2 --absTol=1e-10 --relTol=1e-4 --Movie=0
-mv ZeroDVariableIsoOctSam01EPI3ConvV2.txt ./SampleOut
+mv ZeroDVariableIsoOctSam01EPI3ConvV2.txt ./SampleOutput
