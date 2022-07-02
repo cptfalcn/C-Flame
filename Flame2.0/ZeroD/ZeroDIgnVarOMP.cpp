@@ -90,7 +90,7 @@ int Jtv_TCHEM(N_Vector , N_Vector ,realtype, N_Vector, N_Vector , void* , N_Vect
 //Misc functions
 void PrintFromPtr(realtype *,  int);
 void ErrorCheck(ofstream &, N_Vector, realtype *, int, realtype);
-void PrintDataToFile(ofstream &, realtype *,int, realtype);
+	void PrintDataToFile(ofstream &, realtype *,int, realtype);
 //Main Print function
 void PrintToFile(ofstream &, realtype *, int, realtype, realtype, realtype, realtype, realtype, realtype);
 
@@ -223,8 +223,8 @@ int main(int argc, char* argv[])
 		//===================================
 		number_of_equations		= problem_type::getNumberOfEquations(kmcd);
 		//Trying to use the openmp N_vector
-		N_Vector y 				= N_VNew_Serial(number_of_equations, sunctx); //state
-		//N_Vector y 				= N_VNew_OpenMP(number_of_equations, 1,sunctx); //state
+		//N_Vector y 				= N_VNew_Serial(number_of_equations, sunctx); //state
+		N_Vector y 				= N_VNew_OpenMP(number_of_equations, 1,sunctx); //state
 		N_VScale(0.0, y, y);
 		realtype *data 	= NV_DATA_S(y);			//set the pointer to the state
 		const int MaxKrylovIters= number_of_equations;//use 1000
@@ -260,8 +260,8 @@ int main(int argc, char* argv[])
       	problem._work 	= work;  // problem workspace array
      	problem._kmcd 	= kmcd;  // kinetic model
 		problem.num_equations		= number_of_equations;
-		problem.Jac					= N_VNew_Serial(number_of_equations*number_of_equations, sunctx);//Make the Jacobian
-		//problem.Jac					= N_VNew_OpenMP(number_of_equations*number_of_equations, 1,sunctx);//Make the Jacobian
+		//problem.Jac					= N_VNew_Serial(number_of_equations*number_of_equations, sunctx);//Make the Jacobian
+		problem.Jac					= N_VNew_OpenMP(number_of_equations*number_of_equations, 1,sunctx);//Make the Jacobian
 
 		//==============================================
 		//Create integrators
@@ -337,17 +337,15 @@ int main(int argc, char* argv[])
 		//Console Output
 		//=======================================
 		//Profiling output
-		realtype EffRating 		=	1;
+		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
+		PrintExpParam(FinalTime, FinalTime, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
+		PrintSuperVector(data, Experiment, 1, BAR);
+		PrintToFile(myfile, data, number_of_equations, problem.t, relTol, absTol, KTime, KrylovTol, problem.ignTime);
 		cout << "Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
 		if (Profiling ==1){//Invalid for experiment 0
 			cout << BAR << "    Profiling   " << BAR << endl;
 			if(Method == "EPI3V")
-			{
 				integratorStats->PrintStats();
-				EffRating = 100*integratorStats->numTimeSteps/static_cast<realtype>(JacCnt);
-				cout << BAR << "Overall Efficiency rating" << BAR << endl;
-				cout << EffRating <<"%\n";
-			}
 
 			ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
 			cout << "Integrator CPU time: "<<KTime<<" seconds\n";
@@ -372,11 +370,6 @@ int main(int argc, char* argv[])
 			ProFile.close();
 
 		}//End Profiling
-		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
-		PrintExpParam(FinalTime, FinalTime, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
-		PrintSuperVector(data, Experiment, 1, BAR);
-		PrintToFile(myfile, data, number_of_equations, problem.t, relTol, absTol, KTime, KrylovTol, EffRating);
-
 		//Take out the trash
         myfile.close();
 		N_VDestroy_Serial(y);
@@ -661,6 +654,15 @@ void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N
 	}
 }
 
+
+
+//Cvode Monitor
+int CVODEMonitor(void *cvode_mem, void *user_data)
+{
+	myPb * pbPtr{static_cast<myPb *> (user_data)};//Recast
+	cout << pbPtr->t << endl;
+	return 0;
+}
 
 void PrintBanner()
 {
