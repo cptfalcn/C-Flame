@@ -72,6 +72,7 @@ class Epi3VChem_KIOPS
 		IntegratorStats* NewIntegrate(const realtype hStart, const realtype hMax, const realtype absTol,
 			const realtype relTol, const realtype t0, const realtype tFinal,
 			int basisSizes[], N_Vector y);
+		
 	private:
     	CVRhsFn f;
     	CVSpilsJacTimesVecFn jtv;

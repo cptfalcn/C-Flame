@@ -54,6 +54,9 @@ rm ZeroDIgnVarOMP.o
 #Set local OMP protocols
 export OMP_PROC_BIND=spread
 export OMP_PLACES=threads
+# export OMP_NUM_THREADS=8
+# export OMP_DYNAMIC=false
+
 # #Use the default TChem names
 # chemfile=$inputs"chem.inp"
 # thermfile=$inputs"therm.dat"
@@ -73,7 +76,7 @@ Out="ScrapVar.txt"
 ./ZeroDIgnVarOMP.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method="CVODEKry" --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-9 --relTol=1e-8 --Movie=0 --Input=gri3.0/sample.dat
 ./ZeroDIgnVarOMP.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method="EPI3V" --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-10 --relTol=1e-1 --Movie=0 --Input=gri3.0/sample.dat
 ./ZeroDIgnVarOMP.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method="EPI3V" --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-10 --relTol=5e-2 --Movie=0 --Input=gri3.0/sample.dat
-#Both these stall and will not run.  But TChem TrBDF2 will run this sample okay.
-TF=5e-2
+
+#TF=5e-2
 #./ZeroDIgnVar.x --chemfile=iso-oct/"chem.inp" --thermfile=iso-oct/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method="CVODEKry" --Profiling=1 --Experiment=3 --maxSS=1e-2 --absTol=1e-10 --relTol=1e-10 --Movie=0 --Input=iso-oct/"sample1_10atm.dat"
 #./ZeroDIgnVar.x --chemfile=iso-oct/"chem.inp" --thermfile=iso-oct/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-7 --UseJac=1 --SampleNum=1 --Method="EPI3V" --Profiling=1 --Experiment=3 --maxSS=1e-2 --absTol=1e-10 --relTol=1e-1 --Movie=0 --Input=iso-oct/"sample1_10atm.dat"

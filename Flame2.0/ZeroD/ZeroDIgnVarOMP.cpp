@@ -153,6 +153,7 @@ int main(int argc, char* argv[])
 	realtype absTol				= 1e-10;
 	realtype maxSS 				= StepSize;
 	int Movie 					= 0;
+	int Threads					= 1;
 	//const int MaxKrylovIters	= 54;//use 1000
 	string inputFile;
 	
@@ -224,9 +225,10 @@ int main(int argc, char* argv[])
 		number_of_equations		= problem_type::getNumberOfEquations(kmcd);
 		//Trying to use the openmp N_vector
 		//N_Vector y 				= N_VNew_Serial(number_of_equations, sunctx); //state
-		N_Vector y 				= N_VNew_OpenMP(number_of_equations, 1,sunctx); //state
+		N_Vector y 				= N_VNew_OpenMP(number_of_equations, Threads, sunctx); //state
 		N_VScale(0.0, y, y);
-		realtype *data 	= NV_DATA_S(y);			//set the pointer to the state
+		//realtype *data 	= NV_DATA_S(y);			//set the pointer to the state
+		realtype *data 	= NV_DATA_OMP(y);			//set the pointer to the state
 		const int MaxKrylovIters= number_of_equations;//use 1000
 
 		//Print mechanism data
@@ -260,9 +262,8 @@ int main(int argc, char* argv[])
       	problem._work 	= work;  // problem workspace array
      	problem._kmcd 	= kmcd;  // kinetic model
 		problem.num_equations		= number_of_equations;
-		//problem.Jac					= N_VNew_Serial(number_of_equations*number_of_equations, sunctx);//Make the Jacobian
-		problem.Jac					= N_VNew_OpenMP(number_of_equations*number_of_equations, 1,sunctx);//Make the Jacobian
-
+		problem.Jac					= N_VNew_OpenMP(number_of_equations*number_of_equations, Threads, sunctx);//Make the Jacobian
+		problem.t					= 0;
 		//==============================================
 		//Create integrators
 		//==============================================
@@ -337,15 +338,17 @@ int main(int argc, char* argv[])
 		//Console Output
 		//=======================================
 		//Profiling output
-		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
-		PrintExpParam(FinalTime, FinalTime, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
-		PrintSuperVector(data, Experiment, 1, BAR);
-		PrintToFile(myfile, data, number_of_equations, problem.t, relTol, absTol, KTime, KrylovTol, problem.ignTime);
+		realtype EffRating 		=	1;
 		cout << "Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
 		if (Profiling ==1){//Invalid for experiment 0
 			cout << BAR << "    Profiling   " << BAR << endl;
 			if(Method == "EPI3V")
+			{
 				integratorStats->PrintStats();
+				EffRating = 100*integratorStats->numTimeSteps/static_cast<realtype>(JacCnt);
+				cout << BAR << "Overall Efficiency rating" << BAR << endl;
+				cout << EffRating <<"%\n";
+			}
 
 			ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
 			cout << "Integrator CPU time: "<<KTime<<" seconds\n";
@@ -370,6 +373,13 @@ int main(int argc, char* argv[])
 			ProFile.close();
 
 		}//End Profiling
+		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
+		PrintExpParam(FinalTime, FinalTime, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
+		PrintSuperVector(data, Experiment, 1, BAR);
+		PrintToFile(myfile, data, number_of_equations, problem.t, relTol, absTol, KTime, KrylovTol, EffRating);
+
+		
+		//End Profiling
 		//Take out the trash
         myfile.close();
 		N_VDestroy_Serial(y);
@@ -428,8 +438,10 @@ int RHS_TCHEM(realtype t, N_Vector u, N_Vector udot, void * pb)
 	//TCHEMPB *pbPtr{ static_cast<TCHEMPB*>(pb)} ;//recast the type here.
 	myPb * pbPtr{static_cast<myPb *> (pb)};//Recast
 	ordinal_type number_of_equations=pbPtr->get_num_equations();
-	realtype *y= NV_DATA_S(u);
-	realtype *dy=NV_DATA_S(udot);
+	// realtype *y= NV_DATA_S(u);
+	// realtype *dy=NV_DATA_S(udot);
+	realtype *y= NV_DATA_OMP(u);
+	realtype *dy=NV_DATA_OMP(udot);
 	/// we use std vector mimicing users' interface
 	using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 	using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
@@ -461,8 +473,10 @@ int ComputeJac(N_Vector u, void* pb)
 	//======================================
 	//Set the necessary vectors and pointers
 	//======================================
-	realtype *y= NV_DATA_S(u);
-	realtype *JacD= NV_DATA_S(pbPtr->Jac);
+	// realtype *y= NV_DATA_S(u);
+	// realtype *JacD= NV_DATA_S(pbPtr->Jac);
+	realtype *y		= NV_DATA_OMP(u);
+	realtype *JacD	= NV_DATA_OMP(pbPtr->Jac);
 	//=============================================
 	//We use std vector mimicing users' interface
 	//=============================================
@@ -546,9 +560,12 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 	//======================================
 	//Set the necessary vectors and pointers
 	//======================================
-	realtype *y= NV_DATA_S(u);
-	realtype *JacD= NV_DATA_S(pbPtr->Jac);
-	realtype *JV=NV_DATA_S(Jv);
+	// realtype *y= NV_DATA_S(u);
+	// realtype *JacD= NV_DATA_S(pbPtr->Jac);
+	// realtype *JV=NV_DATA_S(Jv);
+	realtype *y		= NV_DATA_OMP(u);
+	realtype *JacD	= NV_DATA_OMP(pbPtr->Jac);
+	realtype *JV	= NV_DATA_OMP(Jv);
 	//===================
 	//Compute JV
 	//===================
@@ -641,27 +658,34 @@ void ErrorCheck(ofstream & myfile, N_Vector y, realtype * data, int number_of_eq
 */
 void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N_Vector tmp, realtype * JV)
 {
-    realtype * TMP  = NV_DATA_S(tmp);
-	realtype * X 	= NV_DATA_S(x);
-	for (int i=0; i< number_of_equations; i++)//for each state
+    // realtype * TMP  = NV_DATA_S(tmp);
+	// realtype * X 	= NV_DATA_S(x);
+	int i,j;
+	realtype * TMP  = 	NV_DATA_OMP(tmp);
+	realtype * X 	= 	NV_DATA_OMP(x);
+	//#pragma omp parallel default(none) private(i, X, JacD, number_of_equations, TMP, j,x,tmp, JV)
 	{
-		for(int j=0; j<number_of_equations; j++)//marches across the column
+		//#pragma omp for
+		for (int i=0; i< number_of_equations; i++)//for each state
 		{
-			TMP[j]=JacD[j+i*number_of_equations];//Stored row major
-			//JV[i] += X[j] * JacD[i * number_of_equations + j];
+			//#pragma omp parallel for private(j)
+			for(int j=0; j<number_of_equations; j++)//marches across the column
+			{
+				TMP[j]=JacD[j+i*number_of_equations];//Stored row major
+				//JV[i] += X[j] * JacD[i * number_of_equations + j];
+			}
+			JV[i]=N_VDotProd(tmp,x);
 		}
-		JV[i]=N_VDotProd(tmp,x);
 	}
-}
-
-
-
-//Cvode Monitor
-int CVODEMonitor(void *cvode_mem, void *user_data)
-{
-	myPb * pbPtr{static_cast<myPb *> (user_data)};//Recast
-	cout << pbPtr->t << endl;
-	return 0;
+	//This implementation does not work with cvode
+	// //#pragma omp parallel default(none) shared(i,X,JV,JacD,number_of_equations) private(j)
+	// {
+	// 	//#pragma omp for
+    // 	for (i = 0; i < number_of_equations; i++)
+    //   		for (j = 0; j < number_of_equations; j++)
+    //     		JV[i] += JacD[j+i*number_of_equations] * X[j];
+    // }
+  
 }
 
 void PrintBanner()

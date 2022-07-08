@@ -344,9 +344,10 @@ int main(int argc, char* argv[])
 			if(Method == "EPI3V")
 			{
 				integratorStats->PrintStats();
-				EffRating = 100*integratorStats->numTimeSteps/static_cast<realtype>(JacCnt);
+				EffRating 	= 100*integratorStats->numTimeSteps/static_cast<realtype>(JacCnt);
 				cout << BAR << "Overall Efficiency rating" << BAR << endl;
 				cout << EffRating <<"%\n";
+				StepCount 		= integratorStats->numTimeSteps;
 			}
 
 			ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
@@ -375,7 +376,7 @@ int main(int argc, char* argv[])
 		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
 		PrintExpParam(FinalTime, FinalTime, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
 		PrintSuperVector(data, Experiment, 1, BAR);
-		PrintToFile(myfile, data, number_of_equations, problem.t, relTol, absTol, KTime, KrylovTol, EffRating);
+		PrintToFile(myfile, data, number_of_equations, problem.t, relTol, absTol, KTime, StepCount, EffRating);
 
 		//Take out the trash
         myfile.close();

@@ -495,8 +495,8 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	//myPb2 * pb{static_cast<myPb2 *> (userData)};    //Recast
 	myPb * pb{static_cast<myPb *> (userData)};    		//Recast
 	//Now need to dump the jac, rhs and y to file on a failure
-	realtype * jacPtr	= N_VGetArrayPointer(pb->Jac);
-	realtype * Rem 		= NV_DATA_S(Remainder);
+	//realtype * jacPtr	= N_VGetArrayPointer(pb->Jac);
+	//realtype * Rem 		= NV_DATA_S(Remainder);
 	ofstream myfile;
 	pb->MaxStepTaken		= 0;
 	pb->MinStepTaken		= 1;
@@ -690,26 +690,27 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 				pb->ignTime= t - h/2.0;
 			}
 			pb->t=t;					//Set time for pass back;
-			if(pb->Movie==1)//If we want a movie
-			{
-				for(int i = 0 ; i < N_VGetLength(pb->Jac); i ++)
-				{
-					myfile << jacPtr[i];
-					myfile.flush();
-					myfile << "\n";
-				}
-				myfile << h << "\n";
-				//Print y data to file
-				for(int i = 0 ; i < N_VGetLength(y); i++)
-					datafile << data[i] << endl;
+			
+			// if(pb->Movie==1)//If we want a movie
+			// {
+			// 	for(int i = 0 ; i < N_VGetLength(pb->Jac); i ++)
+			// 	{
+			// 		myfile << jacPtr[i];
+			// 		myfile.flush();
+			// 		myfile << "\n";
+			// 	}
+			// 	myfile << h << "\n";
+			// 	//Print y data to file
+			// 	for(int i = 0 ; i < N_VGetLength(y); i++)
+			// 		datafile << data[i] << endl;
 
-				datafile << h << endl;
-				datafile << Err << endl;
-				datafile << IgnDelay << endl;
-				datafile << t << endl;
-				datafile << relTol << endl;
-				datafile << absTol << endl;
-			}
+			// 	datafile << h << endl;
+			// 	datafile << Err << endl;
+			// 	datafile << IgnDelay << endl;
+			// 	datafile << t << endl;
+			// 	datafile << relTol << endl;
+			// 	datafile << absTol << endl;
+			// }
 		ProgressDots = TrackProgress(tFinal, t, PercentDone, ProgressDots);
 		//Check exit conditions
 		if(finalStep)
