@@ -24,31 +24,14 @@
 #include "TChem_Util.hpp"
 #include "TChem_KineticModelData.hpp"
 #include "TChem_Impl_IgnitionZeroD_Problem.hpp" // here is where Ignition Zero D problem is implemented
-//#include "TChem_Impl_NewtonSolver.hpp"
-//#include "TChem_Impl_TrBDF2.hpp"
-//#include "CreateIntegrators.h"
 #include <chrono>
 #include "InitialConditions.h"
 #include "Epi3V.h"
 #include "Print.h"
-#include <omp.h>
 
-//New way
-//using value_type = "analytic_Jacobian";
-//using value_type = Sacado::Fad::SLFad<real_type,200>;//This is probably the issue
 using value_type = realtype;
-//need the following hard call in the define.
-//using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 #define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<value_type, Tines::UseThisDevice<TChem::host_exec_space>::type >
-
-
-
-
-//#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem	<TChem::KineticModelConstData<Kokkos::Device<Kokkos::Serial, Kokkos::HostSpace>, Tines::UseThisDevice<TChem::host_exec_space>::type >>	
-//Old way
-//#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<TChem::KineticModelConstData<Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace> >>
-//#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem	<TChem::KineticModelConstData<Kokkos::Device<Kokkos::Serial, Kokkos::HostSpace> >>	
-//Change to Serial, this can be changed by altering the TChem master build profile to include OPENMP on or off
+//Change to Serial/OMP by altering the TChem master build profile to include OPENMP on or off
 #define BAR "===================="
 
 using namespace std;
@@ -67,6 +50,10 @@ class myPb : public TCHEMPB{
 	SUNMatrix				Mat;
 	int 					Movie;
 	std :: string			dumpJacFile;
+	int						InternalSteps;
+	int						BadErrSteps;
+	int						BlowupSteps;
+	int						KiopsBlowups;
 	//functions
 	ordinal_type			get_num_equations(void)
 	{
@@ -103,9 +90,6 @@ int CVodeComputeJacWrapper(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
 void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, 
 				N_Vector tmp, realtype * JV);
 
-//monitor function
-int CVODEMonitor(void *cvode_mem, void *user_data);
-
 //=====================
 //Namespaces and globals
 //=====================
@@ -134,10 +118,8 @@ int main(int argc, char* argv[])
 	static const int NumBands 	= 3;//Epic stuff, default is 3.
 	realtype StepSize			= 0;
 	realtype KTime				= 0;
-	realtype PrintTime			= 0;
 	int ProgressDots			= 0; //From 0 to 100; only care about percentage
-	int StepCount 				= 0;
-	realtype PercentDone		= 0;
+	long int StepCount 			= 0;
 	realtype TNow				= 0;
 	realtype TNext				= 0;
 	string MyFile				= "Default.txt";
@@ -153,7 +135,6 @@ int main(int argc, char* argv[])
 	realtype absTol				= 1e-10;
 	realtype maxSS 				= StepSize;
 	int Movie 					= 0;
-	//const int MaxKrylovIters	= 54;//use 1000
 	string inputFile;
 	
 
@@ -199,7 +180,6 @@ int main(int argc, char* argv[])
 		//======================
 		using TChem::real_type;
 		using TChem::ordinal_type;
-		using value_type = Sacado::Fad::SLFad<real_type,100>;
 		/// Kokkos environments - host device type and multi dimensional arrays
 		using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 		using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
@@ -222,12 +202,10 @@ int main(int argc, char* argv[])
 		//Declare the state variable locally
 		//===================================
 		number_of_equations		= problem_type::getNumberOfEquations(kmcd);
-		//Trying to use the openmp N_vector
 		N_Vector y 				= N_VNew_Serial(number_of_equations, sunctx); //state
-		//N_Vector y 				= N_VNew_OpenMP(number_of_equations, 1,sunctx); //state
 		N_VScale(0.0, y, y);
-		realtype *data 	= NV_DATA_S(y);			//set the pointer to the state
-		const int MaxKrylovIters= number_of_equations;//use 1000
+		realtype *data 			= NV_DATA_S(y);	//set the pointer to the state
+		const int MaxKrylovIters= max(number_of_equations,10);//use 1000
 
 		//Print mechanism data
 		//only For build tests, comment out otherwise.
@@ -261,8 +239,7 @@ int main(int argc, char* argv[])
      	problem._kmcd 	= kmcd;  // kinetic model
 		problem.num_equations		= number_of_equations;
 		problem.Jac					= N_VNew_Serial(number_of_equations*number_of_equations, sunctx);//Make the Jacobian
-		//problem.Jac					= N_VNew_OpenMP(number_of_equations*number_of_equations, 1,sunctx);//Make the Jacobian
-
+		problem.t					= 0;
 		//==============================================
 		//Create integrators
 		//==============================================
@@ -290,13 +267,9 @@ int main(int argc, char* argv[])
 		retVal = CVodeSetJacTimes(cvode_mem, NULL, Jtv_TCHEM);
 		retVal = CVodeSetLSetupFrequency(cvode_mem, 1); //Remove because also stupid.
 		retVal = CVodeSetJacEvalFrequency(cvode_mem, 1);//Remove becuase this is stupid.
-		retVal = CVodeSetJacFn(cvode_mem, CVodeComputeJacWrapper);		//Error if removed .
+		retVal = CVodeSetJacFn(cvode_mem, CVodeComputeJacWrapper);//Error if removed .
 		retVal = CVodeSetMaxNumSteps(cvode_mem, 1e6);
 		retVal = CVodeSetMaxOrd(cvode_mem, 2);
-
-		// retVal = CVodeSetMonitorFn(cvode_mem, CVODEMonitor);
-		// retVal = CVodeSetMonitorFrequency(cvode_mem, 1);
-
 		//Set Epi3V
 		IntegratorStats *integratorStats = NULL;
 		Epi3VChem_KIOPS * EPI3V = new Epi3VChem_KIOPS(RHS_TCHEM, Jtv_TCHEM, 
@@ -307,7 +280,7 @@ int main(int argc, char* argv[])
 		//Pre-run printing
 		//================
 		cout << "Pressure: " << pressure*PressMult << endl;
-		PrintPreRun(StepSize, 0.0, 0.0, KrylovTol, absTol, relTol, Method, number_of_equations, BAR);
+		//PrintPreRun(StepSize, 0.0, 0.0, KrylovTol, absTol, relTol, Method, number_of_equations, BAR);
 		PrintSuperVector(data, Experiment, 1, BAR);
 		//=================================
 		//Select and run integrator
@@ -318,8 +291,6 @@ int main(int argc, char* argv[])
 			CVode(cvode_mem, FinalTime, y, &TNext, CV_NORMAL);//CV_NORMAL/CV_ONE_STEP
 		else if(Method == "EPI3V")
 		{
-			// integratorStats = EPI3V->Integrate(StepSize, maxSS, absTol, relTol, 
-			// 					0.0, FinalTime, NumBands, startingBasisSizes, y);
 			integratorStats = EPI3V->NewIntegrate(StepSize, maxSS, absTol, relTol, 
 								0.0, FinalTime, startingBasisSizes, y);
 		}
@@ -341,35 +312,54 @@ int main(int argc, char* argv[])
 		cout << "Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
 		if (Profiling ==1){//Invalid for experiment 0
 			cout << BAR << "    Profiling   " << BAR << endl;
+			ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
+
 			if(Method == "EPI3V")
 			{
 				integratorStats->PrintStats();
-				EffRating 	= 100*integratorStats->numTimeSteps/static_cast<realtype>(JacCnt);
+				EffRating 	= 100*integratorStats->numTimeSteps/static_cast<realtype>(problem.InternalSteps);
 				cout << BAR << "Overall Efficiency rating" << BAR << endl;
 				cout << EffRating <<"%\n";
 				StepCount 		= integratorStats->numTimeSteps;
+				cout << "Step rejection break-down\n";
+				cout << "Poor Error Est: " << problem.BadErrSteps << endl;
+				cout << "Bad Error Est : " << problem.BlowupSteps << endl;
+				cout << "Kiops Errors  : " << problem.KiopsBlowups<< endl;
+				cout << "-----------------------------------------\n";
+				cout << "Total Internal Error: " << problem.BadErrSteps + problem.BlowupSteps + problem.KiopsBlowups << endl;
+				cout << "Sucessful time steps: " << StepCount << endl;
+				cout << "Total Internal steps: " << problem.InternalSteps << endl;
+
+				ProFile << problem.BadErrSteps << "\t";
+				ProFile << problem.BlowupSteps << "\t";
+				ProFile << problem.KiopsBlowups << "\t";
+
+			}
+			else if(Method == "CVODEKry")
+			{
+				CVodeGetNumSteps(cvode_mem, &StepCount);
 			}
 
-			ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
-			cout << "Integrator CPU time: "<<KTime<<" seconds\n";
+
 	
 			cout << BAR << "Jacobian\t" << BAR << endl;
 			cout << "Jacobian calls: " << JacCnt << endl;
 			cout << "Jacobian time:  " << JacTime << endl;
 			ProFile << JacCnt << "\t" << JacTime << "\t";
 
-			ProFile << RHSCnt << "\t" << RHSTime;
 			cout << BAR << "RHS\t\t" << BAR << endl;
 			cout << "RHS calls: " << RHSCnt << "\n";
 			cout << "RHS time:  " << RHSTime << endl;
+			ProFile << RHSCnt << "\t" << RHSTime << "\t";
 
-			ProFile << JtvCnt << "\t" << RHSTime;
 			cout << BAR << "Jtv\t\t" << BAR << endl;
 			cout << "Jtv calls: " << JtvCnt << endl;
 			cout << "Jtv time:  " << MatVecTime << endl;
+			ProFile << JtvCnt << "\t" << MatVecTime << "\t";
 
 			ProFile << "\t " << Experiment << "\t" << SampleNum << "\t";
-			ProFile << FinalTime << "\t" << StepSize << endl;
+			ProFile << FinalTime << "\t" << StepSize << "\t";
+			ProFile << absTol <<"\t" << relTol << endl;
 			ProFile.close();
 
 		}//End Profiling

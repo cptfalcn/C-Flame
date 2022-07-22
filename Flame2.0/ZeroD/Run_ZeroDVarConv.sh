@@ -16,11 +16,11 @@ TF=1.3e0
 ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-4 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-10 --relTol=1e-6 --Movie=0
 ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-4 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-11 --relTol=5e-7 --Movie=0
 ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-4 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-12 --relTol=1e-7 --Movie=0
-mv ./ZeroDVariableSam01EPI3ConvV2.txt ./SampleOutput/
+mv ./$Out ./SampleOutput/
  
 
-# Out="ZeroDVariableSam01CVODEConvV2.txt"
-# Method="CVODEKry"
+#  Out="ZeroDVariableSam01CVODEConvV2.txt"
+#  Method="CVODEKry"
 # ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=2 --maxSS=5e-2 --absTol=1e-7 --relTol=1e-5 --Movie=0
 # ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=2 --maxSS=5e-2 --absTol=1e-8 --relTol=1e-6 --Movie=0
 # ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=2 --maxSS=5e-2 --absTol=1e-8 --relTol=1e-7 --Movie=0
@@ -30,9 +30,9 @@ mv ./ZeroDVariableSam01EPI3ConvV2.txt ./SampleOutput/
 # ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-4 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=2 --maxSS=5e-2 --absTol=1e-11 --relTol=1e-11 --Movie=0
 # ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-4 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method=$Method --Profiling=1 --Experiment=2 --maxSS=5e-2 --absTol=1e-11 --relTol=1e-12 --Movie=0
 
-# #Move data to output dir
+# # #Move data to output dir
 # mv ./ZeroDVariableSam01CVODEConvV2.txt ./SampleOutput/
-# #Sample01
+# # #Sample01
 
 
 #<<Sample60

@@ -2,14 +2,15 @@
 New Sundials version
 ===================================================================================== */
 // #include "TChem_CommandLineParser.hpp"
-
-// #include "TChem_Util.hpp"
-// #include "TChem_KineticModelData.hpp"
-// #include "TChem_Impl_IgnitionZeroD_Problem.hpp" // here is where Ignition Zero D problem is implemented
 #include <sundials/sundials_config.h>
 #include <sundials/sundials_nvector.h>
 #include <sundials/sundials_math.h>
 #include <nvector/nvector_serial.h>
+#include "TChem_CommandLineParser.hpp"
+#include "TChem_Util.hpp"
+#include "TChem_KineticModelData.hpp"
+#include "TChem_Impl_IgnitionZeroD_Problem.hpp" // here is where Ignition Zero D problem is implemented
+
 //CVODE includes
 #include <cvode/cvode.h>               /* prototypes for CVODE fcts., consts.  */
 #include <nvector/nvector_serial.h>    /* access to serial N_Vector            */
@@ -25,6 +26,7 @@ New Sundials version
 #include <iomanip>
 #include <cstdlib>
 #include <chrono>
+#include "Epi3V.h"
 
 using namespace std;
 #define NEQ 3
@@ -33,8 +35,44 @@ using namespace std;
 N_Vector InitialConditions();
 int RHS(realtype, N_Vector, N_Vector, void *);
 int Jtv(N_Vector, N_Vector, realtype, N_Vector, N_Vector , void *, N_Vector);
+int ComputeJac(N_Vector, void*);
 int CheckStep(realtype, realtype);
 void postProcess(N_Vector);
+int CVodeComputeJacWrapper(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
+               void * pb, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
+
+
+using value_type = realtype;
+//need the following hard call in the define.
+//using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
+#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<value_type, Tines::UseThisDevice<TChem::host_exec_space>::type >
+
+//Change to Serial, this can be changed by altering the TChem master build profile to include OPENMP on or off
+#define BAR "===================="
+
+using namespace std;
+//=====================
+//Prototypes & Classes
+//=====================
+class myPb : public TCHEMPB{
+	public:
+	//members
+	ordinal_type  			num_equations;
+	N_Vector 				Jac;
+	realtype 				t;
+	realtype 				MaxStepTaken;
+	realtype 				MinStepTaken;
+	realtype 				ignTime;
+	SUNMatrix				Mat;
+	int 					Movie;
+	std :: string			dumpJacFile;
+	//functions
+	ordinal_type			get_num_equations(void)
+	{
+		return this->num_equations;
+	}
+};
+
 
 
 
@@ -47,7 +85,7 @@ int main(int argc, char* argv[])
 	string MyFile = "OutPutFile.txt";
 	realtype StepSize=1e-2;
 	int ProgressDots=0; //From 0 to 100; only care about percentage
-	int StepCount = 0;
+	long int StepCount = 0;
 	realtype PercentDone=0;
 	void *userData=nullptr;
 	realtype TNow=0;
@@ -55,7 +93,7 @@ int main(int argc, char* argv[])
 	N_Vector y = N_VNew_Serial(NEQ, sunctx); //The data y
 	N_VScale(1.0, InitialConditions(), y);
 	realtype *data = NV_DATA_S(y);
-	string opt = "EPI2" ;
+	string opt = "EPI3V" ;
 	bool LastStepAdjusted = 0;
 	realtype KTime = 0;
 	realtype PrintStepSize = 0;
@@ -95,7 +133,15 @@ int main(int argc, char* argv[])
 		StepSize = stof(argv[1]);
 		opt = argv[2];
 		MyFile = argv[3];
-		KrylovTol = stof(argv[4]);
+		absTol = stof(argv[4]);
+	}
+	else if(argc == 6)
+	{
+		StepSize = stof(argv[1]);
+		opt = argv[2];
+		MyFile = argv[3];
+		absTol = stof(argv[4]);
+		relTol = stof(argv[5]);
 	}
 	else
 	{
@@ -134,32 +180,38 @@ int main(int argc, char* argv[])
 	retVal = CVodeSetLinearSolver(cvode_mem, LS, A);
 	retVal = CVodeSetNonlinearSolver(cvode_mem, NLS);
 	retVal = CVodeSetJacTimes(cvode_mem, NULL, Jtv);
-  	retVal = CVodeSetMaxNumSteps(cvode_mem, max(2000,NEQ*NEQ*NEQ));
+  	retVal = CVodeSetMaxNumSteps(cvode_mem, max(10000,NEQ*NEQ*NEQ));
 	N_VDestroy_Serial(AbsTol);
   
-  
-  
-  	const int MaxKrylovIters = 500;
-  	//EpiRK4SV *integrator = new EpiRK4SV(RHS,
-	//EpiRK4SC_KIOPS *integrator = new EpiRK4SC_KIOPS(RHS,
-	//EpiRK5C *integrator = new EpiRK5C(RHS,
-	// IntegratorStats *Stats = NULL;
-  	// Epi2_KIOPS *integrator 	= new Epi2_KIOPS(RHS, Jtv, userData, MaxKrylovIters, y, NEQ);
-	// Epi3_KIOPS * Epi3 		= new Epi3_KIOPS(RHS, Jtv, userData, MaxKrylovIters, y, NEQ);
-	// Epi3SC_KIOPS * Epi3SC  	= new Epi3SC_KIOPS(RHS, Jtv, userData, MaxKrylovIters, y, NEQ);
-	// EpiP2_KIOPS * EpiP2 	= new EpiP2_KIOPS(RHS,Jtv, userData, MaxKrylovIters, y, NEQ, 3, 0, &postProcess);
+  	const int MaxKrylovIters = 10;
+
+	myPb problem;
+	void *pbptr= &problem;
+
+
+	IntegratorStats *Stats = NULL;
+	Epi3VChem_KIOPS * EPI3V = new Epi3VChem_KIOPS(RHS, Jtv, 
+		CVodeComputeJacWrapper, pbptr, MaxKrylovIters, y, NEQ);
+
 	//========================
 	// Set integrator parameters
 	//========================
-	//const realtype KrylovTol = RCONST(1.0e-14);//1e-14
-	int startingBasis[] = {3, 3};
+	int startingBasis[] = {1, 3};
 	cout<<"=======================Initial Data======================\n";
 	cout << setprecision(17);
 	cout <<"y=" << data[0] << "\t\t z=" << data[1] <<"\t\t Temp=" << data[2]<<endl;
-
+	cout << "relTol: " << relTol << "\t absTol: " << absTol << "\tStepSize: " << StepSize << endl;  
 	//Run the cvode integrator
 	auto Start=std::chrono::high_resolution_clock::now();
-	CVode(cvode_mem, FinalTime, y, &TNext, CV_NORMAL);
+	if(opt == "CVODE")
+	{
+		CVode(cvode_mem, FinalTime, y, &TNext, CV_NORMAL);
+	}
+	else if(opt == "EPI3V")
+	{
+		Stats = EPI3V->NewIntegrateNoTChem(StepSize, 1, absTol, relTol, 
+			0.0, FinalTime, startingBasis, y);
+	}
 	auto Stop=std::chrono::high_resolution_clock::now();
 	auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
 	KTime+=Pass.count()/1e9;
@@ -174,22 +226,31 @@ int main(int argc, char* argv[])
 				data[1] - 0.032702315935000,
 				data[2] - 1.967297681076978
 			));
-      error_tmp = data[2] - 1.967297681076978;
+      error_tmp = abs(data[2] - 1.967297681076978);
 	}
 	else if(EPS == 1e-2)
 	{
 		error_inf = max( 
-			data[0] - 0.000000000000000,
+			abs(data[0] - 0.000000000000000),
 			max(
-				data[1] - 0.005848132117459,
-				data[2] - 1.994151867882557
+				abs(data[1] - 0.005848132117459),
+				abs(data[2] - 1.994151867882557)
 			));
-    error_tmp = data[2] - 1.994151867882557;
+    error_tmp = abs(data[2] - 1.994151867882557);
 	}
 
 	//=======================================
 	//Console Output
 	//=======================================
+	if(opt == "EPI3V")
+	{
+		Stats->PrintStats();
+		StepCount 		= Stats->numTimeSteps;
+	}
+	else if(opt == "CVODE")
+	{
+		CVodeGetNumSteps(cvode_mem, &StepCount);
+	}
 	cout<<"===========================Data========================\n";
 	cout << setprecision(17);
 	cout <<"y=" << data[0] << "\t\t z=" << data[1] <<"\t\t Temp=" << data[2]<<endl;
@@ -200,21 +261,22 @@ int main(int argc, char* argv[])
 	cout << "Integration time: " <<KTime << endl;
 	cout << "StepSize: " << StepSize << endl;
 
-	cout << "Temp Error:" << error_tmp << std::endl;
-	cout << "Error Inf:" << error_inf << std::endl;
+	//cout << "Temp Error:" << error_tmp << std::endl;
+	//cout << "Error Inf:" << error_inf << std::endl;
 	//cout <<"Sum of y=" <<data[0]+ data [1] + data [2]<<"\t\t";
-	//cout <<"Error in sum=" << data[0]+data[1]+data[2]-Y0[0]-Y0[1]-Y0[2]<<endl;
+	cout <<"Error in sum=" << abs(data[0]+data[1]+data[2]-2) <<endl;
 	cout <<"===================Printing data to " <<MyFile <<"==============\n";
 	//=======================================
 	//Data file output
 	//=======================================
 	ofstream myfile(MyFile, std::ios_base::app);
+	//myfile << opt << "\t\t";
 	myfile << setprecision(17) << fixed << data[0] << "\t\t" << data[1] << "\t\t";
-	myfile << data[2] << "\t\t" << PrintStepSize << "\t\t" << KTime;
-	myfile << "\t\t" << KrylovTol;
+	myfile << data[2] << "\t\t" << StepCount << "\t\t" << KTime;
+	myfile << "\t\t" << absTol << "\t\t" << relTol << "\t\t" << abs(data[0]+data[1]+data[2]-2) <<endl;
 	//myfile << "\t\t" << Stats->numTimeSteps << endl;
 	myfile.close();
-	cout << "======================Simulation complete=============\n";
+	cout << "======================Simulation complete=============\n\n\n\n";
 
 
 }
@@ -311,8 +373,7 @@ int RHS(realtype t, N_Vector u, N_Vector udot, void *userData)
 	dy[0] = -Omega;
 	dy[1] = Omega-y[1];
 	dy[2] = y[1];
-//	cout << dy[0] <<"\t\t" << dy[1] << "\t\t" << dy[2] <<endl;
-        return 0;
+	return 0;
 }
 
 /*
@@ -375,4 +436,15 @@ void postProcess(N_Vector solution)
 		)
 	*/
 
+}
+int CVodeComputeJacWrapper(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
+               void * pb, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3)
+{
+	ComputeJac(u, pb);
+	return 0;
+}
+
+int ComputeJac(N_Vector y, void* UserData)
+{
+	return 0;
 }

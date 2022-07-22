@@ -3,7 +3,7 @@ exec=./TChemZeroDUtility.x
 inputs=nbutane
 #inputs=nheptane
 #inputs=iso-oct
-ttol=1e-10
+ttol=1e-5
 #inputs=nheptane
 #Default settings, build into a new utilty
 this="$exec --chemfile=$inputs/chem.inp \

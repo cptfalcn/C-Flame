@@ -1,14 +1,9 @@
 #include "Epi3V.h"
 #include <cmath>
 
-//using value_type = Sacado::Fad::SLFad<real_type,100>;
+//Set the necessary userdata class used in zeroD.  THIS MUST MATCH MAIN.
 using value_type = realtype;
-//need the following hard call in the define.
-//using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 #define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<value_type, Tines::UseThisDevice<TChem::host_exec_space>::type > 
-//#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem	<TChem::KineticModelConstData<Kokkos::Device<Kokkos::Serial, Kokkos::HostSpace>, Tines::UseThisDevice<TChem::host_exec_space>::type >>	
-
-
 using namespace std;
 class myPb : public TCHEMPB{
 	public:
@@ -22,6 +17,10 @@ class myPb : public TCHEMPB{
 	SUNMatrix				Mat;
 	int 					Movie;
 	std :: string			dumpJacFile;
+	int						InternalSteps;
+	int						BadErrSteps;
+	int						BlowupSteps;
+	int						KiopsBlowups;
 	//functions
 	ordinal_type			get_num_equations(void)
 	{
@@ -492,7 +491,6 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	realtype PercentDone= 0;
 	int PercentDots		= 0;
 	int ProgressDots	= 0;
-	//myPb2 * pb{static_cast<myPb2 *> (userData)};    //Recast
 	myPb * pb{static_cast<myPb *> (userData)};    		//Recast
 	//Now need to dump the jac, rhs and y to file on a failure
 	//realtype * jacPtr	= N_VGetArrayPointer(pb->Jac);
@@ -501,24 +499,30 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	pb->MaxStepTaken		= 0;
 	pb->MinStepTaken		= 1;
 
-    myfile.open(pb->dumpJacFile, std:: ios_base::app);
+    //myfile.open(pb->dumpJacFile, std:: ios_base::app);
 	ofstream datafile;
-	datafile.open("EPI3VData.txt", std::ios_base::app);
+	//datafile.open("EPI3VData.txt", std::ios_base::app);
 
 	//Debugging output files
 	//Need RHS(y), hJac, y, and Remainder.
 
-	ofstream	hRHS;
-	ofstream    hJAC;
-	ofstream    Y;
-	ofstream 	REM;
+	// ofstream	hRHS;
+	// ofstream    hJAC;
+	// ofstream    Y;
+	// ofstream 	REM;
 
-	hRHS.open("FailedIsoRHS.txt",  std::ios_base::app);
-	hJAC.open("FailedIsohJac.txt",  std::ios_base::app);
-	Y.open("FailedIsoY.txt", std::ios_base::app);
-	REM.open("FailedIsoRemainder.txt",  std::ios_base::app);
+	// hRHS.open("FailedIsoRHS.txt",  std::ios_base::app);
+	// hJAC.open("FailedIsohJac.txt",  std::ios_base::app);
+	// Y.open("FailedIsoY.txt", std::ios_base::app);
+	// REM.open("FailedIsoRemainder.txt",  std::ios_base::app);
 
 	int IgnDelay		= 0;
+	int KiopsErrors		= 0;		//When Kiops throws an error
+	int NaNPhiCount		= 0;		//When error is getting bigger than 1e4
+	int ErrEstPoor		= 0;		//When poor error but not exploding
+	int IntSteps		= 0;		//Integration steps
+	int InternalSteps	= 0;		//Total internal steps (good and bad)
+	realtype PhiNorm	= 0;
 	//=======================
 	//Standard error checking
 	//=======================
@@ -532,185 +536,192 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 		printf("Starting time is larger the end time. \n");
 		exit(EXIT_FAILURE);
 	}
+
 	realtype t = t0, hNew= hStart, h=hStart;                //Use this an initial guess
-	int count 	= 0;
-	int IntSteps	= 0;
-        if(hMax < hStart)
-        {
-			hNew=hMax;
-			h=hMax;
-        }
-        //End Error checking block.
-        bool finalStep= false;                  //Set this necessary EOF flag
-        N_Vector yTemp = N_VClone(y);
-        N_VConst(1.0, yTemp);
-        realtype sqrtN = EPICRSqrt(N_VDotProd(yTemp,yTemp));
-        realtype krylovTol= 0.1 * sqrtN * absTol;
-		int retVal		= 0;
-		int ForceRej 	= 0;
-        //Main integration loop
-        while(t<tFinal)
-        {
-			realtype Err=5.0;
-			realtype ErrEst=0;
-			count = 0;
-			IntSteps ++;
-			while(Err > 1 )//was 1
-			{//Iterate until error is low enough
-				count ++;
-				h=hNew;//h = k;
-				// f is RHS function from the problem; y = u_n
-				f(t, y, fy, userData); 							// f(t, y) = fy
-				N_VScale(h, fy, hfy); 							//Scale f(y);
-				this->jacf(t, y, y,     pb->Mat, this->userData, y,y,y);
-				JTimesV jtimesv(jtv, f, delta, t, y, fy, userData, tmpVec);
+	if(hMax < hStart)
+	{
+		hNew=hMax;
+		h=hMax;
+	}
+	//End Error checking block.
+	bool finalStep= false;                  //Set this necessary EOF flag
+	N_Vector yTemp = N_VClone(y);
+	N_VConst(1.0, yTemp);
+	realtype sqrtN = EPICRSqrt(N_VDotProd(yTemp,yTemp));
+	realtype krylovTol= 0.1 * sqrtN * absTol;
+	int retVal		= 0;
+	int ForceRej 	= 0;
+	//Main integration loop
+	while(t<tFinal)
+    {
+		realtype Err=5.0;
+		realtype ErrEst=0;
+		IntSteps ++;
+		//f(t, y, fy, userData); 							// f(t, y) = fy
+		//this->jacf(t, y, y,     pb->Mat, this->userData, y,y,y);
+		while(Err > 1 )//was 1
+		{//Iterate until error is low enough
+			InternalSteps ++;
+			h=hNew;//h = k;
+			// f is RHS function from the problem; y = u_n
+			f(t, y, fy, userData); 							// f(t, y) = fy
+			N_VScale(h, fy, hfy); 							//Scale f(y);
+			this->jacf(t, y, y,     pb->Mat, this->userData, y,y,y);
+			JTimesV jtimesv(jtv, f, delta, t, y, fy, userData, tmpVec);
 
-				//Mayya's new method//
-				// Y1= y_n + phi_1(6/8 hJ) h f(y_n)
-				// R(z)= f(z)-f(y_n) - J*(z-y_n)
-				// y(n+1)= y_n + phi_1(hJ) h f(y_n) + 2 phi_3(hj) h r(Y1)
-				N_Vector stage1InputVecs[] 	= {zeroVec, hfy}; //Set the b vector
-				N_Vector stage1OutputVecs[] = {r1,r2}; //Set output vectors
-				N_Vector stage2OutputVecs[]	= {r3};
-				realtype timePts[] 			= {6.0/8.0, 1.0};
-				realtype timePts2[]			= {1.0};
+			//Mayya's new method//
+			// Y1= y_n + phi_1(6/8 hJ) h f(y_n)
+			// R(z)= f(z)-f(y_n) - J*(z-y_n)
+			// y(n+1)= y_n + phi_1(hJ) h f(y_n) + 2 phi_3(hj) h r(Y1)
+			N_Vector stage1InputVecs[] 	= {zeroVec, hfy}; //Set the b vector
+			N_Vector stage1OutputVecs[] = {r1,r2}; //Set output vectors
+			N_Vector stage2OutputVecs[]	= {r3};
+			realtype timePts[] 			= {6.0/8.0, 1.0};
+			realtype timePts2[]			= {1.0};
 
-				retVal = NewKrylov->ComputeKry(2, stage1InputVecs, timePts, 2, stage1OutputVecs, &jtimesv,
-					h, krylovTol, basisSizes[0], &integratorStats->krylovStats[0]);
-				if(retVal!=0)
-				{
-					//cout << "We have returned an error in Phi2\n";
-					//exit(EXIT_FAILURE);
-					ForceRej = 1;
-
-				}
-
-				//Set  r1= 6/8 phi_1(6/8 hJ), r2=phi_1(hJ)
-				this->CheckNanBlowUp(r1, N_VGetLength(r1));
-				this->CheckNanBlowUp(r2, N_VGetLength(r2));
-				//std :: cout << "Second order cleared\n";
-
-				N_VScale(8.0/6.0, r1, r1);              //Set r1=phi_1 (6/8 hJ) h f_n //PBFlag
-				N_VLinearSum(1.0, y, 1.0, r1, Y1);      //Set Y1= y_n + phi_1(6/8 hJ) h f(y_n)= y_n + r1
-				f(t,Y1, fY1, userData);                 //f(t, Y1)= fY1
-				jtimesv.ComputeJv(r1,Remainder);        //Set Remainder = J (Y1-y_n)= J (r1)
-				N_VLinearSum(-1.0, fy, -1.0, Remainder, Remainder);//Remainder = J(r1) - f(y_n)
-				N_VLinearSum(1.0, Remainder, 1.0, fY1, Remainder);//Remainder = R(Y1) = J(r1) - f(y_n) + f(Y1)
-				N_VScale(h,Remainder,Remainder);        //set Remainder= h R(Y1)
-				N_Vector stage2InputVecs[]= {zeroVec, zeroVec, zeroVec, Remainder}; //[0,0,0,hR(Y1)]
-				//Run Kiops again.
-				retVal = NewKrylov->ComputeKry(4, stage2InputVecs, timePts2, 1, stage2OutputVecs, &jtimesv,
-						h, krylovTol, basisSizes[0], &integratorStats->krylovStats[0]);
-
-				if(retVal!=0)
-				{
-					//cout << "We have returned an error in Phi3\n";
-					//exit(EXIT_FAILURE);
-					ForceRej = 1;
-				}
-
-				if(ForceRej ==1)//If we forced a step rejection
-				{
-					Err			= 1000;
-					hNew 		= h/2;
-					ForceRej 	= 0;
-					//Optional additional printing
-					// for (int i = 0; i < N_VGetLength(pb->Jac); i++ )
-					// 	hJAC << jacPtr[i] << endl;
-					
-					// hJAC << endl << endl;
-
-					// realtype * hfyData= NV_DATA_S(hfy);
-					// for (int i = 0; i < N_VGetLength(y); i++)
-					// {
-					// 	hRHS << hfyData[i] << endl;
-					// 	Y   << data[i] << endl;
-					// 	REM << Rem[i] << endl;
-					// }
-					// hRHS << endl << endl;
-					// Y << endl << endl;
-
-				}
-				else
-				{
-					N_VScale(2.0, r3, r3);                       	//R3 is also the error estimate
-					//get final err est for next step
-					N_VAbs(y, Scratch1);							//Scratch1 sp to be high order
-					N_VScale(relTol, Scratch1, Scratch1);			//relTol*|y|->Scratch1
-					N_VAddConst(Scratch1, absTol, Scratch1);		//relTol*|y|+absTol ->Scratch1
-					N_VDiv(r3, Scratch1, Scratch1);					//ErrEst/(relTol*|y| + absTol)->Scratch1
-					ErrEst = N_VDotProd(Scratch1, Scratch1);		//dot(ErrEst)
-					ErrEst = ErrEst/ N_VGetLength(r3);				//Normalize ErrEst
-					ErrEst = EPICRSqrt(ErrEst);						//sqrt ErrEst
-					Err = ErrEst;                               	//Finalize Error Estimate
-
-					//============================
-					//Past this point errors arise
-					//============================
-					hNew = 0.9 * h * pow(ErrEst, -1.0/ 2.0);                  //Create New Step, usually .9
-					if(hNew>100*h)//we increase the time
-						hNew= 2*h;			//throttle
-					if(1000*hNew<h)
-						hNew= 0.01*h;		//throttle
-					if( hNew>hMax)
-						hNew=hMax;
-					if(hNew<1e-15)//if( hNew <= ZERO)
-					{
-						//Perform Data dump
-						printf("There is a possible singularity in the solution\n");
-						std :: cout << "time stamp: " << t << std :: endl;
-						std :: cout << "hNew: " << hNew<< std :: endl;
-						std :: cout << "ErrEst: " << Err << std :: endl;
-						std :: cout << "y: \n";
-						//N_VPrint_Serial(y);
-						exit(EXIT_FAILURE);
-					}
-				}
-			}//Exit Adaptive loop
-			//Step accepted, Do the following update
-			N_VLinearSum(1.0, y, 1.0, r2, y); 		// Second Order = y + r2 = y + phi( ) * hfy
-			N_VLinearSum(1.0 ,y, 1.0, r3, y); 		// Add the third order component.
-			integratorStats->Step();                //Recompute integrator statistics
-
-			this->Clean(y, N_VGetLength(y));		//Clean the data
-			//this->CheckNanBlowUp(y, N_VGetLength(y));		//Check for errors
-			t = t + h;                              		//Advance the time 
-
-			//Check curret stepsize against mins and maxes
-			if(h > pb->MaxStepTaken)
-				pb->MaxStepTaken=h;
-			if(h < pb->MinStepTaken)
-				pb->MinStepTaken=h;
-
-			if(data[0] >1500 && IgnDelay ==0)
+			retVal = NewKrylov->ComputeKry(2, stage1InputVecs, timePts, 2, stage1OutputVecs, &jtimesv,
+				h, krylovTol, basisSizes[0], &integratorStats->krylovStats[0]);
+			if(retVal!=0)
 			{
-				cout << "Ign Delay between: ";
-				cout << t-h << "and " << t << endl;
-				IgnDelay=1;
-				pb->ignTime= t - h/2.0;
+				ForceRej 	= 1;
+				retVal		= 1;
+				KiopsErrors ++;
 			}
-			pb->t=t;					//Set time for pass back;
-			
-			// if(pb->Movie==1)//If we want a movie
-			// {
-			// 	for(int i = 0 ; i < N_VGetLength(pb->Jac); i ++)
-			// 	{
-			// 		myfile << jacPtr[i];
-			// 		myfile.flush();
-			// 		myfile << "\n";
-			// 	}
-			// 	myfile << h << "\n";
-			// 	//Print y data to file
-			// 	for(int i = 0 ; i < N_VGetLength(y); i++)
-			// 		datafile << data[i] << endl;
 
-			// 	datafile << h << endl;
-			// 	datafile << Err << endl;
-			// 	datafile << IgnDelay << endl;
-			// 	datafile << t << endl;
-			// 	datafile << relTol << endl;
-			// 	datafile << absTol << endl;
-			// }
+			//Set  r1= 6/8 phi_1(6/8 hJ), r2=phi_1(hJ)
+			this->CheckNanBlowUp(r1, N_VGetLength(r1));
+			this->CheckNanBlowUp(r2, N_VGetLength(r2));
+			//std :: cout << "Second order cleared\n";
+			//New comments out next line
+			N_VScale(8.0/6.0, r1, r1);              //Set r1=phi_1 (6/8 hJ) h f_n //PBFlag
+			N_VLinearSum(1.0, y, 1.0, r1, Y1);      //Set Y1= y_n + phi_1(6/8 hJ) h f(y_n)= y_n + r1
+			f(t,Y1, fY1, userData);                 //f(t, Y1)= fY1
+			jtimesv.ComputeJv(r1,Remainder);        //Set Remainder = J (Y1-y_n)= J (r1)
+			N_VLinearSum(-1.0, fy, -1.0, Remainder, Remainder);//Remainder = J(r1) - f(y_n)
+			N_VLinearSum(1.0, Remainder, 1.0, fY1, Remainder);//Remainder = R(Y1) = J(r1) - f(y_n) + f(Y1)
+			N_VScale(h,Remainder,Remainder);        //set Remainder= h R(Y1)
+			N_Vector stage2InputVecs[]= {zeroVec, zeroVec, zeroVec, Remainder}; //[0,0,0,hR(Y1)]
+			//Run Kiops again.
+			retVal = NewKrylov->ComputeKry(4, stage2InputVecs, timePts2, 1, stage2OutputVecs, &jtimesv,
+					h, krylovTol, basisSizes[0], &integratorStats->krylovStats[0]);
+
+			if(retVal!=0)
+			{
+				//cout << "We have returned an error in Phi3\n";
+				ForceRej 	= 1;
+				retVal		= 0;
+				KiopsErrors ++;
+			}
+
+			if(ForceRej ==1)//If we forced a step rejection
+			{
+				Err			= 1000;
+				hNew 		= h/2;
+				ForceRej 	= 0;
+				//Optional additional printing
+				// for (int i = 0; i < N_VGetLength(pb->Jac); i++ )
+				// 	hJAC << jacPtr[i] << endl;
+				
+				// hJAC << endl << endl;
+
+				// realtype * hfyData= NV_DATA_S(hfy);
+				// for (int i = 0; i < N_VGetLength(y); i++)
+				// {
+				// 	hRHS << hfyData[i] << endl;
+				// 	Y   << data[i] << endl;
+				// 	REM << Rem[i] << endl;
+				// }
+				// hRHS << endl << endl;
+				// Y << endl << endl;
+
+			}
+			else
+			{
+				this->CheckNanBlowUp(r3, N_VGetLength(r3));
+				PhiNorm = N_VL1Norm(r3);
+				//N_VScale(32.0/9.0,r3, r3);						//New
+				N_VScale(2.0, r3, r3);                       	//R3 is also the error estimate
+				//get final err est for next step
+				N_VAbs(y, Scratch1);							//Scratch1 sp to be high order
+				N_VScale(relTol, Scratch1, Scratch1);			//relTol*|y|->Scratch1
+				N_VAddConst(Scratch1, absTol, Scratch1);		//relTol*|y|+absTol ->Scratch1
+				N_VDiv(r3, Scratch1, Scratch1);					//ErrEst/(relTol*|y| + absTol)->Scratch1
+				ErrEst = N_VDotProd(Scratch1, Scratch1);		//dot(ErrEst)
+				ErrEst = ErrEst/ N_VGetLength(r3);				//Normalize ErrEst
+				ErrEst = EPICRSqrt(ErrEst);						//sqrt ErrEst
+				Err = ErrEst;                               	//Finalize Error Estimate
+				if(PhiNorm >5)
+					NaNPhiCount ++;
+				else if(PhiNorm<5 &&Err>1)
+					ErrEstPoor ++;
+					//cout << "Rejected Error Step\n";
+				//============================
+				//Past this point errors arise
+				//============================
+				hNew = 0.9 * h * pow(ErrEst, -1.0/ 2.0);                  //Create New Step, usually .9
+				if(hNew>100*h)//we increase the time
+					hNew= 2*h;			//throttle
+				if(1000*hNew<h)
+					hNew= 0.01*h;		//throttle
+				if( hNew>hMax)
+					hNew=hMax;
+				if(hNew<1e-15)//if( hNew <= ZERO)
+				{
+					//Perform Data dump
+					printf("There is a possible singularity in the solution\n");
+					std :: cout << "time stamp: " << t << std :: endl;
+					std :: cout << "hNew: " << hNew<< std :: endl;
+					std :: cout << "ErrEst: " << Err << std :: endl;
+					std :: cout << "y: \n";
+					//N_VPrint_Serial(y);
+					exit(EXIT_FAILURE);
+				}
+			}
+		}//Exit Adaptive loop
+		//Step accepted, Do the following update
+		N_VLinearSum(1.0, y, 1.0, r2, y); 		// Second Order = y + r2 = y + phi( ) * hfy
+		N_VLinearSum(1.0 ,y, 1.0, r3, y); 		// Add the third order component.
+		integratorStats->Step();                //Recompute integrator statistics
+
+		this->Clean(y, N_VGetLength(y));		//Clean the data
+		//this->CheckNanBlowUp(y, N_VGetLength(y));		//Check for errors
+		t = t + h;                              		//Advance the time 
+
+		//Check curret stepsize against mins and maxes
+		if(h > pb->MaxStepTaken)
+			pb->MaxStepTaken=h;
+		if(h < pb->MinStepTaken)
+			pb->MinStepTaken=h;
+
+		if(data[0] >1500 && IgnDelay ==0)
+		{
+			cout << "Ign Delay between: ";
+			cout << t-h << "and " << t << endl;
+			IgnDelay=1;
+			pb->ignTime= t - h/2.0;
+		}
+		pb->t=t;					//Set time for pass back;
+		
+		// if(pb->Movie==1)//If we want a movie
+		// {
+		// 	for(int i = 0 ; i < N_VGetLength(pb->Jac); i ++)
+		// 	{
+		// 		myfile << jacPtr[i];
+		// 		myfile.flush();
+		// 		myfile << "\n";
+		// 	}
+		// 	myfile << h << "\n";
+		// 	//Print y data to file
+		// 	for(int i = 0 ; i < N_VGetLength(y); i++)
+		// 		datafile << data[i] << endl;
+
+		// 	datafile << h << endl;
+		// 	datafile << Err << endl;
+		// 	datafile << IgnDelay << endl;
+		// 	datafile << t << endl;
+		// 	datafile << relTol << endl;
+		// 	datafile << absTol << endl;
+		// }
 		ProgressDots = TrackProgress(tFinal, t, PercentDone, ProgressDots);
 		//Check exit conditions
 		if(finalStep)
@@ -723,16 +734,29 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 			finalStep = true;			//No?  		One more step
 		}
 	}//end Loop
+
 	std :: cout << std :: endl;
+
+	// std :: cout << "Internal step:" << InternalSteps << std :: endl;
+	// std :: cout << "Kiops Errors: " << KiopsErrors << std :: endl;
+	// std :: cout << "Integration steps: " << IntSteps << std :: endl;
+	// std :: cout << "Phi Blowups: " << NaNPhiCount << std :: endl;
+	// std :: cout << "Poor Error Est: " << ErrEstPoor << std :: endl;
+	pb->InternalSteps	= InternalSteps;
+	pb->BadErrSteps		= ErrEstPoor;
+	pb->BlowupSteps		= NaNPhiCount;
+	pb->KiopsBlowups	= KiopsErrors;
+
 	if(pb->Movie==1)
 	{
 		myfile.close();
 		datafile.close();
 	}
-	hRHS.close();
-	hJAC.close();
-	Y.close();
-	REM.close();
+	
+	// hRHS.close();
+	// hJAC.close();
+	// Y.close();
+	// REM.close();
 
 	return integratorStats;
 }
@@ -830,8 +854,8 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
 	ofstream Hfile;
 	ofstream Phifile;
 	//Open said filestreams
-	Hfile.open("FailedIsoHMat.txt", std::ios_base::app);
-	Phifile.open("FailedIsoPhiMat.txt", std::ios_base::app);
+	// Hfile.open("FailedIsoHMat.txt", std::ios_base::app);
+	// Phifile.open("FailedIsoPhiMat.txt", std::ios_base::app);
     // We only allow m to vary between mmin and mmax
     m = max(M_min, min(M_max, m));
 
@@ -945,8 +969,9 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
             }
             nrm = sqrt(nrm);
 			if(isnan(nrm))
-				cout << "norm is NaN\n";
-
+			{
+				//cout << "norm is NaN\n";
+			}
             // Happy breakdown
             if (nrm < tol) {
                 happy = true;
@@ -1002,7 +1027,7 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
 				// std :: cout << "Phi Mat value: " <<phiMatrix[j-1 + j * (j+1)] << "\n";
 				// std :: cout << "H Mat value: " << H[j + (j-1) * MatrixSize] << "\n";
 				// cout << expm->Compute(j + 1, phiMatrix) << endl;
-				// cout << j << endl;
+				// cout << t_now << endl;
 				// for( int k = 0 ; k < MatrixSize*MatrixSize; k++)
 				// {
 				// 	Phifile << phiMatrix[k] << endl;
@@ -1133,11 +1158,11 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
 
         oldtau = tau;
         tau = tau_new;
-	oldm = m;
-	m = m_new;
+		oldm = m;
+		m = m_new;
 		if (ireject > 2*VecLength)
 		{
-			// std::cout<<"==========KIOPS has stalled, rejects========="<<std::endl;
+			//std::cout<<"==========KIOPS has stalled, rejects========="<<std::endl;
 			// std::cout<<"==============Data=================="<<std::endl;
 			// std::cout<<"t_now="<<t_now<<"\t\t"<< "tau="<<tau<<endl;
             //             std::cout<<"Pade norm="<<expm->Compute(j+1,phiMatrix)<<endl;
@@ -1146,19 +1171,176 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
 			// std::cout << "Omega: " << omega << endl;
 			return 1;
 		}
-		/**/
-		/**/
 		if (tau_new==0&&t_now!=t_out)
 		{
-			// std::cout << "\n============KIOPS stalled, tau==========" << std::endl;
+			
+			//std::cout << "\n============KIOPS stalled, tau==========" << std::endl;
 			// std::cout << "t_now=" << t_now << "\t\t" << "tau=" << tau << endl;
 			// std::cout << "Pade norm=" << expm->Compute(j+1,phiMatrix) << endl;
 			// std::cout << "Omega: " << omega << endl;
 			return 1;
 		}
-		/**/
     }
     krylovStats->numMatrixExponentials = totalMatrixExponentials;
 
 	return 0;
+}
+
+
+
+
+//Playing with a new cleaned up integration with a modified kiops and full jtv
+IntegratorStats *Epi3VChem_KIOPS::NewIntegrateNoTChem(const realtype hStart, const realtype hMax, const realtype absTol,
+			const realtype relTol, const realtype t0, const realtype tFinal,
+			int basisSizes[], N_Vector y)
+{
+	realtype * 	data	= N_VGetArrayPointer(y);		//Query the state in debugger with this
+	realtype fac		= pow(0.25, .5);
+	realtype PercentDone= 0;
+	int PercentDots		= 0;
+	int ProgressDots	= 0;
+	//int IgnDelay		= 0;
+	//=======================
+	//Standard error checking
+	//=======================
+	if( hStart < ZERO )
+	{
+		printf("Time step h is to small. \n");
+		exit(EXIT_FAILURE);
+	}
+	if( tFinal < t0 )
+	{
+		printf("Starting time is larger the end time. \n");
+		exit(EXIT_FAILURE);
+	}
+	realtype t = t0, hNew= hStart, h=hStart;                //Use this an initial guess
+	
+	if(hMax < hStart)
+	{
+		hNew=hMax;
+		h=hMax;
+	}
+	//End Error checking block.
+	bool finalStep= false;                  //Set this necessary EOF flag
+	N_Vector yTemp = N_VClone(y);
+	N_VConst(1.0, yTemp);
+	realtype sqrtN = EPICRSqrt(N_VDotProd(yTemp,yTemp));
+	realtype krylovTol= 0.1 * sqrtN * absTol;
+	int retVal		= 0;
+	int ForceRej 	= 0;
+	//Main integration loop
+	auto Start=std::chrono::high_resolution_clock::now();
+	while(t<tFinal)
+	{
+		realtype Err=5.0;
+		realtype ErrEst=0;
+		while(Err > 1 )//was 1
+		{//Iterate until error is low enough
+			h=hNew;//h = k;
+			// f is RHS function from the problem; y = u_n
+			f(t, y, fy, userData); 							// f(t, y) = fy
+			N_VScale(h, fy, hfy); 							//Scale f(y);
+			//this->jacf(t, y, y,     pb->Mat, this->userData, y,y,y);
+			JTimesV jtimesv(jtv, f, delta, t, y, fy, userData, tmpVec);
+
+			//Mayya's new method//
+			// Y1= y_n + phi_1(6/8 hJ) h f(y_n)
+			// R(z)= f(z)-f(y_n) - J*(z-y_n)
+			// y(n+1)= y_n + phi_1(hJ) h f(y_n) + 2 phi_3(hj) h r(Y1)
+			N_Vector stage1InputVecs[] 	= {zeroVec, hfy}; //Set the b vector
+			N_Vector stage1OutputVecs[] = {r1,r2}; //Set output vectors
+			N_Vector stage2OutputVecs[]	= {r3};
+			realtype timePts[] 			= {6.0/8.0, 1.0};
+			realtype timePts2[]			= {1.0};
+
+			retVal = NewKrylov->ComputeKry(2, stage1InputVecs, timePts, 2, stage1OutputVecs, &jtimesv,
+				h, krylovTol, basisSizes[0], &integratorStats->krylovStats[0]);
+
+			if(retVal!=0)
+				ForceRej = 1;
+
+			//Set  r1= 6/8 phi_1(6/8 hJ), r2=phi_1(hJ)
+			//Trying Val's new method
+			//N_VScale(8.0/6.0, r1, r1);              //Old Set r1=phi_1 (6/8 hJ) h f_n //PBFlag
+			N_VLinearSum(1.0, y, 1.0, r1, Y1);      //Set Y1= y_n + phi_1(6/8 hJ) h f(y_n)= y_n + r1
+			f(t,Y1, fY1, userData);                 //f(t, Y1)= fY1
+			jtimesv.ComputeJv(r1,Remainder);        //Set Remainder = J (Y1-y_n)= J (r1)
+			N_VLinearSum(-1.0, fy, -1.0, Remainder, Remainder);//Remainder = J(r1) - f(y_n)
+			N_VLinearSum(1.0, Remainder, 1.0, fY1, Remainder);//Remainder = R(Y1) = J(r1) - f(y_n) + f(Y1)
+			N_VScale(h,Remainder,Remainder);        //set Remainder= h R(Y1)
+			N_Vector stage2InputVecs[]= {zeroVec, zeroVec, zeroVec, Remainder}; //[0,0,0,hR(Y1)]
+			//Run Kiops again.
+			retVal = NewKrylov->ComputeKry(4, stage2InputVecs, timePts2, 1, stage2OutputVecs, &jtimesv,
+					h, krylovTol, basisSizes[0], &integratorStats->krylovStats[0]);
+
+			if(retVal!=0)
+				ForceRej = 1;
+
+			if(ForceRej ==1)//If we forced a step rejection
+			{
+				Err			= 1000;
+				hNew 		= h/2;
+				ForceRej 	= 0;
+			}
+			else
+			{
+				N_VScale(32.0/9.0, r3, r3);
+				//N_VScale(2.0, r3, r3);                       	//Old R3 is also the error estimate
+				//get final err est for next step
+				N_VAbs(y, Scratch1);							//Scratch1 sp to be high order
+				N_VScale(relTol, Scratch1, Scratch1);			//relTol*|y|->Scratch1
+				N_VAddConst(Scratch1, absTol, Scratch1);		//relTol*|y|+absTol ->Scratch1
+				N_VDiv(r3, Scratch1, Scratch1);					//ErrEst/(relTol*|y| + absTol)->Scratch1
+				ErrEst = N_VDotProd(Scratch1, Scratch1);		//dot(ErrEst)
+				ErrEst = ErrEst/ N_VGetLength(r3);				//Normalize ErrEst
+				ErrEst = EPICRSqrt(ErrEst);						//sqrt ErrEst
+				Err = ErrEst;                               	//Finalize Error Estimate
+
+				//============================
+				//Past this point errors arise
+				//============================
+				hNew = 0.9 * h * pow(ErrEst, -1.0/ 2.0);                  //Create New Step, usually .9
+				if(hNew>100*h)//we increase the time
+					hNew= 2*h;			//throttle
+				if(1000*hNew<h)
+					hNew= 0.01*h;		//throttle
+				if( hNew>hMax)
+					hNew=hMax;
+				if(hNew<1e-15)//if( hNew <= ZERO)
+				{
+					//Perform Data dump
+					printf("There is a possible singularity in the solution\n");
+					std :: cout << "time stamp: " << t << std :: endl;
+					std :: cout << "hNew: " << hNew<< std :: endl;
+					std :: cout << "ErrEst: " << Err << std :: endl;
+					std :: cout << "y: \n";
+					//N_VPrint_Serial(y);
+					exit(EXIT_FAILURE);
+				}
+			}
+		}//Exit Adaptive loop
+		//Step accepted, Do the following update
+		N_VLinearSum(1.0, y, 1.0, r2, y); 		// Second Order = y + r2 = y + phi( ) * hfy
+		N_VLinearSum(1.0 ,y, 1.0, r3, y); 		// Add the third order component.
+		integratorStats->Step();                //Recompute integrator statistics
+
+		this->Clean(y, N_VGetLength(y));		//Clean the data
+		t = t + h;                              //Advance the time 
+		ProgressDots = TrackProgress(tFinal, t, PercentDone, ProgressDots);
+		//Check exit conditions
+		if(finalStep)
+			break;						//Yes?  	Exit
+		if(t+hNew>=tFinal)				//Check Overstepping final time
+		{
+			hNew=tFinal-t;				//Set next step
+			if(hNew < 1e-10)			//Close enough?
+				break;					//Yes?  	Exit
+			finalStep = true;			//No?  		One more step
+		}
+	}//end Loop
+	auto Stop=std::chrono::high_resolution_clock::now();
+	auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+	cout << endl;
+	cout << Pass.count()/1e9 << endl;
+	return integratorStats;
 }
