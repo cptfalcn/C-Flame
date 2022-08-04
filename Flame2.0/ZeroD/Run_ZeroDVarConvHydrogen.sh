@@ -6,6 +6,7 @@ Sam=1
 Exp=1
 #Specific inputs
 Out="ZeroDVariableHydrogenEpi3V.txt"
+#Runs version 3
 Method="EPI3V"
 ## NHeptane
 ## ehco "\nRunning NButane mechanism test"

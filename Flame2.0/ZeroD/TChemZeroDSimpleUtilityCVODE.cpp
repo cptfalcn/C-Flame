@@ -22,7 +22,7 @@ Sandia National Laboratories, Livermore, CA, USA
 #include "TChem_CommandLineParser.hpp"
 #include "TChem_Impl_IgnitionZeroD.hpp"
 
-#define TINES_ENABLE_TPL_SUNDIALS
+//#define TINES_ENABLE_TPL_SUNDIALS
 // #define TCHEM_ENABLE_SAVE_SOLUTION
 
 int main(int argc, char *argv[]) {
@@ -46,9 +46,9 @@ int main(int argc, char *argv[]) {
 
   bool use_prefixPath(false);
 
-//#if defined(TINES_ENABLE_TPL_SUNDIALS)
-bool use_cvode(false);
-//#endif
+#if defined(TINES_ENABLE_TPL_SUNDIALS)
+  bool use_cvode(true);
+#endif
 
   /// parse command line arguments
   TChem::CommandLineParser opts("This example computes the solution of a gas ignition 0D - problem");
@@ -275,9 +275,9 @@ bool use_cvode(false);
         tadv._tbeg = t();
         tadv._dt = dt();
 
-#if defined(TCHEM_ENABLE_SAVE_SOLUTION)
-        writeSolution(iter, t(), dt(), state, fout);
-#endif
+// #if defined(TCHEM_ENABLE_SAVE_SOLUTION)
+//         writeSolution(iter, t(), dt(), state, fout);
+// #endif
 
       }                // end time iter
       Kokkos::fence(); /// timing purpose
@@ -350,61 +350,71 @@ bool use_cvode(false);
       problem._work_cvode = tw; // time integrator workspace
       // constant pressure; for other type of reactors, pressure will need to be updated inside of the time loop
       const auto pressure = sv.Pressure();
+      realtype intTime = 0;
+      int TotalIter = 0;
       problem._p = pressure; // pressure
       ordinal_type iter = 0;
       timer.reset();
       for (; iter < max_num_time_iterations && t() <= tend * 0.9999; ++iter) {
         const auto temperature = sv.Temperature();
-        if (t() < tadv._tend) {
-          {
-            const real_type dt_in = tadv._dt, dt_min = tadv._dtmin, dt_max = tadv._dtmax;
-            const real_type t_beg = tadv._tbeg;
-            /// m is nSpec + 1
-            vals(0) = temperature;
-            for (ordinal_type i = 1; i < m; ++i)
-              vals(i) = Ys(i - 1);
-            real_type t_out = t(), dt_out = 0;
-            cvode.initialize(t_out, dt_in, dt_min, dt_max, tol_time(0, 0), tol_time(0, 1),
-                             TChem::Impl::ProblemIgnitionZeroD_ComputeFunctionCVODE,
-                             TChem::Impl::ProblemIgnitionZeroD_ComputeJacobianCVODE);
+        if (t() < tadv._tend) 
+        {
+          const real_type dt_in = tadv._dt, dt_min = tadv._dtmin, dt_max = tadv._dtmax;
+          const real_type t_beg = tadv._tbeg;
+          /// m is nSpec + 1
+          vals(0) = temperature;
+          for (ordinal_type i = 1; i < m; ++i)
+            vals(i) = Ys(i - 1);
+          real_type t_out = t(), dt_out = 0;
+          cvode.initialize(t_out, dt_in, dt_min, dt_max, tol_time(0, 0), tol_time(0, 1),
+                            TChem::Impl::ProblemIgnitionZeroD_ComputeFunctionCVODE,
+                            TChem::Impl::ProblemIgnitionZeroD_ComputeJacobianCVODE);
 
-            cvode.setProblem(problem);
-            for (ordinal_type iter_internal = 0;
-                 iter_internal <= tadv._num_time_iterations_per_interval && t_out <= tadv._tend; ++iter_internal) {
-              const real_type t_prev = t_out;
-              cvode.advance(tadv._tend, t_out, 1);
-              dt_out = t_out - t_prev;
-            }
+          cvode.setProblem(problem);
+          for (ordinal_type iter_internal = 0;
+                iter_internal <= tadv._num_time_iterations_per_interval && t_out <= tadv._tend; ++iter_internal) {
+            const real_type t_prev = t_out;
+            cvode.advance(tadv._tend, t_out, 1);
+            dt_out = t_out - t_prev;
 
-            t() = t_out;
-            dt() = dt_out;
+          t() = t_out;
+          dt() = dt_out;
 
-            temperature_out() = vals(0);
-            for (ordinal_type i = 1; i < m; ++i)
-              Ys_out(i - 1) = vals(i);
+          temperature_out() = vals(0);
+          for (ordinal_type i = 1; i < m; ++i)
+            Ys_out(i - 1) = vals(i);
 
-            density_out() = Impl::RhoMixMs<real_type, interf_host_device_type>::team_invoke(
-                member, temperature_out(), pressure_out(), Ys_out, kmcd);
-          }
+          density_out() = Impl::RhoMixMs<real_type, interf_host_device_type>::team_invoke(
+              member, temperature_out(), pressure_out(), Ys_out, kmcd);
+        }
 
-#if defined(TCHEM_ENABLE_SAVE_SOLUTION)
-          writeSolution(iter, t(), dt(), state, fout_cvode);
-#endif
+          // #if defined(TCHEM_ENABLE_SAVE_SOLUTION)
+          //           writeSolution(iter, t(), dt(), state, fout_cvode);
+          // #endif
           tadv._tbeg = t();
           tadv._dt = dt();
         }
         Kokkos::fence(); /// timing purpose
         const real_type t_integration = timer.seconds();
+        intTime = t_integration;
 
         const ordinal_type total_num_iter = iter * tadv._num_time_iterations_per_interval;
-        FILE *fout_wall = fopen("cvode_wall_times.dat", "w");
-        writeEndSolutionAndWallTime(sv, t(), t_integration, atol_time, rtol_time, total_num_iter, fout_wall);
-        fclose(fout_wall);
+        // std :: cout <<"Outputting to file: "  << outputFile << std :: endl;
+        // FILE *fout_wall = fopen(&outputFile[0], "a");
+        // //FILE *fout_wall = fopen("cvode_wall_times.dat", "a");
+        // writeEndSolutionAndWallTime(sv, t(), t_integration, atol_time, rtol_time, total_num_iter, fout_wall);
+        // fclose(fout_wall);
+        TotalIter=total_num_iter;
+        
       }
-
-#if defined(TCHEM_ENABLE_SAVE_SOLUTION)
-      fclose(fout_cvode);
-#endif
+    std :: cout <<"Outputting to file: "  << outputFile << std :: endl;  
+    FILE *fout_wall = fopen(&outputFile[0], "a");
+    //FILE *fout_wall = fopen("cvode_wall_times.dat", "a");
+    writeEndSolutionAndWallTime(sv, t(), intTime, atol_time, rtol_time, TotalIter, fout_wall);
+    fclose(fout_wall);
+// #if defined(TCHEM_ENABLE_SAVE_SOLUTION)
+//       fclose(fout_cvode);
+// #endif
     }
 
 #endif

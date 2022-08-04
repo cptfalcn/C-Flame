@@ -1,8 +1,8 @@
 exec=./TChemZeroDSimpleUtility.x
-inputs=gri3.0
-out="ZeroDVariableGriBDF2.txt"
-sample="sample1.dat"
-TF=1.3
+inputs=ndodecane
+out="ZeroDVariableNDodecaneBDF2.txt"
+sample="sample.dat"
+TF=5e-3
 TTol=1e-12
 # this="$exec --chemfile=$inputs/chem.inp \
 #             --thermfile=$inputs/therm.dat \
@@ -77,7 +77,7 @@ this="$exec --chemfile=$inputs/chem.inp \
 "
 eval $this
 
-TTol=5e-7
+TTol=1e-7
 this="$exec --chemfile=$inputs/chem.inp \
             --thermfile=$inputs/therm.dat \
             --samplefile=$inputs/$sample \
@@ -94,7 +94,24 @@ this="$exec --chemfile=$inputs/chem.inp \
 "
 eval $this
 
-TTol=1e-7
+TTol=1e-8
+this="$exec --chemfile=$inputs/chem.inp \
+            --thermfile=$inputs/therm.dat \
+            --samplefile=$inputs/$sample \
+            --outputfile=$out \
+            --atol-newton=1e-18 \
+            --rtol-newton=1e-8\
+            --max-newton-iterations=20 \
+            --tol-time=$TTol \
+            --dtmax=1e-1 \
+            --dtmin=1e-10 \
+            --tend=$TF \
+            --time-iterations-per-interval=10 \
+            --max-time-iterations=260 \
+"
+eval $this
+
+TTol=5e-9
 this="$exec --chemfile=$inputs/chem.inp \
             --thermfile=$inputs/therm.dat \
             --samplefile=$inputs/$sample \

@@ -54,6 +54,8 @@ class myPb : public TCHEMPB{
 	int						BadErrSteps;
 	int						BlowupSteps;
 	int						KiopsBlowups;
+	std :: string			stepRatioFile;
+	realtype 				stepRatio;
 	//functions
 	ordinal_type			get_num_equations(void)
 	{
@@ -240,6 +242,7 @@ int main(int argc, char* argv[])
 		problem.num_equations		= number_of_equations;
 		problem.Jac					= N_VNew_Serial(number_of_equations*number_of_equations, sunctx);//Make the Jacobian
 		problem.t					= 0;
+		problem.stepRatioFile		= "ZeroDVariableExp"+to_string(Experiment)+"Stepfile.txt";
 		//==============================================
 		//Create integrators
 		//==============================================
@@ -367,7 +370,7 @@ int main(int argc, char* argv[])
 		PrintExpParam(FinalTime, FinalTime, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
 		PrintSuperVector(data, Experiment, 1, BAR);
 		PrintToFile(myfile, data, number_of_equations, problem.t, relTol, absTol, KTime, StepCount, EffRating);
-
+		//N_VPrint_Serial(y);
 		//Take out the trash
         myfile.close();
 		N_VDestroy_Serial(y);
@@ -636,6 +639,7 @@ void ErrorCheck(ofstream & myfile, N_Vector y, realtype * data, int number_of_eq
 //============================================================
 //We cover our bases by doing MatVec directly for EPI methods.
 //By doing this, we don't have to transpose the data.
+//Does Jac*v = JV
 */
 void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N_Vector tmp, realtype * JV)
 {
@@ -645,8 +649,8 @@ void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N
 	{
 		for(int j=0; j<number_of_equations; j++)//marches across the column
 		{
-			TMP[j]=JacD[j+i*number_of_equations];//Stored row major
-			//JV[i] += X[j] * JacD[i * number_of_equations + j];
+			TMP[j]=JacD[j+i*number_of_equations];//Stored row major, pointer copy
+			//JV[i] = JV[i] + X[j] * JacD[i * number_of_equations + j];
 		}
 		JV[i]=N_VDotProd(tmp,x);
 	}

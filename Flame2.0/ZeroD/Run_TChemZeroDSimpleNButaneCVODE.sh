@@ -1,8 +1,8 @@
-exec=./TChemZeroDSimpleUtility.x
-inputs=gri3.0
-out="ZeroDVariableGriBDF2.txt"
-sample="sample1.dat"
-TF=1.3
+exec=./TChemZeroDSimpleUtilityCVODE.x
+inputs=nbutane
+out="ZeroDVariableNButaneTCHEMCVODE.txt"
+sample="sample.dat"
+TF=5e-3
 TTol=1e-12
 # this="$exec --chemfile=$inputs/chem.inp \
 #             --thermfile=$inputs/therm.dat \
@@ -26,6 +26,24 @@ TTol=1e-12
 #Default settings, build into a new utilty
 #Run series on the first sample
 # sample="sample1.dat"
+TTol=1e-3
+this="$exec --chemfile=$inputs/chem.inp \
+            --thermfile=$inputs/therm.dat \
+            --samplefile=$inputs/$sample \
+            --outputfile=$out \
+            --atol-newton=1e-18 \
+            --rtol-newton=1e-8\
+            --max-newton-iterations=20 \
+            --tol-time=$TTol \
+            --atol-time=1e-10 \
+            --dtmax=5e-2 \
+            --dtmin=1e-10 \
+            --tend=$TF \
+            --time-iterations-per-interval=10 \
+            --max-time-iterations=260 \
+"
+eval $this
+
 TTol=5e-4
 this="$exec --chemfile=$inputs/chem.inp \
             --thermfile=$inputs/therm.dat \
@@ -35,11 +53,30 @@ this="$exec --chemfile=$inputs/chem.inp \
             --rtol-newton=1e-8\
             --max-newton-iterations=20 \
             --tol-time=$TTol \
-            --dtmax=1e-1 \
+            --atol-time=1e-10 \
+            --dtmax=5e-2 \
             --dtmin=1e-10 \
             --tend=$TF \
             --time-iterations-per-interval=10 \
-            --max-time-iterations=260 \
+            --max-time-iterations=500 \
+"
+eval $this
+
+TTol=2e-4
+this="$exec --chemfile=$inputs/chem.inp \
+            --thermfile=$inputs/therm.dat \
+            --samplefile=$inputs/$sample \
+            --outputfile=$out \
+            --atol-newton=1e-18 \
+            --rtol-newton=1e-8\
+            --max-newton-iterations=20 \
+            --tol-time=$TTol \
+            --atol-time=1e-10 \
+            --dtmax=5e-2 \
+            --dtmin=1e-10 \
+            --tend=$TF \
+            --time-iterations-per-interval=10 \
+            --max-time-iterations=2000 \
 "
 eval $this
 
@@ -56,7 +93,7 @@ this="$exec --chemfile=$inputs/chem.inp \
             --dtmin=1e-10 \
             --tend=$TF \
             --time-iterations-per-interval=10 \
-            --max-time-iterations=260 \
+            --max-time-iterations=100000 \
 "
 eval $this
 
@@ -69,28 +106,12 @@ this="$exec --chemfile=$inputs/chem.inp \
             --rtol-newton=1e-8\
             --max-newton-iterations=20 \
             --tol-time=$TTol \
-            --dtmax=1e-1 \
+            --atol-time=1e-10 \
+            --dtmax=5e-2 \
             --dtmin=1e-10 \
             --tend=$TF \
             --time-iterations-per-interval=10 \
-            --max-time-iterations=260 \
-"
-eval $this
-
-TTol=5e-7
-this="$exec --chemfile=$inputs/chem.inp \
-            --thermfile=$inputs/therm.dat \
-            --samplefile=$inputs/$sample \
-            --outputfile=$out \
-            --atol-newton=1e-18 \
-            --rtol-newton=1e-8\
-            --max-newton-iterations=20 \
-            --tol-time=$TTol \
-            --dtmax=1e-1 \
-            --dtmin=1e-10 \
-            --tend=$TF \
-            --time-iterations-per-interval=10 \
-            --max-time-iterations=260 \
+            --max-time-iterations=100000 \
 "
 eval $this
 
@@ -103,10 +124,47 @@ this="$exec --chemfile=$inputs/chem.inp \
             --rtol-newton=1e-8\
             --max-newton-iterations=20 \
             --tol-time=$TTol \
-            --dtmax=1e-1 \
+            --atol-time=1e-10 \
+            --dtmax=5e-2 \
             --dtmin=1e-10 \
             --tend=$TF \
             --time-iterations-per-interval=10 \
-            --max-time-iterations=260 \
+            --max-time-iterations=100000 \
+"
+eval $this
+
+TTol=1e-8
+this="$exec --chemfile=$inputs/chem.inp \
+            --thermfile=$inputs/therm.dat \
+            --samplefile=$inputs/$sample \
+            --outputfile=$out \
+            --atol-newton=1e-18 \
+            --rtol-newton=1e-8\
+            --max-newton-iterations=20 \
+            --tol-time=$TTol \
+            --atol-time=1e-10 \
+            --dtmax=5e-2 \
+            --dtmin=1e-10 \
+            --tend=$TF \
+            --time-iterations-per-interval=10 \
+            --max-time-iterations=100000 \
+"
+eval $this
+
+TTol=1e-9
+this="$exec --chemfile=$inputs/chem.inp \
+            --thermfile=$inputs/therm.dat \
+            --samplefile=$inputs/$sample \
+            --outputfile=$out \
+            --atol-newton=1e-18 \
+            --rtol-newton=1e-8\
+            --max-newton-iterations=20 \
+            --tol-time=$TTol \
+            --atol-time=1e-10 \
+            --dtmax=5e-2 \
+            --dtmin=1e-10 \
+            --tend=$TF \
+            --time-iterations-per-interval=10 \
+            --max-time-iterations=100000 \
 "
 eval $this

@@ -21,6 +21,8 @@ class myPb : public TCHEMPB{
 	int						BadErrSteps;
 	int						BlowupSteps;
 	int						KiopsBlowups;
+	std :: string			stepRatioFile;
+	realtype 				stepRatio;
 	//functions
 	ordinal_type			get_num_equations(void)
 	{
@@ -489,6 +491,7 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	realtype * 	data	= N_VGetArrayPointer(y);		//Query the state in debugger with this
 	realtype fac		= pow(0.25, .5);
 	realtype PercentDone= 0;
+	realtype hOld		= 0;
 	int PercentDots		= 0;
 	int ProgressDots	= 0;
 	myPb * pb{static_cast<myPb *> (userData)};    		//Recast
@@ -505,7 +508,8 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 
 	//Debugging output files
 	//Need RHS(y), hJac, y, and Remainder.
-
+	ofstream	StepFile;
+	StepFile.open(pb->stepRatioFile, std::ios_base::app);
 	// ofstream	hRHS;
 	// ofstream    hJAC;
 	// ofstream    Y;
@@ -557,18 +561,20 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 		realtype Err=5.0;
 		realtype ErrEst=0;
 		IntSteps ++;
-		//f(t, y, fy, userData); 							// f(t, y) = fy
-		//this->jacf(t, y, y,     pb->Mat, this->userData, y,y,y);
+		f(t, y, fy, userData); 							// f(t, y) = fy
+		this->jacf(t, y, y,     pb->Mat, this->userData, y,y,y);
+		JTimesV jtimesv(jtv, f, delta, t, y, fy, userData, tmpVec);
 		while(Err > 1 )//was 1
 		{//Iterate until error is low enough
+			if(InternalSteps>1)//Output the step analysis to a new file
+			{
+				StepFile << t <<"\t"<< InternalSteps << "\t" <<hNew;
+				StepFile << "\t" <<  h/hNew <<"\t";
+			}
 			InternalSteps ++;
 			h=hNew;//h = k;
-			// f is RHS function from the problem; y = u_n
-			f(t, y, fy, userData); 							// f(t, y) = fy
-			N_VScale(h, fy, hfy); 							//Scale f(y);
-			this->jacf(t, y, y,     pb->Mat, this->userData, y,y,y);
-			JTimesV jtimesv(jtv, f, delta, t, y, fy, userData, tmpVec);
-
+			N_VScale(h, fy, hfy); 				//Scale f(y);
+			
 			//Mayya's new method//
 			// Y1= y_n + phi_1(6/8 hJ) h f(y_n)
 			// R(z)= f(z)-f(y_n) - J*(z-y_n)
@@ -589,8 +595,8 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 			}
 
 			//Set  r1= 6/8 phi_1(6/8 hJ), r2=phi_1(hJ)
-			this->CheckNanBlowUp(r1, N_VGetLength(r1));
-			this->CheckNanBlowUp(r2, N_VGetLength(r2));
+			//this->CheckNanBlowUp(r1, N_VGetLength(r1));
+			//this->CheckNanBlowUp(r2, N_VGetLength(r2));
 			//std :: cout << "Second order cleared\n";
 			//New comments out next line
 			N_VScale(8.0/6.0, r1, r1);              //Set r1=phi_1 (6/8 hJ) h f_n //PBFlag
@@ -659,6 +665,7 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 				//Past this point errors arise
 				//============================
 				hNew = 0.9 * h * pow(ErrEst, -1.0/ 2.0);                  //Create New Step, usually .9
+				//std :: cout << h/hNew << std :: endl;
 				if(hNew>100*h)//we increase the time
 					hNew= 2*h;			//throttle
 				if(1000*hNew<h)
@@ -757,7 +764,8 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	// hJAC.close();
 	// Y.close();
 	// REM.close();
-
+	StepFile << std :: endl;
+	StepFile.close();
 	return integratorStats;
 }
 

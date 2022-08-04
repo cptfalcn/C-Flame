@@ -1,8 +1,8 @@
 exec=./TChemZeroDSimpleUtility.x
-inputs=gri3.0
-out="ZeroDVariableGriBDF2.txt"
-sample="sample1.dat"
-TF=1.3
+inputs=nbutane
+out="ZeroDVariableNButaneBDF2.txt"
+sample="sample.dat"
+TF=5e-3
 TTol=1e-12
 # this="$exec --chemfile=$inputs/chem.inp \
 #             --thermfile=$inputs/therm.dat \
@@ -26,7 +26,7 @@ TTol=1e-12
 #Default settings, build into a new utilty
 #Run series on the first sample
 # sample="sample1.dat"
-TTol=5e-4
+TTol=1e-4
 this="$exec --chemfile=$inputs/chem.inp \
             --thermfile=$inputs/therm.dat \
             --samplefile=$inputs/$sample \
@@ -77,7 +77,7 @@ this="$exec --chemfile=$inputs/chem.inp \
 "
 eval $this
 
-TTol=5e-7
+TTol=1e-7
 this="$exec --chemfile=$inputs/chem.inp \
             --thermfile=$inputs/therm.dat \
             --samplefile=$inputs/$sample \
@@ -94,7 +94,7 @@ this="$exec --chemfile=$inputs/chem.inp \
 "
 eval $this
 
-TTol=1e-7
+TTol=1e-8
 this="$exec --chemfile=$inputs/chem.inp \
             --thermfile=$inputs/therm.dat \
             --samplefile=$inputs/$sample \

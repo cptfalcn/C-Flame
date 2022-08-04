@@ -1,6 +1,8 @@
 #<<Sample01
 #Runs the GRI mechanism
-Out="ZeroDVariableSam01EPI3ConvV2.txt"
+#Out="ZeroDVariableSam01EPI3ConvV3.txt"
+Out="" #Silent output
+#V3 runs with the one Jacobian/RHS/Jtv setup per successful step 
 Sam=1
 Method="EPI3V"
 TF=1.3e0 
