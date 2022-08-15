@@ -54,6 +54,7 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 	this->SmallChem	= N_VNew_Serial(num_eqs);			//Used for a single point of chem
 	this->Tmp 		= N_VNew_Serial(vecLength);			//TempScratch vector of full size
 	this->Scrap 	= N_VNew_Serial(vecLength);			//Temp storage, clean before accessing.
+	this->ScalarGradient= N_VClone(this->Scrap);
 	//Options
 	this->HeatingOn = 1;
 	this->dumpJac	= 0;								//Do we dump the Jac for visualization
@@ -696,7 +697,531 @@ int myPb2::TempTableLookUp(realtype Temp, N_Vector TempTable)
 	return TempInd;
 }
 
-void myPb2::SetTransportGrid(N_Vector State)
+
+
+void myPb2::Set_RHS(CVRhsFn OneD_RHS_Chem, CVRhsFn OneD_RHS_Adv, CVRhsFn OneD_RHS_Diff, CVRhsFn OneD_RHS_Heat)
+{
+	this->RHS_Adv		=OneD_RHS_Adv;
+	this->RHS_Diff		=OneD_RHS_Diff;
+	this->RHS_Chem		=OneD_RHS_Chem;
+	this->RHS_Heat 		=OneD_RHS_Heat;
+}
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
+//  ad88888ba                           88                                                   
+// d8"     "8b                          88                                                   
+// Y8,                                  88                                                   
+// `Y8aaaaa,     ,adPPYba,  ,adPPYYba,  88  ,adPPYYba,  8b,dPPYba,                           
+//   `"""""8b,  a8"     ""  ""     `Y8  88  ""     `Y8  88P'   "Y8                           
+//         `8b  8b          ,adPPPPP88  88  ,adPPPPP88  88                                   
+// Y8a     a8P  "8a,   ,aa  88,    ,88  88  88,    ,88  88                                   
+//  "Y88888P"    `"Ybbd8"'  `"8bbdP"Y8  88  `"8bbdP"Y8  88                                                                                                                            
+//   ,ad8888ba,                                    88  88                                    
+//  d8"'    `"8b                                   88  ""                             ,d     
+// d8'                                             88                                 88     
+// 88             8b,dPPYba,  ,adPPYYba,   ,adPPYb,88  88   ,adPPYba,  8b,dPPYba,   MM88MMM  
+// 88      88888  88P'   "Y8  ""     `Y8  a8"    `Y88  88  a8P_____88  88P'   `"8a    88     
+// Y8,        88  88          ,adPPPPP88  8b       88  88  8PP"""""""  88       88    88     
+//  Y8a.    .a88  88          88,    ,88  "8a,   ,d88  88  "8b,   ,aa  88       88    88,    
+//   `"Y88888P"   88          `"8bbdP"Y8   `"8bbdP"Y8  88   `"Ybbd8"'  88       88    "Y888  
+// 88b           d88                        88               88                              
+// 888b         d888                        88               88                              
+// 88`8b       d8'88                        88               88                              
+// 88 `8b     d8' 88   ,adPPYba,    ,adPPYb,88  88       88  88   ,adPPYba,                  
+// 88  `8b   d8'  88  a8"     "8a  a8"    `Y88  88       88  88  a8P_____88                  
+// 88   `8b d8'   88  8b       d8  8b       88  88       88  88  8PP"""""""                  
+// 88    `888'    88  "8a,   ,a8"  "8a,   ,d88  "8a,   ,a88  88  "8b,   ,aa                  
+// 88     `8'     88   `"YbbdP"'    `"8bbdP"Y8   `"YbbdP'Y8  88   `"Ybbd8"'                                                                                
+//==================================================================================================
+//==================================================================================================
+// ooooo     ooo              o8o      .      ooooooooooooo                        .            
+// `888'     `8'              `"'    .o8      8'   888   `8                      .o8            
+//  888       8  ooo. .oo.   oooo  .o888oo         888       .ooooo.   .oooo.o .o888oo  .oooo.o 
+//  888       8  `888P"Y88b  `888    888           888      d88' `88b d88(  "8   888   d88(  "8 
+//  888       8   888   888   888    888           888      888ooo888 `"Y88b.    888   `"Y88b.  
+//  `88.    .8'   888   888   888    888 .         888      888    .o o.  )88b   888 . o.  )88b 
+//    `YbodP'    o888o o888o o888o   "888"        o888o     `Y8bod8P' 8""888P'   "888" 8""888P' 
+//   .oooooo.                                          oooo                .                    
+//  d8P'  `Y8b                                         `888              .o8                    
+// 888           .ooooo.  ooo. .oo.  .oo.   oo.ooooo.   888   .ooooo.  .o888oo  .ooooo.         
+// 888          d88' `88b `888P"Y88bP"Y88b   888' `88b  888  d88' `88b   888   d88' `88b        
+// 888          888   888  888   888   888   888   888  888  888ooo888   888   888ooo888        
+// `88b    ooo  888   888  888   888   888   888   888  888  888    .o   888 . 888    .o        
+//  `Y8bood8P'  `Y8bod8P' o888o o888o o888o  888bod8P' o888o `Y8bod8P'   "888" `Y8bod8P'        
+//                                           888                                                
+//                                          o888o                                                                                                                                            
+//  __ ==============_===================___==============_================_====_===================                   
+// / _\  ___   __ _ | |  __ _  _ __     /   \  ___  _ __ (_)__   __  __ _ | |_ (_)__   __  ___  ___ 
+// \ \  / __| / _` || | / _` || '__|   / /\ / / _ \| '__|| |\ \ / / / _` || __|| |\ \ / / / _ \/ __|
+// _\ \| (__ | (_| || || (_| || |     / /_// |  __/| |   | | \ V / | (_| || |_ | | \ V / |  __/\__ \
+// \__/ \___| \__,_||_| \__,_||_|    /___,'   \___||_|   |_|  \_/   \__,_| \__||_|  \_/   \___||___/
+//==================================================================================================
+//==================================================================================================      
+//===============================================
+//Sets scalar Temp and mass fraction gradients.
+//===============================================
+// 
+//  _____             _                                         _        _              _    ___    ___      __  ___    ___      __ ____   ____  
+// /__   \  ___  ___ | |_  ___    ___   ___   _ __ ___   _ __  | |  ___ | |_   ___   __| |  / _ \  ( _ )    / / / _ \  / _ \    / /|___ \ |___ \ 
+//   / /\/ / _ \/ __|| __|/ __|  / __| / _ \ | '_ ` _ \ | '_ \ | | / _ \| __| / _ \ / _` | | | | | / _ \   / / | | | || (_) |  / /   __) |  __) |
+//  / /   |  __/\__ \| |_ \__ \ | (__ | (_) || | | | | || |_) || ||  __/| |_ |  __/| (_| | | |_| || (_) | / /  | |_| | \__, | / /   / __/  / __/ 
+//  \/     \___||___/ \__||___/  \___| \___/ |_| |_| |_|| .__/ |_| \___| \__| \___| \__,_|  \___/  \___/ /_/    \___/    /_/ /_/   |_____||_____|
+//                                                      |_|                                                                                                                  
+//The test call is:
+//./OneDIgnCons.x --chemfile=gri3.0/chem.inp --thermfile=gri3.0/therm.dat --StepSize=2e-7 --FinalTime=4e-7 --MyFile="Scrap.txt"  --KrylovTol=1e-7 \
+//--UseJac=1 --SampleNum=4 --Method="EPI2" --Experiment=2 --NumPts=100 --Pow=1.0 --VelUp=1 --Profiling=1 --Movie=0 --absTol=1e-10 --relTol=1e-8 --Delx=1e-2
+
+void myPb2::Set_ScalarGradient(N_Vector State)
+{
+	realtype * uData        = NV_DATA_S(State);//Stuff comes from here.
+	realtype * resultData	= NV_DATA_S(this->ScalarGradient);
+    int numPts 				= this->NumGridPts;
+    int grid 				= 0;
+	int TI					= 0;
+    realtype * Ghost 		= NV_DATA_S(this->Ghost);
+	realtype x				= 0;
+	realtype denom			= 1.0/(2 * this->delx);
+    int vecLength 			= this->num_equations * this->NumGridPts;
+	//std :: cout << this->delx << std :: endl;
+	//Start main loop
+	for (int i = 0; i < vecLength; i++)
+	{
+		TI		= i % numPts;
+		grid 	= floor(i/this->NumGridPts);
+		x 		= TI*this->delx + this->delx/2.0;
+		if(TI==0)//Left
+		{
+			//std :: cout << "Ghost: " <<Ghost[grid];
+			resultData[i]		= (uData[i+1] - Ghost[grid])* denom;
+			//std :: cout << " x: " << x <<" Boundary derivative: " << resultData[i] << "\t\t Data @ x" << uData[i] << "\n\n";  //<< "\t\t Data @ i+1: " << uData[i+1] <<std :: endl;
+		}
+		else if(TI==this->NumGridPts-1)//Right
+		{
+			resultData[i]		= (uData[i] - uData[i-1]) * denom;
+			//std :: cout << "x: " << x <<" Derivative: " << resultData[i] << "\t\t Data @ x " << uData[i] << "\n\n"; //"\t\t Data @ i-1: " << uData[i-1] << "\n\n";
+		}
+		else//middle
+		{
+			resultData[i]		= (uData[i+1] - uData[i-1]) * denom;
+			//std :: cout << "x: " << x <<" Derivative: " << resultData[i] << "\t\t Data @ x " << uData[i] << "\n\n"; //"\t\t Data @ i-1: " << uData[i-1] << "\t\t Data @ i+1: " << uData[i+1] << std :: endl;
+		}
+    }
+}
+
+//=====================================================================
+//Passed diagnostic second order convergence via eyeball norm 08/09/22
+//=====================================================================
+//Diagnostic testing for the scalar gradient grid.
+int myPb2::Test_ScalarGradient(N_Vector TestState)
+{
+	//======================
+	//Const 1
+	//======================
+	std :: cout << "Running Const 1 test\n";
+	realtype * TSD 	= NV_DATA_S(TestState);
+	realtype * GP   = NV_DATA_S(this->Ghost);
+	realtype * RSD  = NV_DATA_S(this->Scrap);
+	//N_VConst(1.0, TestState);
+	//Modify the ghost points
+	for( int i = 0 ; i < this->num_equations; i++)
+	{
+		GP[i]= 1;
+	}
+	N_VConst(1.0, TestState);
+	this->Set_ScalarGradient(TestState);
+	//N_VPrint_Serial(this->ScalarGradient);
+	std :: cout << "\n\n\n\n\n Const Error: " << N_VMaxNorm(this->ScalarGradient) << std :: endl;
+	
+	
+	//=================
+	//Cosine(2 pi x) + 1
+	//=================
+	std :: cout << "Running Cosine test\n";
+	//============v omg this was annoying==========================================//08/09/22
+	SinWave(TSD, this->NumGridPts, this->NumGridPts*this->num_equations, this->delx);
+	for( int i = 0 ; i < this->num_equations; i++)
+	{
+		GP[i]= TSD[0];//symmetry of cos
+	}
+	//N_VPrint_Serial(TestState);
+	std :: cout << "\n\n\n\n";
+	this->Set_ScalarGradient(TestState);
+
+	//=================
+	//Cosine(2 pi x) + 1
+	//=================
+	std :: cout << "Running Sine test\n";
+	//============v omg this was annoying==========================================//08/09/22
+	SinWave2(TSD, this->NumGridPts, this->NumGridPts*this->num_equations, this->delx);
+	for( int i = 0 ; i < this->num_equations; i++)
+	{
+		GP[i]= -1*TSD[0];//symmetry of sine
+	}
+	//N_VPrint_Serial(TestState);
+	//Note the right most point will only be half its expected value due to 0 boundary conditions.
+	std :: cout << "\n\n\n\n";
+	this->Set_ScalarGradient(TestState);
+
+	return 0;
+}
+
+
+//This derivative is on the scalar grid
+//Should be called only once per step.
+//Set Gradients of the transport properties.  Called by cross diffusion.
+void myPb2::Set_TransportGradient(N_Vector State)
+{
+	//realtype * uData        = NV_DATA_S(State);//Stuff comes from here.
+	realtype * resultData	= NV_DATA_S(this->ScalarGradient); //Target for result
+	int index				= 0;
+	realtype 	denom		= 1.0/(2*this->delx);
+	//Used for ghost data
+	realtype * LookupTemp	= NV_DATA_S(this->TempTable);
+	realtype * LookupCp		= N_VGetArrayPointer(this->CPPoly);
+	realtype * LookupDiff	= N_VGetArrayPointer(this->DiffTable);
+	realtype * LookupRho	= N_VGetArrayPointer(this->RhoTable);
+	//Grids resolved for that spots current temperature (user need make sure it is updated).
+	realtype * CpData		= NV_DATA_S(this->CpGrid);
+	realtype * RhoData		= NV_DATA_S(this->RhoGrid);
+	realtype * DiffData 	= NV_DATA_S(this->DiffGrid);
+	realtype * data 		= NV_DATA_S(State);
+	realtype * GhostP		= NV_DATA_S(this->Ghost);
+	//Get the transport scalars derivative pointers.
+	index				= this->TempTableLookUp(GhostP[0], this->TempTable);//Ghost temp
+	realtype * GradT	= NV_DATA_S(this->TempGrad);
+	realtype * GradRho	= NV_DATA_S(this->RhoGrad);
+	realtype * GradCp	= NV_DATA_S(this->CpGrad);
+	realtype * GradDiff	= NV_DATA_S(this->DiffGrad);
+
+
+	//Run the boundary data
+	//Left boundary
+	GradRho	[0]	=	(RhoData[1] - LookupRho[index])	*denom; // Boundary GradRho
+	GradCp	[0] = 	(CpData[1]- LookupCp[index])	*denom;	// Boundary Cp
+	//Right boundary
+	int End= this->NumGridPts-1;
+	GradRho	[End]	=	(RhoData[End] - RhoData[End-1])	*denom; // Boundary GradRho
+	GradCp	[End] = 	(CpData[End]- CpData[End-1])	*denom;	// Boundary Cp
+
+	//std:: cout << CpData[1] << " " << LookupCp[index] << std :: endl;
+	
+	//This needs to be fixed. Does the full set of boundary 
+	for(int i = 0 ; i < this->num_equations; i ++)
+	{	//============================================v jth diffusion @ i+1              v Ghost of jth diffusion
+		GradDiff[this->NumGridPts*i] 		=	( DiffData[i*this->NumGridPts + 1] - LookupDiff[i*500 + index])*denom; //Left
+		//============================================v jth diffusion @ end v jth diffusion @ end-1	
+		GradDiff[this->NumGridPts*(i+1)-1] 	=	( DiffData[(i+1)*this->NumGridPts-1]- DiffData[(i+1)*this->NumGridPts-2] )*denom; //Right
+		
+		// GradDiff[this->num_equations*(i+1)-1] 	=	( DiffData[(i+1)*500-1]- DiffData[(i+1)*500-2] )*denom; //Right
+	}
+
+	//Do the large nasty grid.
+	int gridjump 		= this->NumGridPts;
+	//Loop over interior
+	for( int i = 1 ; i < this->NumGridPts-1; i ++)
+	{
+		GradRho[i]	= ( RhoData[i+1] - RhoData[i-1])/(2*this->delx);
+		GradCp[i]	= ( CpData[i+1] - CpData[i-1])/(2*this->delx);
+		for( int j = 0; j < this->num_equations ; j ++)
+		{
+			GradDiff[j*gridjump + i] = (DiffData[j* gridjump+ i +1] - DiffData[j*gridjump+ i - 1 ])*denom;
+		}
+	}
+
+}
+
+
+//  _____             _                                         _        _              _    ___    ___      __ _  _     __ ____   ____  
+// /__   \  ___  ___ | |_  ___    ___   ___   _ __ ___   _ __  | |  ___ | |_   ___   __| |  / _ \  ( _ )    / // |/ |   / /|___ \ |___ \ 
+//   / /\/ / _ \/ __|| __|/ __|  / __| / _ \ | '_ ` _ \ | '_ \ | | / _ \| __| / _ \ / _` | | | | | / _ \   / / | || |  / /   __) |  __) |
+//  / /   |  __/\__ \| |_ \__ \ | (__ | (_) || | | | | || |_) || ||  __/| |_ |  __/| (_| | | |_| || (_) | / /  | || | / /   / __/  / __/ 
+//  \/     \___||___/ \__||___/  \___| \___/ |_| |_| |_|| .__/ |_| \___| \__| \___| \__,_|  \___/  \___/ /_/   |_||_|/_/   |_____||_____|
+//                                                      |_|                                                                              
+//Diagnostic testing for the scalar gradient grid.
+//Use the testing initial conditions to check if we can pass the const and sine tests
+int myPb2::Test_TransportGradient(N_Vector TestState)
+{
+	//Const test
+	//Fill the transport data and Ghost with const data
+	std :: cout << "Running Const 1 test\n";
+	realtype * TSD 	= NV_DATA_S(TestState);
+	realtype * GP   = NV_DATA_S(this->Ghost);
+	realtype * RSD  = NV_DATA_S(this->Scrap);
+	int failFlag 	= 0;
+	int failState	= 0;
+	for( int i = 0 ; i < this->num_equations; i++)
+	{
+		GP[i]= 1;
+	}
+	N_VConst(1.0, TestState);
+	//Set grids to 1
+	N_VConst(1.0, this->CpGrid);
+	N_VConst(1.0, this->RhoGrid);
+	N_VConst(1.0, this->DiffGrid);
+	//Change the tables to match the grid for ghost calculations
+	N_VConst(1.0, this->CPPoly);
+	N_VConst(1.0, this->RhoTable);
+	N_VConst(1.0, this->DiffTable);
+	this->Set_TransportGradient(TestState);
+	if(N_VMaxNorm(this->CpGrad)+N_VMaxNorm(this->RhoGrad)+ N_VMaxNorm(this->DiffGrad)==0)
+		std :: cout << "Const test passed!\n";
+	else
+	{
+		std :: cout << "Const test failed!\n";
+		std :: cout << N_VMaxNorm(this->CpGrad)+N_VMaxNorm(this->RhoGrad)+ N_VMaxNorm(this->DiffGrad) << std :: endl;
+	}
+	std :: cout << "completed Transport const test\n";
+	
+
+	//=================
+	//Begin sine test.
+	//=================
+	//Cosine(2 pi x) + 1
+	//=================
+	std :: cout << "\n\n\n\n";
+	std :: cout << "Running Cosine test\n";
+	//============v omg this was annoying==========================================
+	SinWave(NV_DATA_S(CpGrid), this->NumGridPts, this->NumGridPts, this->delx);
+	N_VScale(1.0, CpGrid, RhoGrid);
+	//Set the giant DiffTable
+	SinWave(NV_DATA_S(DiffGrid), this->NumGridPts, this->NumGridPts*this->num_equations, this->delx);
+	realtype * GhostSetter 	= NV_DATA_S(CpGrid);
+	//std :: cout << "testing ghost point: " << GhostSetter[0] << std :: endl;
+	for( int i = 0 ; i < this->num_equations; i++)
+	{
+		GP[i]= GhostSetter[0];//symmetry of cos
+	}
+	N_VConst(GP[0], this->CPPoly);
+	N_VConst(GP[0], this->RhoTable);
+	N_VConst(GP[0], this->DiffTable);
+	//N_VPrint_Serial(CpGrid);
+	
+	this->Set_TransportGradient(TestState);
+
+
+	//Now that the data has been set, measure the error.
+	//Reference is pm 2*pi Other sine wave function. 
+	//===================================================
+	//Set a reference for a single grid of NumGridPts.
+	//===================================================
+	//Ref: -2 pi Sine(2 pi x)
+	N_Vector Ref 	=	N_VClone(this->SmallScrap);
+	realtype * RefPt=	NV_DATA_S(Ref);
+	realtype * BRefPt=	NV_DATA_S(this->Scrap);
+	SinWave2(NV_DATA_S(Ref), this->NumGridPts, this->NumGridPts, this->delx);
+	SinWave2(NV_DATA_S(this->Scrap), this->NumGridPts, this->NumGridPts*this->num_equations, this->delx);
+	N_VAddConst(Ref, -1.0, Ref);
+	N_VAddConst(this->Scrap, -1.0, this->Scrap);
+	//scale								vthis is our reference
+	N_VScale(-2.0 * M_PI, Ref,Ref);
+	N_VScale(-2.0 * M_PI, this->Scrap,this->Scrap); 
+
+	//cosine cp
+	N_VLinearSum(1.0, this->CpGrad, -1.0, Ref, this->SmallScrap );
+	if(N_VDotProd(this->SmallScrap, this->SmallScrap)< 10*this->delx )
+	{
+		std ::cout << "Congrats: CpGrad passed the Cosine test!\n";
+	}
+	else
+	{
+		std :: cout <<"Error not within tolerance!\n";
+		failFlag =	1;
+		failState ++;
+	}
+	std :: cout << "2-norm error from solution: " << N_VDotProd(this->SmallScrap, this->SmallScrap) << std::endl;
+	//cosine rho
+	N_VLinearSum(1.0, this->RhoGrad, -1.0, Ref, this->SmallScrap );
+	if(N_VDotProd(this->SmallScrap, this->SmallScrap)< 10*this->delx )
+	{
+		std ::cout << "Congrats: RhoGrad passed the Cosine test!\n";
+	}
+	else
+	{
+		std :: cout <<"Error not within tolerance!\n";
+		failFlag =	1;
+		failState ++;
+	}
+	std :: cout << "2-norm error from solution: " << N_VDotProd(this->SmallScrap, this->SmallScrap) << std::endl;
+
+	
+	//Diff
+	N_VLinearSum(1.0, this->DiffGrad, -1.0, this->Scrap, this->Scrap );
+
+	if(N_VDotProd(this->Scrap, this->Scrap)< 10*this->delx )
+	{
+		std ::cout << "Congrats: Diffusion coefficient gradients passed the Cosine test!\n";
+	}
+	else
+	{
+		std :: cout <<"Error not within tolerance!\n" << std :: endl;
+		failFlag =	1;
+		failState ++;
+	}
+	std :: cout << "2-norm error from solution: " << N_VDotProd(this->Scrap, this->Scrap) << std::endl;
+	std :: cout << "completed Transport sine test\n";
+
+
+
+	
+	//Start Sine->Cosine test
+	//=================
+	//Sine(2 pi x) + 1
+	//=================
+	std :: cout << "\n\n\n\n";
+	std :: cout << "Running Sine test\n";
+	//============v omg this was annoying==========================================
+	SinWave2(NV_DATA_S(CpGrid), this->NumGridPts, this->NumGridPts, this->delx);
+	N_VScale(1.0, CpGrid, RhoGrid);
+
+	//Set the giant DiffTable
+	SinWave2(NV_DATA_S(DiffGrid), this->NumGridPts, this->NumGridPts*this->num_equations, this->delx);
+	for( int i = 0 ; i < this->num_equations; i++)
+	{
+		GP[i]= 2-GhostSetter[0];//antisymmetry of sine
+	}
+	N_VConst(GP[0], this->CPPoly);
+	N_VConst(GP[0], this->RhoTable);
+	N_VConst(GP[0], this->DiffTable);
+
+	//N_VPrint_Serial(CpGrid);
+	//N_VPrint_Serial(this->DiffGrid);
+
+	
+	this->Set_TransportGradient(TestState);
+
+	//manually fix the right boundary conditions double them to account for the error
+	NV_DATA_S(this->CpGrad)[this->NumGridPts-1]= 2*NV_DATA_S(this->CpGrad)[this->NumGridPts-1];
+	NV_DATA_S(this->RhoGrad)[this->NumGridPts-1]= 2*NV_DATA_S(this->RhoGrad)[this->NumGridPts-1];
+
+	for (int i  = 0 ; i < this->NumGridPts; i++)
+		NV_DATA_S(this->DiffGrad)[(i+1)*(this->NumGridPts)-1]= 2*NV_DATA_S(this->DiffGrad)[(i+1)*(this->NumGridPts)-1];
+
+	//===================================================
+	//Set a reference for a single grid of NumGridPts.
+	//===================================================
+	//Ref: 2 pi Cosine(2 pi x)
+	SinWave(NV_DATA_S(Ref), this->NumGridPts, this->NumGridPts, this->delx);
+	SinWave(NV_DATA_S(this->Scrap), this->NumGridPts, this->NumGridPts*this->num_equations, this->delx);
+	N_VAddConst(Ref, -1.0, Ref);
+	N_VAddConst(this->Scrap, -1.0, this->Scrap);
+	//scale								vthis is our reference
+	N_VScale(2.0 * M_PI, Ref,Ref);
+	N_VScale(2.0 * M_PI, this->Scrap,this->Scrap); 
+
+	N_VLinearSum(1.0, this->CpGrad, -1.0, Ref, this->SmallScrap );
+	if(N_VDotProd(this->SmallScrap, this->SmallScrap)< 10*this->delx )
+	{
+		std ::cout << "Congrats: CpGrad passed the sine test!\n";
+	}
+	else
+	{
+		std :: cout <<"Error not within tolerance!\n";
+		failFlag =	1;
+		failState ++;
+	}
+	std :: cout << "2-norm error from solution: " << N_VDotProd(this->SmallScrap, this->SmallScrap) << std::endl;
+	//cosine rho
+	N_VLinearSum(1.0, this->RhoGrad, -1.0, Ref, this->SmallScrap );
+	if(N_VDotProd(this->SmallScrap, this->SmallScrap)< 10*this->delx )
+	{
+		std ::cout << "Congrats: RhoGrad passed the sine test!\n";
+	}
+	else
+	{
+		std :: cout <<"Error not within tolerance!\n";
+		failFlag =	1;
+		failState ++;
+	}
+	std :: cout << "2-norm error from solution: " << N_VDotProd(this->SmallScrap, this->SmallScrap) << std::endl;
+	//Diff
+	N_VLinearSum(1.0, this->DiffGrad, -1.0, this->Scrap, this->Scrap );
+
+	if(N_VDotProd(this->Scrap, this->Scrap)< 10*this->delx )
+	{
+		std ::cout << "Congrats: Diffusion coefficient gradients passed the Sine test!\n";
+	}
+	else
+	{
+		std :: cout <<"Error not within tolerance!\n" << std :: endl;
+		failFlag =	1;
+		failState ++;
+	}
+	std :: cout << "2-norm error from solution: " << N_VDotProd(this->Scrap, this->Scrap) << std::endl;
+
+
+
+
+
+	std :: cout << "completed sine tests!\n";
+
+
+
+
+
+
+	std :: cout << "completed all tests!\n";
+	std :: cout << "Report:  Failed unit tests: " << failState << std :: endl;
+
+	return 0;
+}
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//---------------------------------------------------------------------------------------------------------                                                                                          
+//    ___                                            
+//   / __\ _ __   ___   ___  ___                     
+//  / /   | '__| / _ \ / __|/ __|                    
+// / /___ | |   | (_) |\__ \\__ \                    
+// \____/ |_|    \___/ |___/|___/                    
+                                                  
+//     ___  _   __   __              _               
+//    /   \(_) / _| / _| _   _  ___ (_)  ___   _ __  
+//   / /\ /| || |_ | |_ | | | |/ __|| | / _ \ | '_ \ 
+//  / /_// | ||  _||  _|| |_| |\__ \| || (_) || | | |
+// /___,'  |_||_|  |_|   \__,_||___/|_| \___/ |_| |_|
+                                                  
+//  _____             _                              
+// /__   \  ___  ___ | |_                            
+//   / /\/ / _ \/ __|| __|                           
+//  / /   |  __/\__ \| |_                            
+//  \/     \___||___/ \__|          
+// ooooo     ooo              o8o      .      ooooooooooooo                        .            
+// `888'     `8'              `"'    .o8      8'   888   `8                      .o8            
+//  888       8  ooo. .oo.   oooo  .o888oo         888       .ooooo.   .oooo.o .o888oo  .oooo.o 
+//  888       8  `888P"Y88b  `888    888           888      d88' `88b d88(  "8   888   d88(  "8 
+//  888       8   888   888   888    888           888      888ooo888 `"Y88b.    888   `"Y88b.  
+//  `88.    .8'   888   888   888    888 .         888      888    .o o.  )88b   888 . o.  )88b 
+//    `YbodP'    o888o o888o o888o   "888"        o888o     `Y8bod8P' 8""888P'   "888" 8""888P' 
+//   .oooooo.                                          oooo                .                    
+//  d8P'  `Y8b                                         `888              .o8                    
+// 888           .ooooo.  ooo. .oo.  .oo.   oo.ooooo.   888   .ooooo.  .o888oo  .ooooo.         
+// 888          d88' `88b `888P"Y88bP"Y88b   888' `88b  888  d88' `88b   888   d88' `88b        
+// 888          888   888  888   888   888   888   888  888  888ooo888   888   888ooo888        
+// `88b    ooo  888   888  888   888   888   888   888  888  888    .o   888 . 888    .o        
+//  `Y8bood8P'  `Y8bod8P' o888o o888o o888o  888bod8P' o888o `Y8bod8P'   "888" `Y8bod8P'        
+//                                           888                                                
+//                                          o888o                      
+//=============================//
+//Sets transport grids and grad//
+//=============================//
+void myPb2::SetTransportGrid(N_Vector State)//One velocity grid for derivatives
 {
 	int index				= 0;
 	realtype * LookupTemp	= NV_DATA_S(this->TempTable);
@@ -719,41 +1244,134 @@ void myPb2::SetTransportGrid(N_Vector State)
 			DiffData[j*this->num_equations + i] = LookupDiff[j*500 + index];
 		}
 	}
-	//Set the gradients
-	//Declare
-	index				= this->TempTableLookUp(GhostP[0], this->TempTable);//Ghost temp
-	realtype * GradT	= NV_DATA_S(this->TempGrad);
-	realtype * GradRho	= NV_DATA_S(this->RhoGrad);
-	realtype * GradCp	= NV_DATA_S(this->CpGrad);
-	realtype * GradDiff	= NV_DATA_S(this->DiffGrad);
-
-	GradT	[0]	=	(data[0]-GhostP[0])/this->delx;				// Boundary GradT
-	GradRho	[0]	=	(RhoData[0] - LookupRho[index])/this->delx;// Boundary GradRho
-	GradCp	[0] = 	(CpData[0]- LookupCp[index])/this->delx;	// Boundary Cp
-	for(int i = 0 ; i < this->num_equations; i ++)
-		GradDiff[this->num_equations*i] =	LookupDiff[i*500 + index];
-
-
-	//Loop
-	for( int i = 1 ; i < this->NumGridPts-1; i ++)
-	{
-		GradT[i] 	= ( data[i] - data[i - 1])/this->delx;
-		GradRho[i]	= ( RhoData[i] - RhoData[i-1])/this->delx;
-		GradCp[i]	= ( CpData[i] - CpData[i-1])/this->delx;
-		for( int j = 0; j < this->num_equations ; j ++)
-		{
-			GradDiff[j*this->num_equations + i] = 
-					(DiffData[j*this->num_equations+ i] - DiffData[j*this->num_equations+ i - 1 ])/this->delx;
-		}
-	}
-	//N_VPrint_Serial(TempGrad);
-	//N_VPrint_Serial(DiffGrad);
 }
 
-	void myPb2::Set_RHS(CVRhsFn OneD_RHS_Chem, CVRhsFn OneD_RHS_Adv, CVRhsFn OneD_RHS_Diff, CVRhsFn OneD_RHS_Heat)
+void myPb2::Test_RHS_CrossDiff(N_Vector TestState)
+{
+	std :: cout << " Beginning Cross-Diffusion test\n";
+
+	this->SetTransportGrid(TestState);						//Sets the transport with respect to the current point's temperature
+	// this->Set_ScalarGradient(TestState);
+	// this->Set_TransportGradient(TestState);
+	std :: cout << "Checking RHS_CrossDiff\n";
+	this->RHS_CrossDiff(0, TestState, this->Tmp, this);
+	if( N_VDotProd(this->Tmp, this->Tmp)<1e-5)
+		std :: cout << "Passed initial state test\n";
+	else
+		std :: cout << "Failed initial state test\n";
+	std :: cout << N_VDotProd(this->Tmp, this->Tmp) << std :: endl;
+
+
+
+
+	std :: cout << "running a Cosine test\n";
+	//rho, cp, state held constant, but Diffusion changed to cosine waves.
+	//this->Set_TransportGradient(TestState);
+	SinWave(NV_DATA_S(DiffGrid), this->NumGridPts, this->NumGridPts*this->num_equations, this->delx);
+
+	//Manually fix the diffGrad boundary via the lookup table
+	realtype * GP 			= NV_DATA_S(this->Ghost);
+	realtype * GhostSetter 	= NV_DATA_S(DiffGrid);
+	N_VConst(GhostSetter[0], DiffTable);
+	this->Set_TransportGradient(TestState);
+	this->Set_ScalarGradient(TestState);
+	N_VConst(1.0, this->RhoTable);
+	N_VConst(1.0, this->CPPoly);
+
+	N_VConst(1.0, this->RhoGrid);
+	N_VConst(1.0, this->CpGrid);
+
+	N_VConst(0.0, this->CpGrad);
+	N_VConst(0.0, this->RhoGrad);
+	N_VConst(1.0, this->ScalarGradient);
+	
+
+	//Prerun print
+	//N_VPrint_Serial(this->RhoGrid);
+	this->RHS_CrossDiff(0, TestState, this->Tmp, this);
+	//N_VPrint_Serial(this->Tmp);
+	N_Vector Ref = N_VClone(this->Tmp);
+	SinWave2(NV_DATA_S(Ref), this->NumGridPts, this->NumGridPts*this->num_equations, this->delx);
+	N_VAddConst(Ref, -1.0, Ref);
+	N_VScale(-2.0 * M_PI, Ref,Ref);
+	
+	//N_VPrint_Serial(this->Tmp);
+	
+	N_VLinearSum(1.0, this->Tmp, -1.0, Ref, Ref);
+	//Ref now has the error check the error
+	realtype Err = N_VDotProd(Ref, Ref);
+	if(Err>10*this->delx)
 	{
-		this->RHS_Adv		=OneD_RHS_Adv;
-		this->RHS_Diff		=OneD_RHS_Diff;
-		this->RHS_Chem		=OneD_RHS_Chem;
-		this->RHS_Heat 		=OneD_RHS_Heat;
+		std:: cout << "You have failed the const rho, cp, state variable diffusion grid test\n";
 	}
+	else
+		std:: cout << "Error: " << Err << std:: endl;
+
+}
+
+void myPb2::Test_JtV_CrossDiff(N_Vector TestState)
+{
+	std :: cout << " Beginning Cross-Diffusion jtv test\n";
+
+	this->SetTransportGrid(TestState);						//Sets the transport with respect to the current point's temperature
+	this->Set_ScalarGradient(TestState);
+	this->Set_TransportGradient(TestState);
+	std :: cout << "Checking JtV_CrossDiff\n";
+	N_VConst(1.0, this->Tmp);
+	N_VConst(0.0, this->DiffGrad);
+	this->JtV_CrossDiff(TestState, this->Tmp, 0, TestState, TestState, this, this->Tmp);
+	if( N_VDotProd(this->Tmp, this->Tmp)<1e-5)
+		std :: cout << "Passed initial state test\n";
+	else
+		std :: cout << "Failed initial state test\n";
+	std :: cout << N_VDotProd(this->Tmp, this->Tmp) << std :: endl;
+
+
+
+
+	std :: cout << "running a Cosine test\n";
+	//rho, cp, state held constant, but Diffusion changed to cosine waves.
+	//this->Set_TransportGradient(TestState);
+	//manually set Diffgrid
+	SinWave(NV_DATA_S(TestState), this->NumGridPts, this->NumGridPts*this->num_equations, this->delx);
+	N_VConst(1.0, this->DiffGrad);
+	N_VConst(1.0, this->ScalarGradient);
+	N_VConst(1.0, this->RhoGrad);
+	N_VConst(1.0, this->CpGrad);
+	N_VConst(1.0, this->RhoGrid);
+	N_VConst(1.0, this->CpGrid);
+	this->JtV_CrossDiff(TestState, this->Tmp, 0, TestState, TestState, this, this->Tmp);
+	
+	//N_VPrint_Serial(this->Tmp);
+	//Appears to give the correct response
+
+	//Set the reference
+	N_Vector Ref = N_VClone(this->Tmp);
+	SinWave2(NV_DATA_S(Ref), this->NumGridPts, this->NumGridPts*this->num_equations, this->delx);
+	N_VAddConst(Ref, -1.0, Ref);
+	N_VScale(-2.0 * M_PI, Ref,Ref);
+	//Manually fix the left boudaries due to stenciling
+	realtype 	denom		= 1.0/(2*this->delx);
+	for (int i  = 0 ; i < this->NumGridPts; i++)
+	NV_DATA_S(Ref)[(i)*(this->NumGridPts)]= NV_DATA_S(TestState)[(i)*(this->NumGridPts)+1]*denom;
+
+	//N_VPrint_Serial(this->Tmp);
+
+	//N_VPrint_Serial(Ref);
+	
+	N_VLinearSum(1.0, this->Tmp, -1.0, Ref, Ref);
+	//Ref now has the error check the error
+	realtype Err = N_VDotProd(Ref, Ref);
+	if(Err>10*this->delx)
+	{
+		std:: cout << "You have failed the const rho, cp, state variable diffusion grid test\n";
+	}
+	else
+	{
+		std :: cout << "Congrats!  Passed sine test with variable state and fixed transport\n";
+	}
+		std:: cout << "Error: " << Err << std:: endl;
+		//N_VPrint_Serial(Ref);
+		std :: cout << "Max error: " << N_VMaxNorm(Ref)<< std :: endl;
+}
+

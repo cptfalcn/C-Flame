@@ -88,6 +88,7 @@ class myPb2{
 	void SetAdvDiffReacPow(realtype, realtype, realtype, realtype, bool);
 	void TempGradient(N_Vector State, N_Vector Gradient);
 	void SetTransportGrid(N_Vector State);
+	void SetTransportGrads(N_Vector State);
 	void SetGradient(N_Vector Input, N_Vector GradientVec, realtype Ghost);
 
 	int			dumpJac;				//Do we want to dump the Jacobian
@@ -115,6 +116,7 @@ class myPb2{
 	realtype	MaxStepTaken;
 	realtype	MinStepTaken;
 	//Storage vectors
+	N_Vector	ScalarGradient;
 	N_Vector	OMEGA;
 	N_Vector	CP;
 	N_Vector	CPPoly;
@@ -160,13 +162,30 @@ class myPb2{
 	int  TempTableLookUp(realtype Temp, N_Vector TempTable);//Lookup a table
 
 	//Function pointers to passed by main and called in parts.
-	CVRhsFn OneD_RHS_CrossDiff;
+	CVRhsFn RHS_CrossDiff;
 	CVRhsFn RHS_Chem;
 	CVRhsFn RHS_Adv;
 	CVRhsFn RHS_Diff;
 	CVRhsFn RHS_Heat;
+	//Jtv functions
+	CVLsJacTimesVecFn 	Jtv_Chem;
+	CVLsJacTimesVecFn 	Jtv_Adv;
+	CVLsJacTimesVecFn 	Jtv_Diff;
+	CVLsJacTimesVecFn 	JtV_CrossDiff;
+
+
+
 	//Set the RHS functions
 	void Set_RHS(CVRhsFn, CVRhsFn, CVRhsFn, CVRhsFn);
+
+	//Scalar Gradient methods
+	void Set_ScalarGradient(N_Vector);
+	void Set_TransportGradient(N_Vector);
+	int	 Test_ScalarGradient(N_Vector);
+	int  Test_TransportGradient(N_Vector);
+	//Test attached RHS modules.
+	void Test_RHS_CrossDiff(N_Vector);
+	void Test_JtV_CrossDiff(N_Vector);
 };
 
 //End class stuff

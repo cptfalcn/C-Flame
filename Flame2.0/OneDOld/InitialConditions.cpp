@@ -339,7 +339,7 @@ void SinWave(realtype * data, int numPts, int myLength, realtype h)
         {
                 myIndex = i % numPts;
                 //cout << myIndex << "\t\t";
-                x =  myIndex*h + h/2;
+                x =  myIndex*h + h/2.0;
                 //cout << x << endl;
                 temp1 = cos(2 * M_PI * x)+1;
 		//cout << temp1 << endl;
@@ -357,7 +357,7 @@ void SinWave2(realtype * data, int numPts, int myLength, realtype h)
         {
                 myIndex = i % numPts;
                 //cout << myIndex << "\t\t";
-                x =  myIndex*h + h/2;
+                x =  myIndex*h + h/2.0;
                 //cout << x << endl;
                 temp1 = sin(2 * M_PI * x)+1;
                 //cout << temp1 << endl;

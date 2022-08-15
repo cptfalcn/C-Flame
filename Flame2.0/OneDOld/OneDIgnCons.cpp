@@ -60,6 +60,7 @@ int OneD_JacArray		(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector,
 int OneD_JtV			(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 int OneD_JtV_Adv		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 int OneD_JtV_Diff		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+int OneD_JtV_CrossDiff	(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 int OneD_Jtv_Chem		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 
 int OneD_Jtv_ChemArray	(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
@@ -254,6 +255,8 @@ int main(int argc, char* argv[])
 		problem2.SetAdvDiffReacPow(ADV, DIFF, CHEM, POW, VelUp);//Additional set up.
 		problem2.kmd = kmd;
 		problem2.Set_RHS(OneD_RHS_Chem, OneD_RHS_Adv, OneD_RHS_Diff, OneD_RHS_Heat);
+		problem2.RHS_CrossDiff=OneD_RHS_CrossDiff;//Attach optional cross diffusion for testing.
+		problem2.JtV_CrossDiff=OneD_JtV_CrossDiff;//Attach optional cross diffusion jtv for testing.
 
 
 		//read in data, error if files do not exist
@@ -334,6 +337,16 @@ int main(int argc, char* argv[])
 										MaxKrylovIters,State,vecLength);
 
 		PrintPreRun(StepSize, Delx, Steps, KrylovTol, absTol, relTol, Method, num_pts, BAR);
+
+
+		// problem2.Test_ScalarGradient(problem2.Scrap);
+		// cout << "Constant 1 test run\n\n";
+		// problem2.Test_ScalarGradient(State);
+		//problem2.Test_TransportGradient(State);
+		//problem2.Test_RHS_CrossDiff(State);
+		//problem2.Test_JtV_CrossDiff(State);
+		// cout << "State test run\n";
+		//exit(EXIT_FAILURE);
 		//if(problem2.NumGridPts>1)
 		//	problem2.RunTests(State);
         //=================================
@@ -349,6 +362,8 @@ int main(int argc, char* argv[])
 			problem2.t	= TNow;
 			//Integrate
 			auto Start	=std::chrono::high_resolution_clock::now();//Time integrator
+			problem2.Set_ScalarGradient(State);
+			problem2.Set_TransportGradient(State);
 
 			if(Method == "EPI2")
 			{
@@ -647,6 +662,8 @@ int OneD_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
 
 	//Given the temperature, set all the grids
 	pb->SetTransportGrid(State);
+	pb->Set_ScalarGradient(State);
+	pb->Set_TransportGradient(State);
 
 	//ChemRHS============================================
 	auto StartChem=std::chrono::high_resolution_clock::now();	//Clock
@@ -666,12 +683,15 @@ int OneD_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
 	//DiffRHS================================================
 	auto StartDiff=std::chrono::high_resolution_clock::now();	//Start Timing Diff
 	pb->RHS_Diff(t, State, pb->Tmp, UserData);
+	N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);
+	OneD_RHS_CrossDiff(t, State, pb->Tmp, UserData);
+	N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);	
 	//SUPER_RHS_DIFF_CP(t, State, pb->Tmp, UserData);				//Diff call	
 	auto StopDiff=std::chrono::high_resolution_clock::now();
 	auto PassDiff = std::chrono::duration_cast<std::chrono::nanoseconds>(StopDiff-StartDiff);
 	pb->rhs_Diff+=PassDiff.count()/1e9;							//Finish timing Diff
 	pb->rhsTime+=PassDiff.count()/1e9;							//Finish timing Diff
-	N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);	//Add Diff to soln
+	//N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);	//Add Diff to soln
 
 	//AdvRHS================================================
 	auto StartAdv=std::chrono::high_resolution_clock::now();	//Start timing Adv
@@ -943,18 +963,15 @@ int OneD_RHS_Diff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 //Calculates [1/rho cp * grad(lambda) dot grad(T), 1/rho* grad(rho Di) dot Yi]
 int OneD_RHS_CrossDiff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 {
-	//ToDo:		Get Grad(Diff), Grad(T), Grad(Yi)
-	//How:		Call myPb2::SetGradient for each of the following grids.
-	//cp, rho, Diff
-    myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
+    myPb2 * problem{static_cast<myPb2 *> (userData)};	//Recast
     realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
     realtype * resultData   = NV_DATA_S(uDot);//stuff goes in here.
-	realtype * LookupTemp	= N_VGetArrayPointer(problem->TempTable);
-	realtype * LookupCp		= N_VGetArrayPointer(problem->CPPoly);
-	realtype * LookupDiff	= N_VGetArrayPointer(problem->DiffTable);
-	realtype * LookupRho	= N_VGetArrayPointer(problem->RhoTable);
+	//Transport Grids
+	realtype * CpPtr		= N_VGetArrayPointer(problem->CpGrid);
+	realtype * DiffPtr		= N_VGetArrayPointer(problem->DiffGrid);
+	realtype * RhoPtr		= N_VGetArrayPointer(problem->RhoGrid);
+	realtype * GradDataPtr	= NV_DATA_S(problem->ScalarGradient);
     int numPts 				= problem->NumGridPts;
-    realtype divisor        = 1.0/(problem->delx * problem->delx);
     int grid 				= 0;
     int tempInd 			= 0;
 	int TI					= 0;
@@ -962,28 +979,45 @@ int OneD_RHS_CrossDiff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 	int TInd 				= 0;
     realtype * Ghost 		= NV_DATA_S(problem->Ghost);
     int vecLength 			= problem->num_equations * problem->NumGridPts;
+	//Transport Gradients
+	realtype * CpGradPtr	= NV_DATA_S(problem->CpGrad);
+	realtype * RhoGradPtr	= NV_DATA_S(problem->RhoGrad);
+	realtype * DiffGradPtr	= NV_DATA_S(problem->DiffGrad);
+	realtype GradData		= 0;
+	//Run internal checks.
 
+	// std :: cout << "\n\nRho grid check!\n";
+	//N_VPrint_Serial(problem->RhoGrid);
 
 	//Start main loop
 	for (int i = 0; i < vecLength; i++)
 	{
+
 		TI		= i % numPts;
 		grid 	= floor(i/problem->NumGridPts);
+		GradData= GradDataPtr[i];
+		if(i < numPts)//If we are looking at temp
+		{
+			resultData[i] = 1.0 / (RhoPtr[i] * CpPtr[i] ) * DiffGradPtr[i] * GradData;
+			//  std :: cout << "Index : " << i <<" rho: " << RhoPtr[i] << " Cp: " << CpPtr[i] << " DiffGrad: ";
+			//  std :: cout << DiffGradPtr[i] << "StateGrad: " << GradData << std:: endl;
 
-		// if(i < numPts)//If we are looking at temp
-		// 	T = LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  );
-		// else
-		// 	T = LookupDiff[ grid * 500 + TInd];	
-		
-		//Set the result
-        // if(i% numPts == 0)//left
-        // 	//resultData[i] = T * divisor * (Ghost[grid] - 2*uData[i] + uData[i+1]);
-        // else if (i % numPts == (numPts - 1) )//right 0 neumann
-        //     //resultData[i] = T * divisor * ( uData[i-1] - uData[i] );
-        // else
-        //     //resultData[i] = T * divisor * (uData[i-1] - 2*uData[i] + uData[i+1]);
+			//std :: cout << abs(GradData-TempGradPtr[i]) << endl;
+		}
+		else
+		{
+			resultData[i] = 1.0/ (RhoPtr[TI])	*(RhoGradPtr[TI]*DiffPtr[TI] + RhoPtr[TI] * DiffGradPtr[i]) * GradData;
+			//std :: cout << 1.0/ (RhoPtr[i]) << " " << RhoPtr[i] << std :: endl;
+			// std :: cout <<" Diff: " << DiffPtr[i] << " Cp: " << CpPtr[i] << " DiffGrad: ";
+			// std :: cout << DiffGradPtr[i] << " rhoGrad: " << RhoGradPtr[i] <<" StateGrad: " << GradData << std:: endl;
+			// std :: cout << resultData[i] << std :: endl;
+			
+		}
+		// if(isnan(resultData[i]))
+		// 	std :: cout << "index " << i << " has NaN\n";
 
     }
+	//std :: cout << std :: endl;
     return 0;
 }
 
@@ -1007,6 +1041,9 @@ int OneD_JtV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void 
 	N_VScale(0.0, Jv, Jv);
 	N_VScale(0.0, tmp, tmp);
 	pbPtr->SetTransportGrid(u);
+	pbPtr->Set_ScalarGradient(u);
+	pbPtr->Set_TransportGradient(u);
+
 
 	if(pbPtr->React>0){//Get Chem
 		//Chem
@@ -1026,6 +1063,10 @@ int OneD_JtV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void 
 	// Diff
 	auto StartDiff=std::chrono::high_resolution_clock::now();
 	OneD_JtV_Diff(v,tmp,t,u, fu, pb, tmp);
+	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
+	pbPtr->JtV_CrossDiff(v,tmp, t, u , fu, pb, tmp);
+	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
+
 	auto StopDiff=std::chrono::high_resolution_clock::now();
 	auto PassDiff = std::chrono::duration_cast<std::chrono::nanoseconds>(StopDiff-StartDiff);
 	pbPtr->jtv_Diff+=PassDiff.count()/1e9;
@@ -1388,3 +1429,67 @@ int OneD_RHS_Heat(realtype t, N_Vector u, N_Vector uDot, void * userData)
 	}
 	return 0;
 }
+
+//New stuff
+//Jtv Cross Diff
+//hold everything but the state constant, so we gradient the v on the second term
+int OneD_JtV_CrossDiff(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void* userData, N_Vector tmp)
+{
+	myPb2 * problem{static_cast<myPb2 *> (userData)};	//Recast
+    realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
+	realtype * vData		= NV_DATA_S(v);
+    realtype * resultData   = NV_DATA_S(Jv);//stuff goes in here.
+	//Transport Grids
+	realtype * CpPtr		= N_VGetArrayPointer(problem->CpGrid);
+	realtype * DiffPtr		= N_VGetArrayPointer(problem->DiffGrid);
+	realtype * RhoPtr		= N_VGetArrayPointer(problem->RhoGrid);
+	realtype * GradDataPtr	= NV_DATA_S(problem->ScalarGradient);
+    int numPts 				= problem->NumGridPts;
+    int grid 				= 0;
+    int tempInd 			= 0;
+	int TI					= 0;
+    realtype T  			= 1;
+	int TInd 				= 0;
+    realtype * Ghost 		= NV_DATA_S(problem->Ghost);
+    int vecLength 			= problem->num_equations * problem->NumGridPts;
+	//Transport Gradients
+	realtype * CpGradPtr	= NV_DATA_S(problem->CpGrad);
+	realtype * RhoGradPtr	= NV_DATA_S(problem->RhoGrad);
+	realtype * DiffGradPtr	= NV_DATA_S(problem->DiffGrad);
+	realtype GradData		= 0;
+	realtype denom			= 1.0/(2*problem->delx);
+	//Start main loop
+	for (int i = 0; i < vecLength; i++)
+	{
+
+		TI		= i % numPts;
+		grid 	= floor(i/problem->NumGridPts);
+		if( TI ==0 ) //Left: fixed
+		{
+			GradData= vData[i+1]*denom;
+		}
+		else if (TI == numPts-1)//Right: 0 neumann
+		{
+			GradData= (vData[i]-vData[i-1])*denom;
+		}
+		else //mid
+		{
+			GradData= (vData[i+1]-vData[i-1])*denom;
+
+		}
+		//std :: cout <<  "index: " << i << "V[i]= " << vData[i] << "V Gradient: " << GradData << std :: endl;
+		//GradData= GradDataPtr[i];
+		if(i < numPts)//If we are looking at temp
+		{
+			resultData[i] = 1.0 / (RhoPtr[i] * CpPtr[i] ) * DiffGradPtr[i] * GradData;
+		}
+		else
+		{
+			resultData[i] = 1.0/ (RhoPtr[TI])	*(RhoGradPtr[TI]*DiffPtr[TI] + RhoPtr[TI] * DiffGradPtr[i]) * GradData;			
+		}
+    }
+
+	return 0;
+}
+
+    
