@@ -61,6 +61,7 @@ class myPb2{
 	int 		vecLength;
 	realtype 	delx;
 	N_Vector 	Ghost;
+	N_Vector 	PointScrap;
 	std::vector<N_Vector> Jacs;
 	N_Vector 	Jac;
 	N_Vector 	Tmp;
@@ -127,13 +128,17 @@ class myPb2{
 	N_Vector	RHO;
 	N_Vector	Vel;
 	N_Vector	Scrap;
+	N_Vector	Scrap2;
 	N_Vector	VelScrap;
 	N_Vector	SmallScrap;
 	N_Vector	VelAve;
 	realtype	PMultiplier;
 	realtype	LeftDiff;
 	N_Vector	SmallChem;
+	//Used in velocity update
 	N_Vector	MolarWeights;
+	N_Vector	GasWeight;
+	N_Vector 	State;
 	//Gradients
 	N_Vector	CpGrad;
 	N_Vector	RhoGrad;
@@ -147,7 +152,11 @@ class myPb2{
 	realtype	Power;
 	realtype	t;
 	realtype	ignTime;
+
+	realtype 	GasConst;
 	bool		VelUp;
+	realtype 	VelAveLeftBnd;
+	realtype 	VelAveRightBnd;
 	int			FlameFrontLocation;
 	realtype	HeatingRightGhost;
 	int 		HeatingOn;
@@ -161,12 +170,15 @@ class myPb2{
 	void VerifyTempTable(N_Vector State);			//Verify Read in and run a temperature test.
 	int  TempTableLookUp(realtype Temp, N_Vector TempTable);//Lookup a table
 
+	
+
 	//Function pointers to passed by main and called in parts.
 	CVRhsFn RHS_CrossDiff;
 	CVRhsFn RHS_Chem;
 	CVRhsFn RHS_Adv;
 	CVRhsFn RHS_Diff;
 	CVRhsFn RHS_Heat;
+	CVRhsFn RHS_Full;
 	//Jtv functions
 	CVLsJacTimesVecFn 	Jtv_Chem;
 	CVLsJacTimesVecFn 	Jtv_Adv;
@@ -186,6 +198,21 @@ class myPb2{
 	//Test attached RHS modules.
 	void Test_RHS_CrossDiff(N_Vector);
 	void Test_JtV_CrossDiff(N_Vector);
+
+	//Set Gas weight
+	void Set_GasWeight(N_Vector);
+	void Set_GasWeightBisetti(N_Vector);
+	void Test_GasWeight(N_Vector);
+
+	//Modified Velocity Divergence
+	void Set_VelocityDivergence(N_Vector);  // calls this->the requisite parts and puts the data together
+	void Set_VelocityDivergence_TempDiff(N_Vector); //Does all the divergence diffusion parts
+	void Set_VelocityDivergence_SpecDiff(N_Vector);
+	void Set_VelocityDivergence_TempReac(N_Vector);
+	void Set_VelocityDivergence_TempHeat(N_Vector);
+	//Tests the set
+	void Test_VelocityDivergence(N_Vector);
+
 };
 
 //End class stuff
