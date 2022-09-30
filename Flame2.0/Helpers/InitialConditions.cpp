@@ -256,6 +256,15 @@ void IntConGri30(realtype * data, int SampleNum)
 		data[4]		= 1.8e-1;//O2
 		data[48] 	= 8e-1;//N2
 		break;
+	case 10:
+		data[0] = 1000.0;//use 1000 for base
+		data[14] =  5.483858845025559731e-02;//CH4
+		data[4]  =  2.187578062376045740e-01;//O2
+		data[48] =  7.137587863547695255e-01;//N2
+		data[49] =  1.264481895737025810e-02;//AR
+		cout << BAR <<"GRI Experiment Sample 1--Hi Pressure\t" << BAR <<endl;
+		break;
+
     }
 }
 

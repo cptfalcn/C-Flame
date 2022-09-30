@@ -14,6 +14,7 @@ class myPb : public TCHEMPB{
 	realtype 				MaxStepTaken;
 	realtype 				MinStepTaken;
 	realtype 				ignTime;
+	realtype				KiopsTime;
 	SUNMatrix				Mat;
 	int 					Movie;
 	std :: string			dumpJacFile;
@@ -23,6 +24,8 @@ class myPb : public TCHEMPB{
 	int						KiopsBlowups;
 	std :: string			stepRatioFile;
 	realtype 				stepRatio;
+	realtype				ProjectTime;
+	realtype				OrthogTime;
 	//functions
 	ordinal_type			get_num_equations(void)
 	{
@@ -492,6 +495,7 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	realtype fac		= pow(0.25, .5);
 	realtype PercentDone= 0;
 	realtype hOld		= 0;
+	realtype KiopsTimer	= 0;
 	int PercentDots		= 0;
 	int ProgressDots	= 0;
 	myPb * pb{static_cast<myPb *> (userData)};    		//Recast
@@ -584,9 +588,16 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 			N_Vector stage2OutputVecs[]	= {r3};
 			realtype timePts[] 			= {6.0/8.0, 1.0};
 			realtype timePts2[]			= {1.0};
+			auto StartK=std::chrono::high_resolution_clock::now();
+
 
 			retVal = NewKrylov->ComputeKry(2, stage1InputVecs, timePts, 2, stage1OutputVecs, &jtimesv,
 				h, krylovTol, basisSizes[0], &integratorStats->krylovStats[0]);
+
+
+			auto StopK=std::chrono::high_resolution_clock::now();
+			auto PassK = std::chrono::duration_cast<std::chrono::nanoseconds>(StopK-StartK);
+			KiopsTimer += PassK.count()/1e9;	
 			if(retVal!=0)
 			{
 				ForceRej 	= 1;
@@ -608,9 +619,12 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 			N_VScale(h,Remainder,Remainder);        //set Remainder= h R(Y1)
 			N_Vector stage2InputVecs[]= {zeroVec, zeroVec, zeroVec, Remainder}; //[0,0,0,hR(Y1)]
 			//Run Kiops again.
+			auto StartK2=std::chrono::high_resolution_clock::now();
 			retVal = NewKrylov->ComputeKry(4, stage2InputVecs, timePts2, 1, stage2OutputVecs, &jtimesv,
 					h, krylovTol, basisSizes[0], &integratorStats->krylovStats[0]);
-
+			auto StopK2=std::chrono::high_resolution_clock::now();
+			auto PassK2 = std::chrono::duration_cast<std::chrono::nanoseconds>(StopK2-StartK2);
+			KiopsTimer += PassK2.count()/1e9;
 			if(retVal!=0)
 			{
 				//cout << "We have returned an error in Phi3\n";
@@ -743,7 +757,7 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	}//end Loop
 
 	std :: cout << std :: endl;
-
+	//std :: cout << KiopsTimer << endl;
 	// std :: cout << "Internal step:" << InternalSteps << std :: endl;
 	// std :: cout << "Kiops Errors: " << KiopsErrors << std :: endl;
 	// std :: cout << "Integration steps: " << IntSteps << std :: endl;
@@ -753,6 +767,8 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	pb->BadErrSteps		= ErrEstPoor;
 	pb->BlowupSteps		= NaNPhiCount;
 	pb->KiopsBlowups	= KiopsErrors;
+	pb->KiopsTime		= KiopsTimer;
+	//std :: cout << pb->KiopsT << endl;
 
 	if(pb->Movie==1)
 	{
@@ -790,7 +806,10 @@ NewKiops::NewKiops(int maxNumVectors, int m_max, N_Vector templateVector, int ve
       M_min(10),
       Orth_len(vecLength),
       MatrixSize(m_max + 1),
-      PhiMatrixSize(MatrixSize + 1)
+      PhiMatrixSize(MatrixSize + 1),
+	  OrthogTime(0.0),
+	  ProjectTime(0.0),
+	  AdaptTime(0.0)
 {
     V = N_VCloneVectorArray(MatrixSize, templateVector);
     if ( V == NULL ) {
@@ -866,7 +885,6 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
 	// Phifile.open("FailedIsoPhiMat.txt", std::ios_base::app);
     // We only allow m to vary between mmin and mmax
     m = max(M_min, min(M_max, m));
-
     // Initial condition
     N_VScale(1.0, inputVectors[0], outputVectors[0]);
     
@@ -896,7 +914,6 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
     realtype tau = t_out;
     bool happy = false;
     int totalMatrixExponentials = 0;
-
     // Setting the safety factors and tolerance requirements
     realtype gamma, gamma_mmax;
     if (t_out > 1.0) {
@@ -922,7 +939,9 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
     int ireject = 0;
     int reject = 0;
 
+	
     while (t_now < t_out) {
+		
         if (j == 0) {
             for (int k = 1; k < p; k++) {
                 int i = p - k;
@@ -943,6 +962,7 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
         }
 
         // Incomplete orthogonalization process
+		auto Start=std::chrono::high_resolution_clock::now();
         while (j < m) 
 		{
             j++;
@@ -979,6 +999,7 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
 			if(isnan(nrm))
 			{
 				//cout << "norm is NaN\n";
+				return 1;
 			}
             // Happy breakdown
             if (nrm < tol) {
@@ -992,9 +1013,13 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
                 V_aug[j*p + k] /= nrm;
             }
         }
-
+		auto Stop=std::chrono::high_resolution_clock::now();
+		auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+		OrthogTime +=Pass.count()/1e9;
+		//End Orthogonalization
 
         // setup PhiMatrix
+	
         for (int i = 0; i < j; i++) {
            for (int k = 0; k < j; k++) {
                 phiMatrix[k + i * (j + 1)] = tau * sign * H[k + i * MatrixSize];
@@ -1006,12 +1031,17 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
         for (int k = 1; k < j + 1; k++) {
             phiMatrix[k + j * (j + 1)] = 0.0;
         }
-        
+
         
         // Compute the exponential of the augmented matrix
+		auto Start2=std::chrono::high_resolution_clock::now();
         expm->Compute(j + 1, phiMatrix);
+		auto Stop2=std::chrono::high_resolution_clock::now();
+		auto Pass2 = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop2-Start2);
+		ProjectTime+=Pass2.count()/1e9;
         totalMatrixExponentials++;
         
+		
         double m_new, tau_new;
         if (happy) {
             // Happy breakdown; wrap up
@@ -1028,23 +1058,6 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
 			//======================
 			if(isnan(err))//New, put a better condition in here
 			{
-				// cout << "Dumping the phi matrix to PhiMat.txt\n";
-				// cout << "Dumping the H matrix to HMat.txt\n"; 
-				// std :: cout << "Error State has occurred: Err NaN\n";
-				// std :: cout << "Beta: " << beta << "\n";
-				// std :: cout << "Phi Mat value: " <<phiMatrix[j-1 + j * (j+1)] << "\n";
-				// std :: cout << "H Mat value: " << H[j + (j-1) * MatrixSize] << "\n";
-				// cout << expm->Compute(j + 1, phiMatrix) << endl;
-				// cout << t_now << endl;
-				// for( int k = 0 ; k < MatrixSize*MatrixSize; k++)
-				// {
-				// 	Phifile << phiMatrix[k] << endl;
-				// 	Hfile   << tau*H[k] << endl;
-				// }
-				// Hfile   << endl << endl;
-				// Phifile << endl << endl;
-				// cout << "Error: LTE NaN" << endl;
-				//exit(EXIT_FAILURE);
 				return 1;
 			}
 			//===============
@@ -1108,6 +1121,7 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
 
         }
 
+
         // Check error against target
         if (omega <= delta) {
             // Yep, got the required tolerance; update
@@ -1138,7 +1152,11 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
                     }
                     
                     // Compute the exponential of the augmented matrix
+					auto Start3=std::chrono::high_resolution_clock::now();
                     expm->Compute(j, phiMatrixSkipped);
+					auto Stop3=std::chrono::high_resolution_clock::now();
+					auto Pass3 = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop3-Start3);
+					AdaptTime+=Pass3.count()/1e9;
                     totalMatrixExponentials++;
 
                     N_VLinearCombination(j, phiMatrixSkipped, V, outputVectors[l+k]);
@@ -1190,7 +1208,6 @@ int NewKiops::ComputeKry(const int numVectors, N_Vector* inputVectors, const rea
 		}
     }
     krylovStats->numMatrixExponentials = totalMatrixExponentials;
-
 	return 0;
 }
 
@@ -1292,8 +1309,8 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrateNoTChem(const realtype hStart, con
 			}
 			else
 			{
-				N_VScale(32.0/9.0, r3, r3);
-				//N_VScale(2.0, r3, r3);                       	//Old R3 is also the error estimate
+				//N_VScale(32.0/9.0, r3, r3);
+				N_VScale(2.0, r3, r3);                       	//Old R3 is also the error estimate
 				//get final err est for next step
 				N_VAbs(y, Scratch1);							//Scratch1 sp to be high order
 				N_VScale(relTol, Scratch1, Scratch1);			//relTol*|y|->Scratch1

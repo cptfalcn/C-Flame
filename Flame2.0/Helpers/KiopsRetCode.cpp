@@ -1,6 +1,6 @@
 //Starts the return code version of KIOPS
 #include "KiopsRetCode.h"
-int fac(int n) { return (n == 1 || n == 0) ? 1 : fac(n - 1) * n; }
+int fac1(int n) { return (n == 1 || n == 0) ? 1 : fac1(n - 1) * n; }
 
 
 KiopsRetCode::KiopsRetCode(int maxNumVectors, int m_max, N_Vector templateVector, int vecLength) 
@@ -8,7 +8,7 @@ KiopsRetCode::KiopsRetCode(int maxNumVectors, int m_max, N_Vector templateVector
       MaxPhiOrder(maxNumVectors-1),
       VecLength(vecLength),
       M_max(m_max),
-      M_min(10),
+      M_min(min(vecLength, 10)),
       Orth_len(vecLength),
       MatrixSize(m_max + 1),
       PhiMatrixSize(MatrixSize + 1)
@@ -80,11 +80,11 @@ int KiopsRetCode::ComputeKry(const int numVectors, N_Vector* inputVectors, const
 {
 	int p = numVectors - 1;
 	//Set optional dump filestreams
-	ofstream Hfile;
-	ofstream Phifile;
-	//Open said filestreams
-	Hfile.open("FailedIsoHMat.txt", std::ios_base::app);
-	Phifile.open("FailedIsoPhiMat.txt", std::ios_base::app);
+	// ofstream Hfile;
+	// ofstream Phifile;
+	// //Open said filestreams
+	// Hfile.open("FailedIsoHMat.txt", std::ios_base::app);
+	// Phifile.open("FailedIsoPhiMat.txt", std::ios_base::app);
     // We only allow m to vary between mmin and mmax
     m = max(M_min, min(M_max, m));
 
@@ -147,7 +147,7 @@ int KiopsRetCode::ComputeKry(const int numVectors, N_Vector* inputVectors, const
         if (j == 0) {
             for (int k = 1; k < p; k++) {
                 int i = p - k;
-                w_aug[k - 1] = pow(t_now, i) / fac(i) * mu;
+                w_aug[k - 1] = pow(t_now, i) / fac1(i) * mu;
             }
             w_aug[p - 1] = mu;
 
@@ -198,8 +198,10 @@ int KiopsRetCode::ComputeKry(const int numVectors, N_Vector* inputVectors, const
             }
             nrm = sqrt(nrm);
 			if(isnan(nrm))
-				cout << "norm is NaN\n";
-
+            {
+				//cout << "norm is NaN\n";
+                return 1;
+            }
             // Happy breakdown
             if (nrm < tol) {
                 happy = true;
@@ -288,15 +290,22 @@ int KiopsRetCode::ComputeKry(const int numVectors, N_Vector* inputVectors, const
                 kestold = true;
             }
 
-            double remaining_time = omega > delta ? t_out - t_now : t_out - (t_now + tau);
+            //double remaining_time = omega > delta ? t_out - t_now : t_out - (t_now + tau);
+            
+            double remaining_time = t_out - t_now;
+            if( omega - delta < 0)
+            {
+                remaining_time -= tau;
+            }
+
             // Krylov adaptivity
             double same_tau = min(remaining_time, tau);
             double tau_opt = tau * pow(gamma / omega, 1.0 / order);
 
-			if(isnan(tau_opt)||tau_opt<1e-10)		//Added by me to try to stop endless cycling conditions.
-			{
-				tau_opt= tau/100;	//Same as above.
-			}
+			// if(isnan(tau_opt)||tau_opt<1e-10)		//Added by me to try to stop endless cycling conditions.
+			// {
+			// 	tau_opt= tau/100;	//Same as above.
+			// }
             tau_opt = min(remaining_time, max(tau / 5.0, min(5.0 * tau, tau_opt)));
 	    	int m_opt = ceil(j + log(omega / gamma) / log(kest));
             m_opt = max(M_min, min(M_max, max((int)floor(3.0 / 4.0 * m),

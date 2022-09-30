@@ -14,6 +14,7 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <chrono>
 #include "TChem_Impl_IgnitionZeroD_Problem.hpp" // here is where Ignition Zero D problem is implemented
 
 #include <memory>
@@ -21,6 +22,9 @@
 class NewKiops{
     public:
         NewKiops(int maxNumVectors, int m_max, N_Vector templateVector, int vecLength);
+		realtype  OrthogTime;
+		realtype  ProjectTime;
+		realtype  AdaptTime;
         ~NewKiops();
         int ComputeKry(const int numVectors, N_Vector* inputVectors, const realtype timePoints[], const int numTimePoints, N_Vector* outputVectors, JTimesV* jtimesv, realtype h, realtype tol, int& m, KrylovStats* krylovStats);
     private:
@@ -35,6 +39,7 @@ class NewKiops{
 
         const int MatrixSize;
         const int PhiMatrixSize;
+
 
         N_Vector* V;
         realtype* V_aug;
@@ -76,6 +81,8 @@ class Epi3VChem_KIOPS
 		IntegratorStats* NewIntegrateNoTChem(const realtype hStart, const realtype hMax, const realtype absTol,
 			const realtype relTol, const realtype t0, const realtype tFinal,
 			int basisSizes[], N_Vector y);
+
+		NewKiops *NewKrylov;
 		
 	private:
     	CVRhsFn f;
@@ -84,7 +91,6 @@ class Epi3VChem_KIOPS
     	EPICNumJacDelta delta;
     	void *userData;
     	Kiops *krylov;
-		NewKiops *NewKrylov;
     	static const int NumProjectionsPerStep = 1;
     	static const int MaxPhiOrder1 = 2;
     	const int NEQ;

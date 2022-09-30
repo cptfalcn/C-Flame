@@ -29,6 +29,8 @@ echo ============================================Linking========================
 #==============
 /usr/bin/c++ ZeroDIgnVar.o \
 -g -O3 -w -fopenmp -DNDEBUG \
+~/Code/C++/Flame2.0/Helpers/Epi3VCntrl.o \
+~/Code/C++/Flame2.0/Helpers/KiopsRetCode.o \
 ~/Code/C++/Flame2.0/Helpers/InitConditions.o \
 ~/Code/C++/Flame2.0/Helpers/Print.o \
 ~/Code/C++/Flame2.0/Helpers/Epi3V.o \
@@ -82,7 +84,9 @@ Out="ScrapVar.txt"
 # TF=1.3e0 
 # Out="Scrap.txt"
 ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method="CVODEKry" --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-9 --relTol=1e-8 --Movie=0 --Input=gri3.0/sample.dat
+
 ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method="EPI3V" --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-10 --relTol=1e-1 --Movie=0 --Input=gri3.0/sample.dat
+./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method="EPI3VCntrl" --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-10 --relTol=1e-1 --Movie=0 --Input=gri3.0/sample.dat
 ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method="EPI3V" --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-10 --relTol=5e-2 --Movie=0 --Input=gri3.0/sample.dat
 #Both these stall and will not run.  But TChem TrBDF2 will run this sample okay.
 TF=5e-2

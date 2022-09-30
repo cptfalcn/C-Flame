@@ -27,7 +27,9 @@
 #include <chrono>
 #include "InitialConditions.h"
 #include "Epi3V.h"
+#include "Epi3VCntrl.h"
 #include "Print.h"
+//#include "Leja.hpp"
 
 using value_type = realtype;
 #define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<value_type, Tines::UseThisDevice<TChem::host_exec_space>::type >
@@ -47,6 +49,7 @@ class myPb : public TCHEMPB{
 	realtype 				MaxStepTaken;
 	realtype 				MinStepTaken;
 	realtype 				ignTime;
+	realtype 				KiopsTime;				
 	SUNMatrix				Mat;
 	int 					Movie;
 	std :: string			dumpJacFile;
@@ -56,6 +59,8 @@ class myPb : public TCHEMPB{
 	int						KiopsBlowups;
 	std :: string			stepRatioFile;
 	realtype 				stepRatio;
+	realtype				ProjectTime;
+	realtype				OrthogTime;
 	//functions
 	ordinal_type			get_num_equations(void)
 	{
@@ -74,7 +79,9 @@ void PrintBanner();
 int RHS_TCHEM(realtype, N_Vector, N_Vector, void *);
 
 //JtV functions
-int Jtv_TCHEM(N_Vector , N_Vector ,realtype, N_Vector, N_Vector , void* , N_Vector );
+int Jtv_TCHEM		(N_Vector , N_Vector ,realtype, N_Vector, N_Vector , void* , N_Vector );
+int JtV_TCHEM_Fast	(N_Vector , N_Vector ,realtype, N_Vector, N_Vector , void* , N_Vector );
+
 
 //Misc functions
 void PrintFromPtr(realtype *,  int);
@@ -91,6 +98,7 @@ int CVodeComputeJacWrapper(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
                void * pb, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
 void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, 
 				N_Vector tmp, realtype * JV);
+void MatrixVectorProductFast(int len, N_Vector Jac, N_Vector x, N_Vector tmp, realtype * JV);
 
 //=====================
 //Namespaces and globals
@@ -207,6 +215,7 @@ int main(int argc, char* argv[])
 		N_Vector y 				= N_VNew_Serial(number_of_equations, sunctx); //state
 		N_VScale(0.0, y, y);
 		realtype *data 			= NV_DATA_S(y);	//set the pointer to the state
+		//const int MaxKrylovIters= max(30,10);//use 1000
 		const int MaxKrylovIters= max(number_of_equations,10);//use 1000
 
 		//Print mechanism data
@@ -226,6 +235,11 @@ int main(int argc, char* argv[])
 		{
 			PressMult = 10;
 		}
+
+		if(Experiment == 2 && SampleNum == 10)
+		{
+			PressMult = 10;
+		}
 		
 		SetIntCons(Experiment, SampleNum, data);		//Will depreciate?
 	    //=================
@@ -242,7 +256,9 @@ int main(int argc, char* argv[])
 		problem.num_equations		= number_of_equations;
 		problem.Jac					= N_VNew_Serial(number_of_equations*number_of_equations, sunctx);//Make the Jacobian
 		problem.t					= 0;
-		problem.stepRatioFile		= "ZeroDVariableExp"+to_string(Experiment)+"Stepfile.txt";
+		problem.stepRatioFile		= "";
+		//problem.stepRatioFile		= "ZeroDVariableExp"+to_string(Experiment)+"Stepfile.txt";
+		problem.KiopsTime			= 0;
 		//==============================================
 		//Create integrators
 		//==============================================
@@ -267,17 +283,18 @@ int main(int argc, char* argv[])
         //Set linear solver
         retVal = CVodeSetLinearSolver(cvode_mem, LS, A);//A might be null, try that
         retVal = CVodeSetNonlinearSolver(cvode_mem, NLS);
-		retVal = CVodeSetJacTimes(cvode_mem, NULL, Jtv_TCHEM);
+		retVal = CVodeSetJacTimes(cvode_mem, NULL, JtV_TCHEM_Fast);
 		retVal = CVodeSetLSetupFrequency(cvode_mem, 1); //Remove because also stupid.
 		retVal = CVodeSetJacEvalFrequency(cvode_mem, 1);//Remove becuase this is stupid.
 		retVal = CVodeSetJacFn(cvode_mem, CVodeComputeJacWrapper);//Error if removed .
 		retVal = CVodeSetMaxNumSteps(cvode_mem, 1e6);
-		retVal = CVodeSetMaxOrd(cvode_mem, 2);
+		retVal = CVodeSetMaxOrd(cvode_mem, 3);
 		//Set Epi3V
 		IntegratorStats *integratorStats = NULL;
-		Epi3VChem_KIOPS * EPI3V = new Epi3VChem_KIOPS(RHS_TCHEM, Jtv_TCHEM, 
+		Epi3VChem_KIOPS * EPI3V = new Epi3VChem_KIOPS(RHS_TCHEM, JtV_TCHEM_Fast, 
 			CVodeComputeJacWrapper, pbptr, MaxKrylovIters, y, number_of_equations);
-
+		Epi3VCntrl * EPI3VCntrl = new Epi3VCntrl(RHS_TCHEM, JtV_TCHEM_Fast, 
+			CVodeComputeJacWrapper, pbptr, MaxKrylovIters, y, number_of_equations);
 
 		//================
 		//Pre-run printing
@@ -288,6 +305,7 @@ int main(int argc, char* argv[])
 		//=================================
 		//Select and run integrator
 		//=================================
+		cout << BAR << Method << " selected " << BAR << endl;
 		auto Start=std::chrono::high_resolution_clock::now();//Time integrator
 
 		if(Method == "CVODEKry")
@@ -295,6 +313,11 @@ int main(int argc, char* argv[])
 		else if(Method == "EPI3V")
 		{
 			integratorStats = EPI3V->NewIntegrate(StepSize, maxSS, absTol, relTol, 
+								0.0, FinalTime, startingBasisSizes, y);
+		}
+		else if(Method =="EPI3VCntrl")
+		{
+			integratorStats = EPI3VCntrl->NewIntegrate(StepSize, maxSS, absTol, relTol, 
 								0.0, FinalTime, startingBasisSizes, y);
 		}
 		else
@@ -315,9 +338,10 @@ int main(int argc, char* argv[])
 		cout << "Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
 		if (Profiling ==1){//Invalid for experiment 0
 			cout << BAR << "    Profiling   " << BAR << endl;
-			ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
+			ofstream ProFile("ZeroDVariableExp"+to_string(Experiment)+ "Method"+ Method + "Sample" + to_string(SampleNum) +"Profile.txt", std::ios_base::app);
+			//ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
 
-			if(Method == "EPI3V")
+			if(Method == "EPI3V" || Method == "EPI3VCntrl")
 			{
 				integratorStats->PrintStats();
 				EffRating 	= 100*integratorStats->numTimeSteps/static_cast<realtype>(problem.InternalSteps);
@@ -333,37 +357,90 @@ int main(int argc, char* argv[])
 				cout << "Sucessful time steps: " << StepCount << endl;
 				cout << "Total Internal steps: " << problem.InternalSteps << endl;
 
-				ProFile << problem.BadErrSteps << "\t";
-				ProFile << problem.BlowupSteps << "\t";
-				ProFile << problem.KiopsBlowups << "\t";
+				// ProFile << problem.BadErrSteps << "\t";
+				// ProFile << problem.BlowupSteps << "\t";
+				// ProFile << problem.KiopsBlowups << "\t";
+				ProFile << integratorStats->krylovStats->numIterations << "\t";
+				ProFile << integratorStats->krylovStats->numProjections << "\t";
+				ProFile << integratorStats->krylovStats->numRejections << "\t";
 
 			}
 			else if(Method == "CVODEKry")
 			{
+				FILE * pFile;
+				pFile = fopen ("Profiling.txt" , "a");
+				//Want:
+				//total steps
+				//Non-linear iterations
+				long int nliters 	= 0 ;
+				long int nniters	= 0 ;
+				//Fails
+				long int nncfails   = 0 ;
+				long int nlcfails	= 0 ;
+				//Get total steps
 				CVodeGetNumSteps(cvode_mem, &StepCount);
+
+				//Get linear iterats
+				CVodeGetNumLinIters(cvode_mem, & nliters);
+				//Get nonlinear solve iters and nonlinear fails
+				CVodeGetNonlinSolvStats(cvode_mem, & nniters, & nncfails);
+				CVodeGetNumLinConvFails(cvode_mem, &nlcfails);
+				cout << "Steps: " << StepCount << endl;
+				cout << "Linear Iterations: " << nliters << endl;
+				cout << "NonLinear Iterations: " << nniters << endl;
+				//cout << "Linear Convergence fails: " << nlcfails << endl;
+				cout << "Linear Iterations per step: " << nliters/(realtype)StepCount << endl;
+				cout << "Linear Iterations per NonLinear iteration: " << nliters/(realtype)nniters<<endl;
+				cout << "Nonlinear Iterations per Step: " << nniters/(realtype)StepCount << endl;
+				CVodePrintAllStats(cvode_mem, pFile, SUN_OUTPUTFORMAT_TABLE);
+				fclose(pFile);
+				ProFile << nliters << "\t" << nniters << "\t" << nlcfails << "\t";
 			}
 
-
-	
+			ProFile << StepCount << "\t\t";
+			cout << "General \t " << BAR << endl;
+			cout << "Steps: " << StepCount << endl;
 			cout << BAR << "Jacobian\t" << BAR << endl;
 			cout << "Jacobian calls: " << JacCnt << endl;
 			cout << "Jacobian time:  " << JacTime << endl;
-			ProFile << JacCnt << "\t" << JacTime << "\t";
+			ProFile << JacCnt << "\t" << JacTime << "\t\t";
 
 			cout << BAR << "RHS\t\t" << BAR << endl;
 			cout << "RHS calls: " << RHSCnt << "\n";
 			cout << "RHS time:  " << RHSTime << endl;
-			ProFile << RHSCnt << "\t" << RHSTime << "\t";
+			ProFile << RHSCnt << "\t" << RHSTime << "\t\t";
 
 			cout << BAR << "Jtv\t\t" << BAR << endl;
 			cout << "Jtv calls: " << JtvCnt << endl;
 			cout << "Jtv time:  " << MatVecTime << endl;
-			ProFile << JtvCnt << "\t" << MatVecTime << "\t";
+
+			cout << "Kiops Time: " << problem.KiopsTime << endl;
+			ProFile << JtvCnt << "\t" << MatVecTime << "\t\t" << KTime << "\t" << problem.KiopsTime <<"\t\t"; 
+
+			
+			if (Method == "EPI3V")
+			{
+				cout << "Kiops internal time" << BAR << endl;
+				cout << "Orthog time: " << EPI3V->NewKrylov->OrthogTime << endl;
+				cout << "Projection time: " << EPI3V->NewKrylov->ProjectTime << endl;
+				ProFile << EPI3V->NewKrylov->OrthogTime << "\t";
+				ProFile << EPI3V->NewKrylov->ProjectTime << "\t";
+				ProFile << EPI3V->NewKrylov->AdaptTime << "\t";
+
+			}
+			else
+			{
+				ProFile << 0.0 << "\t";
+				ProFile << 0.0 << "\t";
+				ProFile << 0.0 << "\t";
+
+			}
 
 			ProFile << "\t " << Experiment << "\t" << SampleNum << "\t";
 			ProFile << FinalTime << "\t" << StepSize << "\t";
 			ProFile << absTol <<"\t" << relTol << endl;
 			ProFile.close();
+
 
 		}//End Profiling
 		cout << BAR <<"Printing data to "<< MyFile << BAR << endl;
@@ -543,7 +620,7 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 {
 	//problem_type problem;
 	myPb * pbPtr{static_cast<myPb *> (pb)};//Recast
-	ordinal_type number_of_equations=pbPtr->num_equations;//Get number of equations
+	int number_of_equations=pbPtr->num_equations;//Get number of equations
 	//======================================
 	//Set the necessary vectors and pointers
 	//======================================
@@ -555,10 +632,25 @@ int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void
 	//===================
 	g_timer.reset();
 	MatrixVectorProduct(number_of_equations, JacD, v, tmp, JV);
+	//MatrixVectorProductFast(number_of_equations, pbPtr->Jac, v, tmp, JV);
+
 	MatVecTime+=g_timer.seconds();
 	JtvCnt ++;
 	return 0;
 }
+
+int JtV_TCHEM_Fast(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void* pb, N_Vector tmp)
+{
+	myPb * pbPtr{static_cast<myPb *> (pb)};//Recast
+	N_VConst(0.0, Jv);
+	g_timer.reset();
+	MatrixVectorProductFast(pbPtr->num_equations, pbPtr->Jac, v, tmp, NV_DATA_S(Jv));
+	MatVecTime += g_timer.seconds();
+	JtvCnt ++;
+	return 0;
+}
+
+
 
 
 //====== ____===========================//
@@ -656,6 +748,19 @@ void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N
 	}
 }
 
+
+void MatrixVectorProductFast(int len, N_Vector Jac, N_Vector x, N_Vector tmp, realtype * JV)
+{
+	realtype * X 			= NV_DATA_S(x);
+	realtype * JacD			= NV_DATA_S(Jac);
+	for (int i=0; i< len; i++)//for each state
+	{
+		for(int j=0; j<len; j++)//marches across the column
+		{
+			JV[i] += X[j] * JacD[j+ i * len];
+		}
+	}
+}
 
 void PrintBanner()
 {
