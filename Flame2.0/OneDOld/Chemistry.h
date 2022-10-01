@@ -18,6 +18,7 @@
 
 #include "TChem_NetProductionRatePerMass.hpp"
 #include "TChem_SpecificHeatCapacityPerMass.hpp"
+#include <omp.h>
 
 //#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<TChem::KineticModelConstData<Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace> >>
 #define TCHEMPB TChem::Impl::IgnitionZeroD_Problem      <TChem::KineticModelConstData   <Kokkos::Device <Kokkos::Serial, Kokkos::HostSpace>  >  >
@@ -180,16 +181,16 @@ class myPb2{
 	CVRhsFn RHS_Heat;
 	CVRhsFn RHS_Full;
 	//Jtv functions
-	CVLsJacTimesVecFn 	Jtv_Chem;
-	CVLsJacTimesVecFn 	Jtv_Adv;
-	CVLsJacTimesVecFn 	Jtv_Diff;
+	CVLsJacTimesVecFn 	JtV_Chem;
+	CVLsJacTimesVecFn 	JtV_Adv;
+	CVLsJacTimesVecFn 	JtV_Diff;
 	CVLsJacTimesVecFn 	JtV_CrossDiff;
 
 
 
 	//Set the RHS functions
 	void Set_RHS(CVRhsFn, CVRhsFn, CVRhsFn, CVRhsFn);
-
+	void Set_Jtv(CVLsJacTimesVecFn, CVLsJacTimesVecFn, CVLsJacTimesVecFn,CVLsJacTimesVecFn);
 	//Scalar Gradient methods
 	void Set_ScalarGradient(N_Vector);
 	void Set_TransportGradient(N_Vector);
@@ -236,6 +237,8 @@ int Jtv_KAPPA(N_Vector , N_Vector , realtype , N_Vector , N_Vector , void * , N_
 
 //Helpers
 void MatrixVectorProduct(int, realtype *, N_Vector, N_Vector, realtype *);
+void MatVecProdFast(int, N_Vector, N_Vector, N_Vector, realtype *);
+void MatVecProdParallel(int, N_Vector, N_Vector, N_Vector, realtype *);
 
 //One-D versions
 	//RHS Functions
@@ -268,5 +271,5 @@ int Clean(int, realtype *);
 int RescaleTemp(realtype, realtype *, int);
 //Debugging
 realtype CompareJacobians(void *, void *, N_Vector, N_Vector, N_Vector, N_Vector, SUNMatrix);
-
+realtype TestMatVecProdPar();
 #endif

@@ -11,7 +11,16 @@ using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_t
 
 //==================================
 //New problem class
-//==================================
+//============================================================================================
+//  .d8888b.                             888                              888                    
+// d88P  Y88b                            888                              888                    
+// 888    888                            888                              888                    
+// 888         .d88b.  88888b.  .d8888b  888888 888d888 888  888  .d8888b 888888 .d88b.  888d888 
+// 888        d88""88b 888 "88b 88K      888    888P"   888  888 d88P"    888   d88""88b 888P"   
+// 888    888 888  888 888  888 "Y8888b. 888    888     888  888 888      888   888  888 888     
+// Y88b  d88P Y88..88P 888  888      X88 Y88b.  888     Y88b 888 Y88b.    Y88b. Y88..88P 888     
+//  "Y8888P"   "Y88P"  888  888  88888P'  "Y888 888      "Y88888  "Y8888P  "Y888 "Y88P"  888     
+//===========================================================================================                                                                                                                                                                                                            
 myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int GridPts,
 			N_Vector y,realtype Delx)
 {
@@ -92,19 +101,26 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 		MWPtr[i+1] = kmcd.sMass[i];
 		//std :: cout << MWPtr[i+1] << std :: endl;
 	}
-
-	// !!!This kills the 0-D problem!!!
-	// realtype * 			MolarWeightsPtr =	NV_DATA_S(MolarWeights);
-	// real_type_1d_view_type SpeciesMolecularWeights(MolarWeightsPtr   ,   GridPts-1);
-	// SpeciesMolecularWeights = Kokkos::create_mirror_view(this->pb._kmcd.sMass);
-	// Kokkos::deep_copy(SpeciesMolecularWeights, this->pb._kmcd.sMass);
-	
-	// //std :: cout << kmcd.sMass << std :: endl;
-	// //const auto SpeciesMolecularWeights = Kokkos::create_mirror_view(kmcd.sMass);
-	// std::setprecision(17);
-	// std :: cout << MolarWeightsPtr[0] << " zero-th mass entry?" << std :: endl;
 }
 
+//====================================================
+//  #     #                                           
+//  #     # ###### #      #####  ###### #####   ####  
+//  #     # #      #      #    # #      #    # #      
+//  ####### #####  #      #    # #####  #    #  ####  
+//  #     # #      #      #####  #      #####       # 
+//  #     # #      #      #      #      #   #  #    # 
+//  #     # ###### ###### #      ###### #    #  ####  
+//=========================================================
+//Run after construction to set problem specific parameters
+//=========================================================
+//============================================================================//
+//The RHS and JtV requires constants to scale their term as follows:		  //
+// AdvPart * adv + DiffPart * diff + ReacPart * reac + Heating*pow			  //
+//Additionally we set if the Velocity is update or not.						  //
+//depreciation:																  //
+//The VelUp will be removed in the future so that it is always being updated. //
+//============================================================================//
 void myPb2::SetAdvDiffReacPow(realtype adv, realtype diff, realtype reac, realtype pow, bool up)
 {
 	this->Adv=adv;
@@ -114,10 +130,16 @@ void myPb2::SetAdvDiffReacPow(realtype adv, realtype diff, realtype reac, realty
 	this->VelUp=up;
 }
 
+//============================================//
+//Sets the ghost point based off the vector y.
+//Main uses the initial condition y
+//============================================//
 void myPb2::SetGhost(N_Vector y)
 {
 	N_VScale(1.0, y, this->Ghost);
 }
+
+
 
 //=================
 //Destructor
@@ -147,6 +169,9 @@ myPb2::~myPb2()
 //==============================
 //Scale the pressure
 //==============================
+//Different experiment/samples can be run at different pressures.
+//The higher the pressure the more energy.
+//================================================================
 void myPb2::ScaleP(int Experiment, int Sample)
 {
 	realtype scale = 1.0;
@@ -158,6 +183,11 @@ void myPb2::ScaleP(int Experiment, int Sample)
 //===============================
 //Create the Velocity grids
 //===============================
+//This is run during setup.  The user can provide a constant velocity field value.
+//We set the velocity field to that, then call Set VelAve.
+//		SetVelAve is called after an integration step
+//		This gives access to the velocity at the cell center.
+//==================================================================================
 void myPb2::SetVels(int velLength, int velOpt)
 {
 	realtype * VelData 		= NV_DATA_S(this->Vel);
@@ -169,6 +199,9 @@ void myPb2::SetVels(int velLength, int velOpt)
 //===============================
 //Set Vel Average
 //===============================
+//Velocity is staggered above the scalar grid at its boundaries.
+//So we have to average the velocity onto the scalar grid.
+//The spacing of the velocity is superior: ith and ith+1 velocity pts associate to ith scalar 
 void myPb2::SetVelAve()
 {
 	realtype * VelData 		= N_VGetArrayPointer(this->Vel);
@@ -176,10 +209,17 @@ void myPb2::SetVelAve()
 	for(int i = 0 ; i < this->NumGridPts; i++)		//Before used GridPts-1
 		VelAveData[i]   	= (VelData[i] + VelData[i+1])/2;
 }
+
+
 //===========================
 //Get TempGradient
 //===========================
 //Note here we step up to the Velocity grid.
+//The Scalar grid is inferior to the velocity grid.
+//So the scalar ith and ith-1 associate to the ith velocity.
+//Because of the inferiority, this prelcudes the boundary pts.
+//Called by: myPb2::UpdateOneDVel (in a comment)
+//Status: Dangling
 void myPb2::TempGradient(N_Vector State, N_Vector Gradient)
 {
 	//Declare
@@ -194,6 +234,8 @@ void myPb2::TempGradient(N_Vector State, N_Vector Gradient)
 		GradD[i] = ( SD[i] - SD[i - 1])/this->delx;
 }
 
+//Called by: ???
+//Status:  Most likely dangling
 void myPb2::SetGradient(N_Vector Input, N_Vector GradientVec, realtype Ghost)
 {
 	//Declare
@@ -208,12 +250,43 @@ void myPb2::SetGradient(N_Vector Input, N_Vector GradientVec, realtype Ghost)
 		GradD[i] = ( SD[i] - SD[i - 1])/this->delx;
 }
 
+//        d88P   d88P  .d8888b.                             888                              888                    
+//       d88P   d88P  d88P  Y88b                            888                              888                    
+//      d88P   d88P   888    888                            888                              888                    
+//     d88P   d88P    888         .d88b.  88888b.  .d8888b  888888 888d888 888  888  .d8888b 888888 .d88b.  888d888 
+//    d88P   d88P     888        d88""88b 888 "88b 88K      888    888P"   888  888 d88P"    888   d88""88b 888P"   
+//   d88P   d88P      888    888 888  888 888  888 "Y8888b. 888    888     888  888 888      888   888  888 888     
+//  d88P   d88P       Y88b  d88P Y88..88P 888  888      X88 Y88b.  888     Y88b 888 Y88b.    Y88b. Y88..88P 888     
+// d88P   d88P         "Y8888P"   "Y88P"  888  888  88888P'  "Y888 888      "Y88888  "Y8888P  "Y888 "Y88P"  888     
+                                                                                                                 
+                                                                                                                                                                                                                                  
+//====================================================================
+// 888     888          888                   d8b 888             
+// 888     888          888                   Y8P 888             
+// 888     888          888                       888             
+// Y88b   d88P  .d88b.  888  .d88b.   .d8888b 888 888888 888  888 
+//  Y88b d88P  d8P  Y8b 888 d88""88b d88P"    888 888    888  888 
+//   Y88o88P   88888888 888 888  888 888      888 888    888  888 
+//    Y888P    Y8b.     888 Y88..88P Y88b.    888 Y88b.  Y88b 888 
+//     Y8P      "Y8888  888  "Y88P"   "Y8888P 888  "Y888  "Y88888 
+// 888     888               888          888                 888 
+// 888     888               888          888            Y8b d88P 
+// 888     888               888          888             "Y88P"  
+// 888     888 88888b.   .d88888  8888b.  888888 .d88b.           
+// 888     888 888 "88b d88" 888     "88b 888   d8P  Y8b          
+// 888     888 888  888 888  888 .d888888 888   88888888          
+// Y88b. .d88P 888 d88P Y88b 888 888  888 Y88b. Y8b.              
+//  "Y88888P"  88888P"   "Y88888 "Y888888  "Y888 "Y8888           
+//             888                                                
+//             888                                                
+//             888                                                
 //===================================================
 //Called by the main function in the integration loop
 //===================================================
 //Awaiting final test clear
 //DoTo:  Clean up extra memory allocations, use existing data
 //===================================================
+//Called by:  Main but commented out.
 void myPb2::UpdateOneDVel(N_Vector State)
 {
 	//Declare and clean
@@ -406,6 +479,8 @@ void myPb2::CheckNaN(N_Vector State, int vecLength)
 	}
 }
 
+
+
 //End Class functions
 //===========================================================
 //||  <:::::>  <::::>  <:::::>     <:::>         <::::>    ||
@@ -497,6 +572,59 @@ void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N
 		}
 		JV[i]=N_VDotProd(tmp,x);
 	}
+}
+
+void MatVecProdFast(int len, N_Vector Jac, N_Vector x, N_Vector tmp, realtype * JV)
+{
+	realtype * X 			= NV_DATA_S(x);
+	realtype * JacD			= NV_DATA_S(Jac);
+	for (int i=0; i< len; i++)//for each state
+	{
+		for(int j=0; j<len; j++)//marches across the column
+		{
+			JV[i] += X[j] * JacD[j+ i * len];
+		}
+	}
+}
+
+void MatVecProdParallel(int len, N_Vector Jac, N_Vector x, N_Vector tmp, realtype * JV)
+{
+#pragma omp parallel num_threads(4)
+{	
+	//realtype * TMP  		= NV_DATA_S(tmp);
+	realtype * X 			= NV_DATA_S(x);
+	realtype * JacD			= NV_DATA_S(Jac);
+	double* PrivateJV = (double*)calloc(len, sizeof(double));
+	for (int i=0; i< len; i++)//for each state
+	{
+		for(int j=0; j<len; j++)//marches across the column
+		{
+			PrivateJV[i] += X[j] * JacD[j+ i * len];
+		}
+	}
+	#pragma omp critical
+    {
+        for(int i =0; i<len; i++) 
+			JV[i] += PrivateJV[i];
+    }
+	free(PrivateJV);
+}
+// #pragma omp parallel num_threads(4)
+// {
+//     int y,i;
+//     double* results_private = (double*)calloc(matrix_size, sizeof(double));
+//     for(y = 0; y < matrix_size ; y++) {
+//         #pragma omp for
+//         for(i = 0; i < matrix_size; i++) {
+//             results_private[y] += vector[i]*matrix[i][y];   
+//         }
+//     }
+//     #pragma omp critical
+//     {
+//         for(y=0; y<matrix_size; y++) results[y] += results_private[y];
+//     }
+//     free(results_private);
+// }
 }
 
 
@@ -666,6 +794,8 @@ void myPb2::VerifyHeatingExp(N_Vector State, N_Vector State0, realtype tElapsed)
 // | |___ |     | |     ||  _ \  | |_| | | |
 // |_____| \___/   \___/ |_| \_\  \___/  |_|
 //===============================================
+
+//To be removed from release version
 void myPb2::VerifyTempTable(N_Vector State)
 {
 	realtype * Data 		= N_VGetArrayPointer(State);
@@ -696,6 +826,11 @@ void myPb2::VerifyTempTable(N_Vector State)
 	}
 }
 
+
+//================================================================================
+//Sets the Transport properties based off the table provided to us by Dr. Bisetti
+//Pushed to production
+//================================================================================
 int myPb2::TempTableLookUp(realtype Temp, N_Vector TempTable)
 {
 	realtype * LookupTemp	= N_VGetArrayPointer(TempTable);
@@ -721,6 +856,16 @@ void myPb2::Set_RHS(CVRhsFn OneD_RHS_Chem, CVRhsFn OneD_RHS_Adv, CVRhsFn OneD_RH
 	this->RHS_Diff		=OneD_RHS_Diff;
 	this->RHS_Chem		=OneD_RHS_Chem;
 	this->RHS_Heat 		=OneD_RHS_Heat;
+}
+
+void myPb2::Set_Jtv(CVLsJacTimesVecFn OneD_JtV_Adv, CVLsJacTimesVecFn OneD_Jtv_Chem, CVLsJacTimesVecFn OneD_JtV_CrossDiff,CVLsJacTimesVecFn OneD_JtV_Diff)
+{
+	this->JtV_Adv		=  	OneD_JtV_Adv;
+	this->JtV_Diff		=  	OneD_JtV_Diff;
+	this->JtV_CrossDiff	= 	OneD_JtV_CrossDiff;
+	this->JtV_Chem		= 	OneD_Jtv_Chem;
+	
+
 }
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
@@ -1439,6 +1584,7 @@ void myPb2::Set_GasWeight(N_Vector State)
 
 }
 
+//Gas weight is 1/(1/W) when returned
 void myPb2::Set_GasWeightBisetti(N_Vector State)
 {
 	realtype * GWPtr 	= NV_DATA_S(this->GasWeight);
@@ -1542,6 +1688,7 @@ void myPb2::Set_VelocityDivergence(N_Vector State)
 	N_VScale(0.0, this->Tmp, this->Tmp);
 	N_VScale(0.0, this->SmallScrap, this->SmallScrap);
 	realtype GasConst  	= this->GasConst;  //8.31446261815324;
+	this->Set_GasWeightBisetti(State);
 
 	realtype * SD			= N_VGetArrayPointer(State);
 	realtype * TmpD			= N_VGetArrayPointer(Tmp);			//Small Tmp data
@@ -1630,6 +1777,8 @@ void myPb2::Set_VelocityDivergence_TempDiff(N_Vector State)
 	//This houses the velocity RHS boundary data
 	realtype * VelBndPtr= NV_DATA_S(this->SmallScrap);
 	realtype * CpPtr	= NV_DATA_S(this->CpGrid);
+	realtype * RhoPtr 	= NV_DATA_S(this->RhoGrid);
+	realtype * GasWPtr  = NV_DATA_S(this->GasWeight);
 	N_VScale(0.0, this->Tmp, this->Tmp);
 	N_VScale(0.0, this->SmallScrap, this->SmallScrap);
 
@@ -1641,10 +1790,16 @@ void myPb2::Set_VelocityDivergence_TempDiff(N_Vector State)
 	}
 	//Start cross diffusion
 	this->RHS_CrossDiff(t, State, this->Tmp, this);
-	//Take the data and modify the Temperature diffusion by R/cp.
+	//Take the data and modify the Temperature diffusion by R/cp (dimensionless quantity).
+	//p = rho R T
+	//So R/cp = p/(rho * cp * T)
+	//[Grad lambda dot Grad T] = M/(T^3 THETA) * THETA/ L = M/(T^3 L)
+	// note [p] = M/(L T^2), so dividing by pressure gives 1/T
+	// So the prefactor looks like : 1/ (rho R T ) * R/ cp = 1/(rho cp T )
+	//But some terms are already included in RHS_CrossDiff, namely 1/(rho cp)
 	for( int i = 0; i < this->NumGridPts; i ++)
 	{
-		VelBndPtr[i]	+= GasConst/CpPtr[i] * TmpData[i];
+		VelBndPtr[i]	+= TmpData[i]/SData[i];	
 	}
 }
 
@@ -1672,19 +1827,25 @@ void myPb2::Set_VelocityDivergence_TempReac(N_Vector State)
 	realtype * RhoPtr	= NV_DATA_S(this->RhoGrid);
 	realtype * SSPtr 	= NV_DATA_S(this->SmallScrap);
 	realtype * TmpPtr 	= NV_DATA_S(this->Tmp);
+	realtype * Data 	= NV_DATA_S(State);
 
 	//Generate the chemistry state data
 	this->RHS_Chem(t, State, this->Tmp, this);
 	
+	// This is wrong, try the replacement above ln 2 in for loop
+	// R/cp * 1/p where p = rho R T gives:  R/ ( cp * rho * R * T) = 1/(cp rho T)
+
 	for (int i = 0 ; i < this->NumGridPts; i ++ )
 	{
-		SSPtr[i]		= TmpPtr[i] * (RhoPtr[i] * this->GasConst )/(this->pb._p* CpPtr[i]);
+		SSPtr[i]		= TmpPtr[i] / Data[i];
+
+		//SSPtr[i]		= TmpPtr[i] * (RhoPtr[i] * this->GasConst )/(this->pb._p* CpPtr[i]);
 	}
 
 }
-
-
-                                                                             
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+//YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY                                                                             
 // 88        88                                   88                            
 // 88        88                            ,d     ""                            
 // 88        88                            88                                   
@@ -1712,76 +1873,51 @@ void myPb2::Set_VelocityDivergence_TempHeat(N_Vector State)
 
 void myPb2::Set_VelocityDivergence_SpecDiff(N_Vector State)//This MUST be called first
 {
-	//Needs to write to small scrap
-	this->SetTransportGrid(State);
-	this->Set_ScalarGradient(State);
-	this->Set_TransportGradient(State);
+	//Will write to small scrap
+	//Intermediary vectors are large
 	//These vectors are large, and will be picked apart later.
+	//Get the Chemistry term
 	this->RHS_Chem(this->t, State, this->Tmp, this); //Saves into Tmp
+	//Get Diffusion
 	this->RHS_Diff(this->t, State, this->Scrap, this);//into Scrap
-	this->RHS_CrossDiff(this->t, State, this->Scrap2, this);//Into Scrap 2
-
-	// std :: cout << "Checking the maximum Chem value: " << N_VMaxNorm(this->Tmp) << std :: endl;
-	// std :: cout << "Checking standard diffusion: " << N_VDotProd(this->Scrap, this->Scrap) << std :: endl;
-	// std :: cout << "Checking Cross Diffusion: " << N_VDotProd(this->Scrap2, this->Scrap2) << std :: endl;
-	//All cleared up to this line.
-
-	N_VLinearSum(1.0, this->Scrap, 1.0, this->Scrap2, this->Scrap); //Combine both diffusion terms
-	N_VLinearSum(1.0, this->Tmp, 1.0, this->Scrap, this->Scrap);// The entire Diff-Reac on the Scrap grid.
-	//This is all correct, the Scrap has all the proper values.
-	//Debug
-	// std :: cout << "Checking if Diffusion is 0: " << sqrt(N_VDotProd(this->Scrap, this->Scrap)) << std :: endl;
-	// std :: cout << "Checking the maximum value : " << N_VMaxNorm(this->Scrap) << std :: endl;
-	//this->Set_GasWeight(State);//Should be fine.
+	//Combine into Scrap
+	N_VLinearSum(1.0, this->Tmp, 1.0, this->Scrap, this->Scrap);
+	//Now Chem & Diffusion are on the same grid.
+	//Get Cross Diffusion onto Tmp
+	this->RHS_CrossDiff(this->t, State, this->Tmp, this);
+	//Combine
+	N_VLinearSum(1.0, this->Scrap, 1.0, this->Tmp, this->Scrap);
+	//All terms combined
 	this->Set_GasWeightBisetti(State);
-	
-	N_VConst(0.0, this->SmallScrap);
-	realtype * SpecDiffPtr 	= NV_DATA_S(this->Scrap); //Input had small scap before
-	//std :: cout << "Create some scratch vectors\n\n";
-	// N_Vector L45 = N_VNew_Serial(this->num_equations);
-	// N_Vector L46 = N_VNew_Serial(this->num_equations);
-	//These two get the points molar weight
+	//Get Pointer to Diff-Chem terms
+	realtype * SpecDiffPtr 	= NV_DATA_S(this->Scrap);
+
+	//Pointer to the molar weight
 	realtype * MassPtr 		= NV_DATA_S(this->MolarWeights); //Input
 	//This is the gas weight
 	realtype * GasWPtr 		= NV_DATA_S(GasWeight);
+	//Pointer to output N_Vector
 	realtype * TmpPtr		= NV_DATA_S(this->VelAve);//Output
-	int 		StateInd	= 0;
-	realtype    Scratch 	= 0;
-	realtype 	GasSratcch  = 0;
-	//For each 
+	N_VConst(0.0, this->VelAve);
 
-	// std :: cout << "Sanity check\n";
-	// std :: cout << "Diff vector length: " << N_VGetLength(this->SmallScrap) << "\n\n";
+	int 		StateInd	= 0;
 	for(int i = 0; i < this->NumGridPts; i ++)
 	{
-		Scratch = 0;
-		GasSratcch = 0;
-		TmpPtr[i] = 0;
 		for(int j = 1 ; j < this->num_equations; j++)
 		{	
-			//StateInd 	=   i + j * this->num_equations;
+			//We jump to each SPECIES diffusion @ point i in the grid
 			StateInd 	=   i + j * this->NumGridPts;
-			
-			//v output sum  GasWght/SpecWght @i * Dy/dt @ i 
-			if( isnan ( GasWPtr[i]/MassPtr[j]) * SpecDiffPtr[StateInd] )
-			{
-				std :: cout << "GasWeight:" << GasWPtr[i];
-				std :: cout << "\n SpeciesWeight: " << MassPtr[j];//  << " * " << StatePtr[StateInd];
-				std :: cout << "\n Species Diff: " << SpecDiffPtr[StateInd] << std :: endl;
-			}
 			//output   add    weight @ i  spec j mass  * Diffusion @ i on grid j 
-			TmpPtr[i]  +=	(GasWPtr[i]   /   (MassPtr[j])) * SpecDiffPtr[StateInd] ;
-			GasSratcch +=   GasWPtr[i]   /   (MassPtr[j]);
-			//std :: cout << TmpPtr[i] << std :: endl;
-			Scratch += SpecDiffPtr[StateInd];
+			TmpPtr[i]  += SpecDiffPtr[StateInd] /MassPtr[j];
 		}
+		TmpPtr[i] = GasWPtr[i] * TmpPtr[i];
 	}
 
 }
 
 
-
-                                                                       
+//=======================================================================
+//=======================================================================                                                                       
 // 888888888888                             88                            
 //      88                           ,d     ""                            
 //      88                           88                                   
@@ -1799,6 +1935,7 @@ void myPb2::Set_VelocityDivergence_SpecDiff(N_Vector State)//This MUST be called
 // 88      a8P  88  "8a,   ,a8"  "8a,   ,aa  88`"Yba,                     
 // 88888888P"   88   `"YbbdP"'    `"Ybbd8"'  88   `Y8a        
 //Test_VelocityDivergence
+//=========================================================================
 void myPb2::Test_VelocityDivergence(N_Vector TestState)
 {
 	//The function writes to this->SmallScrap

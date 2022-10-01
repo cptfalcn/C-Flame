@@ -22,6 +22,7 @@
 #include <iomanip>
 #include "TChem_CommandLineParser.hpp"
 #include <omp.h>
+#include <optional>
 
 //These two will be needed in the future
 //#include "TChem_Impl_NewtonSolver.hpp"
@@ -60,6 +61,8 @@ int OneD_JacArray		(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector,
 int OneD_JtV			(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 int OneD_JtV_Adv		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 int OneD_JtV_Diff		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+int OneD_JtV_DiffFast	(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+
 int OneD_JtV_CrossDiff	(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 int OneD_Jtv_Chem		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 
@@ -102,7 +105,7 @@ int main(int argc, char* argv[])
 	// Intial Declarations
 	//====================
 	int SlowDown 		= 0,	OldProjections	= 0;
-	int MaxIters	= 0,	OldIters	= 0,	CurrStepIters	 = 0, TotalIters = 0;
+	int MaxIters		= 0,	OldIters	= 0,	CurrStepIters	 = 0, TotalIters = 0;
 	realtype SlowTime		= 0;
 	static realtype FinalTime = 0;			//1.0e-4;//1e-4 seems to be the max
 	static const int NumBands = 3;			//Epic stuff, default is 3, but unused.
@@ -257,11 +260,11 @@ int main(int argc, char* argv[])
 		problem2.SetAdvDiffReacPow(ADV, DIFF, CHEM, POW, VelUp);//Additional set up.
 		problem2.kmd = kmd;
 		problem2.Set_RHS(OneD_RHS_Chem, OneD_RHS_Adv, OneD_RHS_Diff, OneD_RHS_Heat);
+		problem2.Set_Jtv(OneD_JtV_Adv, OneD_Jtv_ChemArray, OneD_JtV_CrossDiff, OneD_JtV_DiffFast);
 		problem2.RHS_CrossDiff=OneD_RHS_CrossDiff;//Attach optional cross diffusion for testing.
 		problem2.JtV_CrossDiff=OneD_JtV_CrossDiff;//Attach optional cross diffusion jtv for testing.
 		problem2.RHS_Full=OneD_RHS;
 	
-
 
 		//read in data, error if files do not exist
 		ReadData(problem2.CPPoly,		"Cp_fT.txt");
@@ -375,7 +378,9 @@ int main(int argc, char* argv[])
 			//Integrate
 			auto Start	=std::chrono::high_resolution_clock::now();//Time integrator
 			problem2.Set_ScalarGradient(State);
+			problem2.SetTransportGrid(State);
 			problem2.Set_TransportGradient(State);
+			
 
 			if(Method == "EPI2")
 			{
@@ -519,7 +524,7 @@ int main(int argc, char* argv[])
 		SUNMatDestroy(A);
 		SUNLinSolFree(SUPERLS);
 		SUNNonlinSolFree(SUPERNLS);
-        CVodeFree(&cvode_mem);
+        //CVodeFree(&cvode_mem);
   	}//end local kokkos scope.
   	Kokkos::finalize();	/// Kokkos finalize checks any memory leak that are not properly deallocated.
 	cout << BAR << "\tExiting without error\t" << BAR <<endl;
@@ -677,9 +682,9 @@ int OneD_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
 	//===================================================
 
 	//Given the temperature, set all the grids
-	pb->SetTransportGrid(State);
-	pb->Set_ScalarGradient(State);
-	pb->Set_TransportGradient(State);
+	// pb->SetTransportGrid(State);
+	// pb->Set_ScalarGradient(State);
+	// pb->Set_TransportGradient(State);
 
 	//ChemRHS============================================
 	auto StartChem=std::chrono::high_resolution_clock::now();	//Clock
@@ -744,11 +749,14 @@ int OneD_RHS_First		(realtype t, N_Vector State, N_Vector StateDot, void * UserD
 	auto Start=std::chrono::high_resolution_clock::now();
 	auto StartDiff=std::chrono::high_resolution_clock::now();	//Start Timing Diff
 	pb->RHS_Diff(t, State, pb->Tmp, UserData);
+	N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);
+	OneD_RHS_CrossDiff(t, State, pb->Tmp, UserData);
+	N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);
 	//SUPER_RHS_DIFF_CP(t, State, pb->Tmp, UserData);				//Diff call	
 	auto StopDiff=std::chrono::high_resolution_clock::now();
 	auto PassDiff = std::chrono::duration_cast<std::chrono::nanoseconds>(StopDiff-StartDiff);
 	pb->rhs_Diff+=PassDiff.count()/1e9;							//Finish timing Diff
-	N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);	//Add Diff to soln
+	//N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);	//Add Diff to soln
 
 
 	auto StartAdv=std::chrono::high_resolution_clock::now();	//Start timing Adv
@@ -790,7 +798,7 @@ int OneD_RHS_Second		(realtype t, N_Vector State, N_Vector StateDot, void * User
 	auto StopChem =std::chrono::high_resolution_clock::now();
 	auto PassChem = std::chrono::duration_cast<std::chrono::nanoseconds>(StopChem-StartChem);
 	pb->rhs_Chem+=PassChem.count()/1e9;
-	pb->RHS_Adv(t,State,pb->Tmp, UserData);
+	pb->RHS_Heat(t,State,pb->Tmp, UserData);
 	//SUPER_RHS_HEATING(t, State, pb->Tmp, UserData); 				//Heating
 	N_VLinearSum(pb->Power, pb->Tmp, 1.0, StateDot, StateDot);		//Add the heating to stateDot
 
@@ -997,20 +1005,23 @@ int OneD_JtV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void 
 	myPb2 * pbPtr{static_cast<myPb2 *> (pb)};			//Recast
 	N_VScale(0.0, Jv, Jv);
 	N_VScale(0.0, tmp, tmp);
-	pbPtr->SetTransportGrid(u);
-	pbPtr->Set_ScalarGradient(u);
-	pbPtr->Set_TransportGradient(u);
+	//pbPtr->SetTransportGrid(u);
+	//pbPtr->Set_ScalarGradient(u);
+	//pbPtr->Set_TransportGradient(u);
 
 
 	if(pbPtr->React>0){//Get Chem
 		//Chem
-		OneD_Jtv_ChemArray(v, Jv, t, u, fu, pb, tmp);
+		//OneD_Jtv_ChemArray(v, Jv, t, u, fu, pb, tmp);
+		pbPtr->JtV_Chem(v, Jv, t, u, fu, pb, tmp);
 		N_VScale(pbPtr->React, Jv, Jv);
 	}
 
 
 	auto StartAdv=std::chrono::high_resolution_clock::now();
-	OneD_JtV_Adv(v, tmp, t, u, fu, pb, tmp);
+	
+	pbPtr->JtV_Adv(v, tmp, t, u, fu, pb, tmp);
+	//OneD_JtV_Adv(v, tmp, t, u, fu, pb, tmp);
 	auto StopAdv=std::chrono::high_resolution_clock::now();
 	auto PassAdv = std::chrono::duration_cast<std::chrono::nanoseconds>(StopAdv-StartAdv);
 	pbPtr->jtv_Adv+=PassAdv.count()/1e9;
@@ -1019,7 +1030,8 @@ int OneD_JtV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void 
 
 	// Diff
 	auto StartDiff=std::chrono::high_resolution_clock::now();
-	OneD_JtV_Diff(v,tmp,t,u, fu, pb, tmp);
+	pbPtr->JtV_Diff(v,tmp,t,u, fu, pb, tmp);
+	//OneD_JtV_Diff(v,tmp,t,u, fu, pb, tmp);
 	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
 	pbPtr->JtV_CrossDiff(v,tmp, t, u , fu, pb, tmp);
 	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
@@ -1065,6 +1077,9 @@ int OneD_JtV_First(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu,
 	// Diff
 	auto StartDiff=std::chrono::high_resolution_clock::now();
 	OneD_JtV_Diff(v,tmp,t,u, fu, pb, tmp);
+	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
+	pbPtr->JtV_CrossDiff(v,tmp, t, u , fu, pb, tmp);
+	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
 	auto StopDiff=std::chrono::high_resolution_clock::now();
 	auto PassDiff = std::chrono::duration_cast<std::chrono::nanoseconds>(StopDiff-StartDiff);
 	pbPtr->jtv_Diff+=PassDiff.count()/1e9;
@@ -1078,7 +1093,7 @@ int OneD_JtV_First(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu,
 	JtvDif ++;
 	JtvAdv ++;
 	JtvCnt ++;
-	cout << "Exiting JtV_First\n";
+	//cout << "Exiting JtV_First\n";
     return 0;
 }
 
@@ -1217,6 +1232,45 @@ int OneD_JtV_Diff(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu,v
     return 0;
 }
 
+int OneD_JtV_DiffFast(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu,void* userData, N_Vector tmp)
+{
+	myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
+    realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
+    realtype * resultData   = NV_DATA_S(Jv);//stuff goes in here.
+    realtype * vData        = NV_DATA_S(v);//Stuff also comes from here
+	realtype * CpPtr		= NV_DATA_S(problem->CpGrid);
+	realtype * DiffPtr		= NV_DATA_S(problem->DiffGrid);
+	realtype * RhoPtr		= NV_DATA_S(problem->RhoGrid);
+
+    int numPts              = problem->NumGridPts;
+    realtype delx           = problem->delx;
+    realtype divisor        = 1.0/(delx * delx);
+    int TI                  = 0;
+    int grid                = 0;
+    realtype T              = 0;					//Diff term
+    //realtype c              = divisor;
+	for (int i = 0; i < problem->vecLength; i++)
+	{
+		TI   = i%numPts;
+		grid = floor(i/numPts);
+		//Set Coefficient for step
+		if(i < numPts)						//Parse if we are in Temp or not
+			T 	= DiffPtr[ i ] / (RhoPtr[ i ] * CpPtr [i]  ); //get lambda/rhoCp for this temp
+		else 
+			T 	= DiffPtr[ grid * numPts + TI];								//We need to get DT for species i
+		//End parse Thermal lookup
+		//Main if
+		//std :: cout << T  << std :: endl;
+		if(i% numPts == 0)														//left
+			resultData[i] = divisor * T * (-2*vData[i] + vData[i+1]);
+    	else if (i % numPts == (numPts - 1) )									//right 0 neumann
+            resultData[i] = divisor * T * ( vData[i-1] - vData[i] );
+        else
+        	resultData[i] = divisor * T * (vData[i-1] - 2*vData[i] + vData[i+1]);
+    }
+	JtvDif++;
+    return 0;
+}
 
 //==========================================
 //  ______  _____  __  __  _____  __     __
@@ -1244,6 +1298,7 @@ int OneD_Jtv_ChemArray(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector
 	realtype * JVDATA 		= NV_DATA_S(Jv);
 	int Block 				= num_eqs*num_eqs;
 	N_Vector SmallJV 		= N_VNew_Serial(num_eqs*num_grid);
+	N_VConst(0.0, SmallJV);						//Small fix
 	realtype * SmallJVData	= NV_DATA_S(SmallJV);
 	N_Vector SmallV			= N_VNew_Serial(num_eqs*num_grid);
 	realtype * SmallVData	= NV_DATA_S(SmallV);
@@ -1260,7 +1315,9 @@ int OneD_Jtv_ChemArray(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector
 		auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
 		pbPtr->dataMoveTime+=Pass.count()/1e9;
 
-		MatrixVectorProduct(num_eqs, JACDATA, SmallV, SmallTmp, SmallJVData);
+		MatVecProdFast(num_eqs, pbPtr->Jacs[i], SmallV, SmallTmp, SmallJVData);
+
+		//MatrixVectorProduct(num_eqs, JACDATA, SmallV, SmallTmp, SmallJVData);
 
 		auto Start2=std::chrono::high_resolution_clock::now();
 		VEC_2_SUPER(i, SmallJVData, JVDATA, num_eqs, num_grid);
@@ -1416,7 +1473,7 @@ int OneD_RHS_Heat(realtype t, N_Vector u, N_Vector uDot, void * userData)
 int OneD_RHS_CrossDiff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 {
     myPb2 * problem{static_cast<myPb2 *> (userData)};	//Recast
-    realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
+    //realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
     realtype * resultData   = NV_DATA_S(uDot);//stuff goes in here.
 	//Transport Grids
 	realtype * CpPtr		= N_VGetArrayPointer(problem->CpGrid);
@@ -1425,23 +1482,19 @@ int OneD_RHS_CrossDiff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 	realtype * GradDataPtr	= NV_DATA_S(problem->ScalarGradient);
     int numPts 				= problem->NumGridPts;
     int grid 				= 0;
-    int tempInd 			= 0;
+    //int tempInd 			= 0;
 	int TI					= 0;
     realtype T  			= 1;
 	int TInd 				= 0;
     realtype * Ghost 		= NV_DATA_S(problem->Ghost);
     int vecLength 			= problem->num_equations * problem->NumGridPts;
 	//Transport Gradients
-	realtype * CpGradPtr	= NV_DATA_S(problem->CpGrad);
+	//realtype * CpGradPtr	= NV_DATA_S(problem->CpGrad);
 	realtype * RhoGradPtr	= NV_DATA_S(problem->RhoGrad);
 	realtype * DiffGradPtr	= NV_DATA_S(problem->DiffGrad);
 	realtype GradData		= 0;
 	//Run internal checks.
 
-	// std :: cout << "\n\nRho grid check!\n";
-	//N_VPrint_Serial(problem->RhoGrid);
-
-	//Start main loop
 	for (int i = 0; i < vecLength; i++)
 	{
 
@@ -1451,25 +1504,14 @@ int OneD_RHS_CrossDiff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 		if(i < numPts)//If we are looking at temp
 		{
 			resultData[i] = 1.0 / (RhoPtr[i] * CpPtr[i] ) * DiffGradPtr[i] * GradData;
-			//  std :: cout << "Index : " << i <<" rho: " << RhoPtr[i] << " Cp: " << CpPtr[i] << " DiffGrad: ";
-			//  std :: cout << DiffGradPtr[i] << "StateGrad: " << GradData << std:: endl;
-
-			//std :: cout << abs(GradData-TempGradPtr[i]) << endl;
 		}
 		else
 		{
 			resultData[i] = 1.0/ (RhoPtr[TI])	*(RhoGradPtr[TI]*DiffPtr[TI] + RhoPtr[TI] * DiffGradPtr[i]) * GradData;
-			//std :: cout << 1.0/ (RhoPtr[i]) << " " << RhoPtr[i] << std :: endl;
-			// std :: cout <<" Diff: " << DiffPtr[i] << " Cp: " << CpPtr[i] << " DiffGrad: ";
-			// std :: cout << DiffGradPtr[i] << " rhoGrad: " << RhoGradPtr[i] <<" StateGrad: " << GradData << std:: endl;
-			// std :: cout << resultData[i] << std :: endl;
+
 			
 		}
-		// if(isnan(resultData[i]))
-		// 	std :: cout << "index " << i << " has NaN\n";
-
     }
-	//std :: cout << std :: endl;
     return 0;
 }
 
