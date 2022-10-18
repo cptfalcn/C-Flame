@@ -51,37 +51,42 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 	N_VScale(1.0 , y, this->Ghost);						//Use y to get the ghost points.
 
 	//Velocity data
-	this->VelAve	= N_VNew_Serial(GridPts);			//Averaged velocity
-	this->Vel 		= N_VNew_Serial(GridPts+1);		//This is staggered bigger
+	this->VelAve		= N_VNew_Serial(GridPts);			//Averaged velocity
+	this->Vel 			= N_VNew_Serial(GridPts+1);		//This is staggered bigger
+	this->MatDerivative	= N_VClone(this->Vel);
+	this->MatDerScrap	= N_VClone(this->Vel);
 	//Data Tables:	All fixed sizes
-	this->CPPoly	= N_VNew_Serial(500);				//CP table
-	this->TempTable	= N_VNew_Serial(500);				//Temperature reference table
-	this->RhoTable	= N_VNew_Serial(500);				//Rho table
-	this->DiffTable	= N_VNew_Serial(500*num_eqs);		//Each scalar has its own table
-	this->RhoDiffTab= N_VNew_Serial(500*num_eqs);		//Each scalar has its own table
+	this->CPPoly		= N_VNew_Serial(500);				//CP table
+	this->TempTable		= N_VNew_Serial(500);				//Temperature reference table
+	this->RhoTable		= N_VNew_Serial(500);				//Rho table
+	this->DiffTable		= N_VNew_Serial(500*num_eqs);		//Each scalar has its own table
+	this->RhoDiffTab	= N_VNew_Serial(500*num_eqs);		//Each scalar has its own table
 	//Scratch work vectors
-	this->SmallScrap= N_VNew_Serial(GridPts);			//Used for any small grid
-	this->VelScrap	= N_VNew_Serial(GridPts+1);			//Used for any velocity grid
-	this->SmallChem	= N_VNew_Serial(num_eqs);			//Used for a single point of chem
-	this->Tmp 		= N_VNew_Serial(vecLength);			//TempScratch vector of full size
-	this->Scrap 	= N_VNew_Serial(vecLength);			//Temp storage, clean before accessing.
-	this->Scrap2 	= N_VClone(this->Scrap);			//Another temp storage vector.
+	this->SmallScrap	= N_VNew_Serial(GridPts);			//Used for any small grid
+	this->VelScrap		= N_VNew_Serial(GridPts+1);			//Used for any velocity grid
+	this->SmallChem		= N_VNew_Serial(num_eqs);			//Used for a single point of chem
+	this->Tmp 			= N_VNew_Serial(vecLength);			//TempScratch vector of full size
+	this->Scrap 		= N_VNew_Serial(vecLength);			//Temp storage, clean before accessing.
+	this->Scrap2 		= N_VClone(this->Scrap);			//Another temp storage vector.
 	this->ScalarGradient= N_VClone(this->Scrap);
 	//Options
-	this->HeatingOn = 1;
-	this->dumpJac	= 0;								//Do we dump the Jac for visualization
+	this->HeatingOn 	= 1;
+	this->dumpJac		= 0;								//Do we dump the Jac for visualization
 	//Transport grids
-	this->CpGrid	= N_VNew_Serial(GridPts);		//The value of Cp based on grid position.
-	this->RhoGrid	= N_VNew_Serial(GridPts);		//The value of Rho based on grid position.
+	this->CpGrid		= N_VNew_Serial(GridPts);		//The value of Cp based on grid position.
+	this->RhoGrid		= N_VNew_Serial(GridPts);		//The value of Rho based on grid position.
+	this->RhoGridPrev	= N_VClone(this->RhoGrid);		
 	std :: cout << "Vec length: " << vecLength << std :: endl;
 	this->DiffGrid		= N_VClone(this->Tmp);
+	this->LambdaGrid	= N_VClone(this->CpGrid);
 	//this->DiffGrid	= N_VNew_Serial(vecLength);			//Diffusion coefficient based on grid position.
-	this->MolarWeights = N_VNew_Serial(GridPts);		//Only grab the species molar wieghts;
+	this->MolarWeights 	= N_VNew_Serial(GridPts);		//Only grab the species molar wieghts;
 	//Gradient Grids
-	this->CpGrad	= N_VClone(this->CpGrid);
-	this->RhoGrad	= N_VClone(this->RhoGrid);
-	this->DiffGrad	= N_VClone(this->DiffGrid);
-	this->TempGrad	= N_VClone(this->CpGrid);
+	this->CpGrad		= N_VClone(this->CpGrid);
+	this->RhoGrad		= N_VClone(this->RhoGrid);
+	this->DiffGrad		= N_VClone(this->DiffGrid);
+	this->TempGrad		= N_VClone(this->CpGrid);
+	this->lambdaGrad	= N_VClone(this->LambdaGrid);
 
 	//Jacobian Array and prototype
 	N_Vector LittleJac	= N_VNew_Serial(num_eqs*num_eqs);//JacArray Prototype
@@ -154,6 +159,7 @@ myPb2::~myPb2()
 	N_VDestroy_Serial(this->Tmp);
 	N_VDestroy_Serial(this->SmallChem);
 	N_VDestroy_Serial(this->SmallScrap);//Problematic line?
+	N_VDestroy_Serial(this->MatDerivative);
 	N_VDestroy_Serial(this->VelScrap);
 	N_VDestroy_Serial(this->Scrap);
 	N_VDestroy_Serial(this->TempTable);
@@ -233,91 +239,6 @@ void myPb2::SetVelAve()
 		VelAveData[i]   	= (VelData[i] + VelData[i+1])/2;
 }
 
-
-//===========================
-//Get TempGradient
-//===========================
-//Note here we step up to the Velocity grid.
-//The Scalar grid is inferior to the velocity grid.
-//So the scalar ith and ith-1 associate to the ith velocity.
-//Because of the inferiority, this prelcudes the boundary pts.
-//Called by: myPb2::UpdateOneDVel (in a comment)
-//Status: Dangling
-void myPb2::TempGradient(N_Vector State, N_Vector Gradient)
-{
-	//Declare
-	realtype * SD		= N_VGetArrayPointer(State);
-	realtype * GD		= N_VGetArrayPointer(this->Ghost);
-	realtype * GradD	= N_VGetArrayPointer(Gradient);
-	int	End				= this->NumGridPts;
-	N_VScale(0.0, Gradient, Gradient);				//Zero out
-	//Loop
-	GradD[0]=(SD[0]-GD[0])/this->delx;				// Boundary
-	for( int i = 1 ; i < End; i ++)
-		GradD[i] = ( SD[i] - SD[i - 1])/this->delx;
-}
-
-//Called by: ???
-//Status:  Most likely dangling
-void myPb2::SetGradient(N_Vector Input, N_Vector GradientVec, realtype Ghost)
-{
-	//Declare
-	realtype * SD		= N_VGetArrayPointer(Input);
-	realtype * GD		= N_VGetArrayPointer(this->Ghost);
-	realtype * GradD	= N_VGetArrayPointer(GradientVec);
-	int	End				= this->NumGridPts;
-	N_VScale(0.0, GradientVec, GradientVec);				//Zero out
-	//Loop
-	GradD[0]=(SD[0]-Ghost)/this->delx;				// Boundary
-	for( int i = 1 ; i < End-1; i ++)
-		GradD[i] = ( SD[i] - SD[i - 1])/this->delx;
-}
-
-//        d88P   d88P  .d8888b.                             888                              888                    
-//       d88P   d88P  d88P  Y88b                            888                              888                    
-//      d88P   d88P   888    888                            888                              888                    
-//     d88P   d88P    888         .d88b.  88888b.  .d8888b  888888 888d888 888  888  .d8888b 888888 .d88b.  888d888 
-//    d88P   d88P     888        d88""88b 888 "88b 88K      888    888P"   888  888 d88P"    888   d88""88b 888P"   
-//   d88P   d88P      888    888 888  888 888  888 "Y8888b. 888    888     888  888 888      888   888  888 888     
-//  d88P   d88P       Y88b  d88P Y88..88P 888  888      X88 Y88b.  888     Y88b 888 Y88b.    Y88b. Y88..88P 888     
-// d88P   d88P         "Y8888P"   "Y88P"  888  888  88888P'  "Y888 888      "Y88888  "Y8888P  "Y888 "Y88P"  888   
-
-
-
-
-//=============================================
-//Verification tests for the Simpson Integrator
-//=============================================
-//Called by:  Main in testing mode.
-void myPb2::RunTests(N_Vector State)
-{
-	//Solve with V(0)=1, totally arbitrary.
-	N_VConst(1,this->Vel);
-	N_Vector fAve 	= N_VNew_Serial(this->NumGridPts+1);
-	realtype * FAD	= N_VGetArrayPointer(fAve);
-	N_VConst(1,fAve);
-
-	this->VelIntegrate( FAD, State, 1,1);
-	std:: cout << "Updated Const Velocity" << std :: endl;
-	N_VPrint_Serial(this->Vel);
-	std :: cout << "End Const Experiment" << std :: endl;
-
-	N_VConst(1,this->Vel);
-	SinWave(FAD, this->NumGridPts, this->NumGridPts, this->delx);
-	this->VelIntegrate(FAD, State, FAD[0], FAD[this->NumGridPts-1]);
-	std :: cout << "Updated Cos Velocity" << std :: endl;
-	N_VPrint_Serial(this->Vel);
-	std :: cout << "End Cos Experiment" << std :: endl;
-
-
-	SinWave2(FAD, this->NumGridPts, this->NumGridPts, this->delx);
-	this->VelIntegrate(FAD, State, FAD[0], FAD[this->NumGridPts-1]);
-	std :: cout << "Updated Sin Velocity" << std :: endl;
-	N_VPrint_Serial(this->Vel);
-	std :: cout << "End Sine Experiment" << std :: endl;
-	N_VDestroy(fAve);
-}
-
 //===========================
 //Additional Set up  Wrapper
 //===========================
@@ -335,24 +256,14 @@ void myPb2::SetGhostPVel(N_Vector y, int Experiment, int SampleNum, realtype Vel
 		this->SetVels(this->NumGridPts+1,VelVal);
 }
 
-//Called by: ???
-void myPb2::CheckNaN(N_Vector State, int vecLength)
-{
-	realtype * DATA = N_VGetArrayPointer(State);
-	for( int i = 0 ; i < vecLength; i ++)
-	{
-		if(isnan(DATA[i]) || abs(DATA[i]) >1e5)
-		{
-			if( isnan(DATA[i]) )
-				std :: cout << "Data has NaN: " <<  i << DATA[i] << "\n";
-			if(abs(DATA[i]) > 1e5)
-				std :: cout << "Data is out of control: "<< i << DATA[i] <<"\n";
-			exit(EXIT_FAILURE);
-		}
-	}
-}
-
-
+//        d88P   d88P  .d8888b.                             888                              888                    
+//       d88P   d88P  d88P  Y88b                            888                              888                    
+//      d88P   d88P   888    888                            888                              888                    
+//     d88P   d88P    888         .d88b.  88888b.  .d8888b  888888 888d888 888  888  .d8888b 888888 .d88b.  888d888 
+//    d88P   d88P     888        d88""88b 888 "88b 88K      888    888P"   888  888 d88P"    888   d88""88b 888P"   
+//   d88P   d88P      888    888 888  888 888  888 "Y8888b. 888    888     888  888 888      888   888  888 888     
+//  d88P   d88P       Y88b  d88P Y88..88P 888  888      X88 Y88b.  888     Y88b 888 Y88b.    Y88b. Y88..88P 888     
+// d88P   d88P         "Y8888P"   "Y88P"  888  888  88888P'  "Y888 888      "Y88888  "Y8888P  "Y888 "Y88P"  888   
 
 //End Class functions
 //===========================================================
@@ -434,8 +345,6 @@ int CHEM_COMP_JAC(N_Vector u, void* pb)
 //We cover our bases by doing MatVec directly for EPI methods.
 //By doing this, we don't have to transpose the data.
 */
-
-
 void MatVecProdFast(int len, N_Vector Jac, N_Vector x, N_Vector tmp, realtype * JV)
 {
 	realtype * X 			= NV_DATA_S(x);
@@ -555,7 +464,6 @@ int SUPER_CHEM_JAC_TCHEM(realtype t, N_Vector State, N_Vector StateDot, SUNMatri
 //=================
 //SUPERRHS_2_RHS
 //=================
-
 int  SUPER_2_VEC(int i, realtype * VECDATA, realtype* SUPERDATA, int num_eqs, int grid_sz)
 {
 	for(int j = 0; j < num_eqs; j++)//March over each equation of the state.
@@ -619,36 +527,6 @@ void myPb2::CheckHeating(N_Vector State, realtype t)
 
 }
 
-//Will be removed in final version
-void myPb2::VerifyHeatingExp(N_Vector State, N_Vector State0, realtype tElapsed)
-{
-	if( this->Adv == 0.0 && this->Diff == 0.0 && this->React == 0.0 && this->Power!=0)
-	{
-		//N_VPrint_Serial(State0);
-		CheckHeating(State0, 0);
-		if(this->HeatingOn==1)
-			std:: cout << "Verifying Heating\n";
-		else
-		{
-			std :: cout << "Error with the Heating Check\n";
-		 	exit(EXIT_FAILURE);
-		}
-	N_Vector Powered 	= N_VClone(State0);
-	N_VScale(1.0, State0, Powered);
-	this->RHS_Heat(tElapsed, State0, Powered, this);
-	//SUPER_RHS_HEATING(tElapsed, State0, Powered, this);
-	N_VScale(tElapsed*this->Power, Powered, Powered);		//RHS*Time
-	N_VLinearSum(1.0, State0, 1.0, Powered, Powered);		//S(0)+RHS*Time
-	N_VLinearSum(1.0, State, -1.0, Powered, Powered);
-	std :: cout << "Powered Error: " << sqrt(N_VDotProd(Powered,Powered)) << std :: endl ;
-	}
-	else
-	{
-		std :: cout << "Heating check skipped\n";
-	}
-
-
-}
 //==============================================
 //  _       ___     ___   _    _  _   _   ____ 
 // | |     /   \   /   \ | |_/ / | | | | |    \
@@ -711,10 +589,7 @@ int myPb2::TempTableLookUp(realtype Temp, N_Vector TempTable)
 }
 
 
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
+                                                                                        
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                                          
 //  ad88888ba                           88                                                   
@@ -856,6 +731,14 @@ void myPb2::Set_TransportGradient(N_Vector State)
 			GradDiff[j*gridjump + i] = (DiffData[j* gridjump+ i +1] - DiffData[j*gridjump+ i - 1 ])*denom;
 		}
 	}
+	//Set the lambda grad
+	realtype * LambdaGradPtr 	= NV_DATA_S(this->lambdaGrad);
+	for( int i = 0 ; i < this->NumGridPts ; i++)
+	{
+		LambdaGradPtr[i] = GradDiff[i] * RhoData[i] * CpData[i] +
+							DiffData[i] * GradRho[i] * CpData[i] +
+						 	DiffData[i] * RhoData[i] * GradCp[i]; 
+	}
 
 }
 
@@ -885,10 +768,6 @@ void myPb2::Set_GasWeightBisetti(N_Vector State)
 		//std :: cout << GWPtr[i] << std :: endl;
 		//Outputs uniform gas weight.
 	}
-
-
-	//N_VPrint_Serial(this->GasWeight);  //I don't understand why this line prints 0's
-
 }
 
 //88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
@@ -972,7 +851,7 @@ void myPb2::Set_VelocityDivergence(N_Vector State)
 	realtype * CpPtr	= NV_DATA_S(this->CpGrid);
 	N_VScale(0.0, this->Tmp, this->Tmp);
 	N_VScale(0.0, this->SmallScrap, this->SmallScrap);
-	realtype GasConst  	= this->GasConst;  //8.31446261815324;
+	//realtype GasConst  	= this->GasConst;  //8.31446261815324;
 	this->Set_GasWeightBisetti(State);
 
 	realtype * SD			= N_VGetArrayPointer(State);
@@ -996,26 +875,22 @@ void myPb2::Set_VelocityDivergence(N_Vector State)
 	//WARNING:  This must be run first, writes directly to the VelAve
 	//=======================================================
 	this->Set_VelocityDivergence_SpecDiff(State);
-	//N_VPrint_Serial(this->VelAve);
-	
 	//Temp Terms============================================
 	this->Set_VelocityDivergence_TempReac(State);				//Data Written to small scrap
 	N_VLinearSum(1.0, this->SmallScrap, 1.0, this->VelAve, this->VelAve);
 	//Set the boundary
 	SUPER_2_VEC(End, NV_DATA_S(this->PointScrap), SD, this->num_equations, this->NumGridPts);//copy right ghost state from far right
-
 	this->GhostChem(0, this->PointScrap, this->SmallChem, this);			//Right Floating Chem using Scratch
-	
 	this->VelAveLeftBnd= NV_DATA_S(SmallChem)[0]/GD[0];
 
-
+	//Temp Diff---
 	//N_VPrint_Serial(this->VelAve);
 	this->Set_VelocityDivergence_TempDiff(State);				//Data written to small scrap
 	N_VLinearSum(1.0, this->SmallScrap, 1.0, this->VelAve, this->VelAve);
-	//N_VPrint_Serial(this->VelAve);
 	//Set the boundary
 	this->VelAveRightBnd = VelBndPtr[End];
 
+	//Heating---
 	//Heating needs to be treated differently
 	this->Set_VelocityDivergence_TempHeat(State);
 	N_VLinearSum(1.0, this->SmallScrap, 1.0, this->VelAve, this->VelAve);
@@ -1149,6 +1024,10 @@ void myPb2::Set_VelocityDivergence_SpecDiff(N_Vector State)//This MUST be called
 	realtype * MassPtr 		= NV_DATA_S(this->MolarWeights); //Input
 	//This is the gas weight
 	realtype * GasWPtr 		= NV_DATA_S(GasWeight);
+
+	////////////////////////////
+	//Set
+	////////////////////////////
 	//Pointer to output N_Vector
 	realtype * TmpPtr		= NV_DATA_S(this->VelAve);//Output
 	N_VConst(0.0, this->VelAve);
@@ -1168,7 +1047,191 @@ void myPb2::Set_VelocityDivergence_SpecDiff(N_Vector State)//This MUST be called
 
 }
 
+//====================================================================
+// 888     888          888                   d8b 888             
+// 888     888          888                   Y8P 888             
+// 888     888          888                       888             
+// Y88b   d88P  .d88b.  888  .d88b.   .d8888b 888 888888 888  888 
+//  Y88b d88P  d8P  Y8b 888 d88""88b d88P"    888 888    888  888 
+//   Y88o88P   88888888 888 888  888 888      888 888    888  888 
+//    Y888P    Y8b.     888 Y88..88P Y88b.    888 Y88b.  Y88b 888 
+//     Y8P      "Y8888  888  "Y88P"   "Y8888P 888  "Y888  "Y88888 
+// 888     888               888          888                 888 
+// 888     888               888          888            Y8b d88P 
+// 888     888               888          888             "Y88P"  
+// 888     888 88888b.   .d88888  8888b.  888888 .d88b.           
+// 888     888 888 "88b d88" 888     "88b 888   d8P  Y8b          
+// 888     888 888  888 888  888 .d888888 888   88888888          
+// Y88b. .d88P 888 d88P Y88b 888 888  888 Y88b. Y8b.              
+//  "Y88888P"  88888P"   "Y88888 "Y888888  "Y888 "Y8888           
+//             888                                                
+//             888                                                
+//             888                                                
+//===================================================
+//Called by the main function in the integration loop
+//===================================================
+//Awaiting final test clear
+//DoTo:  Clean up extra memory allocations, use existing data
+//===================================================
+//Called by:  Main but commented out.
+void myPb2::UpdateOneDVel(N_Vector State)
+{
+	//Declare and clean
+	N_Vector VTemp 			= N_VClone(this->VelAve);			//Scalar size
+	//N_Vector TempGrad		= N_VClone(this->Vel);				//Velocity size.
+	N_Vector Scratch		= N_VClone(this->SmallChem);		//Used for right ghost
+	N_VScale(0.0, VTemp, VTemp);								//Clean
+	N_VScale(0.0, Tmp, Tmp);									//Clean
+	//N_VScale(0.0, TempGrad, TempGrad);							//Clean
+	//Set relevent data pointers.
+	realtype * SD			= N_VGetArrayPointer(State);
+	realtype * VTempData	= N_VGetArrayPointer(VTemp);
+	realtype * TmpD			= N_VGetArrayPointer(Tmp);			//Small Tmp data
+	realtype * SCP			= N_VGetArrayPointer(this->SmallChem);
+	realtype * GD			= N_VGetArrayPointer(this->Ghost);
+	//realtype * TG			= N_VGetArrayPointer(TempGrad);
+	realtype * ScratchData	= N_VGetArrayPointer(Scratch);
+	//Ghosts
+	realtype LeftTemp		= 0;
+	realtype RightTemp		= 0;
+	int End 				= this->NumGridPts-1;			//The final vector entry
+	int TInd				= 0;
+	//See Dr. Bisetti's book, chapter 17 for full details.
+	
+	//Set the chemistry information:  omegaT / (rho * cp * Temp)
+	//Ghost Prep: Call functions.
+	SUPER_2_VEC(End, ScratchData, SD, this->num_equations, this->NumGridPts);//copy right ghost state from far right
+	this->GhostChem(0, Scratch, this->SmallChem, this);			//Right Floating Chem using Scratch
+	this->RHS_Chem(0, State, this->Tmp, this);
+	//Loop set: calculate OmegaT/(T rho c_p)= SUPER_CHEM_RHS_TCHEM / T
+	for(int i = 0 ; i < this->NumGridPts; i ++)			//Put the temp int VTemp
+		VTempData[i]	= TmpD[i]/(SD[i]); 				//Divide by temperature
+	LeftTemp  = SCP[0]/(GD[0]);							//May need to be zero //Set left boundary data, fixed point
+	RightTemp = VTempData[End];							//Set right boundary 0 N conditions
+	
+	N_VScale(0.0, this->Tmp, this->Tmp);				//Clean out Tmp Vec for later use
 
+	//Set the diffusion term.  DT/T nablagrad(T)
+	this->RHS_Diff(0, State, this->Tmp, this);
+	for(int i = 0; i < this->NumGridPts; i++)			//Loop over Temp indices.
+		VTempData[i]	+=	TmpD[i]/SD[i];				//New, adds the Temp Integral
+	LeftTemp 			+=  TmpD[0]/SD[0];
+	RightTemp			+=VTempData[End];				//New, possibly problematic
+	N_VScale(0.0, this->Tmp, this->Tmp);
+	//Heating component
+	//This will turn on/off depending on Temperature max value or time.
+	if(this->HeatingOn==1)
+	{
+		this->RHS_Heat(0, State, this->Tmp, this);
+		N_VScale(this->Power, this->Tmp, this->Tmp);			//Scale on/off
+		this->HeatingRightGhost	= this->HeatingOn *
+			this->Power*this->HeatingRightGhost;	//Scale on/off the ghost point
+		for( int i =0 ; i < this->NumGridPts; i ++)
+			VTempData[i] 	+= TmpD[i]/SD[i];		
+		//Set boundaries
+		LeftTemp += 0;											//Should always be zero
+		RightTemp+= this->HeatingRightGhost/SD[End];			//Call the end boundary.
+	}
+	/**/
+	//======================
+	//Finalize
+	//======================
+	this->VelIntegrate(VTempData, State, LeftTemp, RightTemp);
+	//V(x) = Integral( omega/(rho T c_p) ,[0,x] ) + V(0);		See VelIntegrate function
+	this->SetVelAve();											//Modify VelAve
+	if(N_VMin(this->Vel)<0  &&  abs(N_VMin(this->Vel)>1e-1) )
+		std :: cout << "Warning: negative vel @" << this->t <<"\n";
+	//Destroy Temp Vectors
+	N_VDestroy(VTemp);
+	//N_VDestroy(TempGrad);
+	N_VDestroy(Scratch);
+	//Exit
+}
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+// 888b     d888          888                    d8b          888                 
+// 8888b   d8888          888                    Y8P          888                 
+// 88888b.d88888          888                                 888                 
+// 888Y88888P888  8888b.  888888 .d88b.  888d888 888  8888b.  888                 
+// 888 Y888P 888     "88b 888   d8P  Y8b 888P"   888     "88b 888                 
+// 888  Y8P  888 .d888888 888   88888888 888     888 .d888888 888                 
+// 888   "   888 888  888 Y88b. Y8b.     888     888 888  888 888                 
+// 888       888 "Y888888  "Y888 "Y8888  888     888 "Y888888 888                 
+// 8888888b.                   d8b                   888    d8b                   
+// 888  "Y88b                  Y8P                   888    Y8P                   
+// 888    888                                        888                          
+// 888    888  .d88b.  888d888 888 888  888  8888b.  888888 888 888  888  .d88b.  
+// 888    888 d8P  Y8b 888P"   888 888  888     "88b 888    888 888  888 d8P  Y8b 
+// 888    888 88888888 888     888 Y88  88P .d888888 888    888 Y88  88P 88888888 
+// 888  .d88P Y8b.     888     888  Y8bd8P  888  888 Y88b.  888  Y8bd8P  Y8b.     
+// 8888888P"   "Y8888  888     888   Y88P   "Y888888  "Y888 888   Y88P    "Y8888  
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&                                                                               
+//	This module contains the following methods:
+// int 	Set_RhoTimeDerivative(N_Vector, realtype, N_Vector);
+// int 	Set_MaterialDerivative(N_Vector, N_Vector);
+// int 	Print_MaterialDerivative(N_Vector, std :: string);                                                                               
+
+//Called by Set_MaterialDerivative
+int myPb2::Set_RhoTimeDerivative(realtype Delt, N_Vector Output)
+{
+	//Keep in mind that we need to average rho onto the velocity grid.
+	//Output will be one grid point larger than RhoGrid.
+	//External data
+	realtype * OD		= NV_DATA_S(Output);
+	if(N_VGetLength(Output)<= this->NumGridPts)
+	{
+		std :: cout << "Error: Output vector length incorrect!\n";
+		return 1;
+	}
+	//Internal data
+	realtype * RhoData	= NV_DATA_S(this->RhoGrid);		//Get Rho Pointer
+	realtype * RhoPData	= NV_DATA_S(this->RhoGridPrev);	//Get Previous Rho Pointer
+	int End				= this->NumGridPts;
+	//Interior
+	//for( int i = 0 ; i < this->NumGridPts-1; i ++)
+	for( int i = 1 ; i < End- 1; i ++)
+	{
+		OD[i] 	= (RhoData[i]+RhoData[i-1]-RhoPData[i]-RhoPData[i-1]  )/(2*Delt);
+	}
+	//Boundaries
+	OD[End]		= (RhoData[End-1]-RhoPData[End-1])/(Delt); //This causes a segfault
+	OD[0]		= (RhoData[0]- RhoPData[0])/(Delt);//This is a hack.
+	return 0;
+}
+
+// Sets Material derivative of Vector / by Vector of Rho
+int myPb2::Set_MaterialDerivative(realtype Delt, N_Vector Output)
+{
+	realtype * OD 			= NV_DATA_S(Output);
+	realtype * RhoTimeDPtr	= NV_DATA_S(this->MatDerScrap);
+	realtype * VelData		= NV_DATA_S(this->Vel);
+	realtype * RhoGridPtr	= NV_DATA_S(this->RhoGrid);
+	int 	End				= this->NumGridPts;
+	//Output is on the velocity grid
+	//Get the time Derivative of Rho.
+	this->Set_RhoTimeDerivative(Delt, this->MatDerScrap);
+	N_VConst(0.0, this->MatDerivative);
+
+	for( int i = 1 ; i < this->NumGridPts-1; i ++)
+	{
+		OD[i] 	= -(RhoTimeDPtr[i] + 
+					VelData[i]* (RhoGridPtr[i]-RhoGridPtr[i-1])/this->delx )
+					*(2.0 / (RhoGridPtr[i] - RhoGridPtr[i-1]) );
+	}
+	// //Boundaries
+	OD[End]		= -(RhoTimeDPtr[End-1])/(RhoGridPtr[End-1]);
+	OD[0]		= -(RhoTimeDPtr[0])/(RhoGridPtr[0]);//This is a hack.
+	return 0;
+
+}
+
+int myPb2::Print_MaterialDerivative(N_Vector Output, std::ofstream & fileName)
+{
+	realtype * OD 	= NV_DATA_S(Output);
+	for( int i = 0 ; i < N_VGetLength(Output); i++)
+		fileName << OD[i] << "\t\t";
+	fileName << std :: endl;
+	return 0;
+}
 
 
 //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -1205,6 +1268,39 @@ void myPb2::Set_VelocityDivergence_SpecDiff(N_Vector State)//This MUST be called
 // 88888888P"   88   `"YbbdP"'    `"Ybbd8"'  88   `Y8a        
 //Test_VelocityDivergence
 //=========================================================================
+//=============================================
+//Verification tests for the Simpson Integrator
+//=============================================
+//Called by:  Main in testing mode.
+void myPb2::RunTests(N_Vector State)
+{
+	//Solve with V(0)=1, totally arbitrary.
+	N_VConst(1,this->Vel);
+	N_Vector fAve 	= N_VNew_Serial(this->NumGridPts+1);
+	realtype * FAD	= N_VGetArrayPointer(fAve);
+	N_VConst(1,fAve);
+
+	this->VelIntegrate( FAD, State, 1,1);
+	std:: cout << "Updated Const Velocity" << std :: endl;
+	N_VPrint_Serial(this->Vel);
+	std :: cout << "End Const Experiment" << std :: endl;
+
+	N_VConst(1,this->Vel);
+	SinWave(FAD, this->NumGridPts, this->NumGridPts, this->delx);
+	this->VelIntegrate(FAD, State, FAD[0], FAD[this->NumGridPts-1]);
+	std :: cout << "Updated Cos Velocity" << std :: endl;
+	N_VPrint_Serial(this->Vel);
+	std :: cout << "End Cos Experiment" << std :: endl;
+
+
+	SinWave2(FAD, this->NumGridPts, this->NumGridPts, this->delx);
+	this->VelIntegrate(FAD, State, FAD[0], FAD[this->NumGridPts-1]);
+	std :: cout << "Updated Sin Velocity" << std :: endl;
+	N_VPrint_Serial(this->Vel);
+	std :: cout << "End Sine Experiment" << std :: endl;
+	N_VDestroy(fAve);
+}
+
 void myPb2::Test_VelocityDivergence(N_Vector TestState)
 {
 	//The function writes to this->SmallScrap
@@ -1788,197 +1884,7 @@ int myPb2::Test_ScalarGradient(N_Vector TestState)
 	return 0;
 }
 
-//====================================================================
-// 888     888          888                   d8b 888             
-// 888     888          888                   Y8P 888             
-// 888     888          888                       888             
-// Y88b   d88P  .d88b.  888  .d88b.   .d8888b 888 888888 888  888 
-//  Y88b d88P  d8P  Y8b 888 d88""88b d88P"    888 888    888  888 
-//   Y88o88P   88888888 888 888  888 888      888 888    888  888 
-//    Y888P    Y8b.     888 Y88..88P Y88b.    888 Y88b.  Y88b 888 
-//     Y8P      "Y8888  888  "Y88P"   "Y8888P 888  "Y888  "Y88888 
-// 888     888               888          888                 888 
-// 888     888               888          888            Y8b d88P 
-// 888     888               888          888             "Y88P"  
-// 888     888 88888b.   .d88888  8888b.  888888 .d88b.           
-// 888     888 888 "88b d88" 888     "88b 888   d8P  Y8b          
-// 888     888 888  888 888  888 .d888888 888   88888888          
-// Y88b. .d88P 888 d88P Y88b 888 888  888 Y88b. Y8b.              
-//  "Y88888P"  88888P"   "Y88888 "Y888888  "Y888 "Y8888           
-//             888                                                
-//             888                                                
-//             888                                                
-//===================================================
-//Called by the main function in the integration loop
-//===================================================
-//Awaiting final test clear
-//DoTo:  Clean up extra memory allocations, use existing data
-//===================================================
-//Called by:  Main but commented out.
-void myPb2::UpdateOneDVel(N_Vector State)
-{
-	//Declare and clean
-	N_Vector VTemp 			= N_VClone(this->VelAve);			//Scalar size
-	N_Vector TempGrad		= N_VClone(this->Vel);				//Velocity size.
-	N_Vector Scratch		= N_VClone(this->SmallChem);		//Used for right ghost
-	N_VScale(0.0, VTemp, VTemp);								//Clean
-	N_VScale(0.0, Tmp, Tmp);									//Clean
-	N_VScale(0.0, TempGrad, TempGrad);							//Clean
-	//Set relevent data pointers.
-	realtype * SD			= N_VGetArrayPointer(State);
-	realtype * VTempData	= N_VGetArrayPointer(VTemp);
-	realtype * TmpD			= N_VGetArrayPointer(Tmp);			//Small Tmp data
-	realtype * SCP			= N_VGetArrayPointer(this->SmallChem);
-	realtype * GD			= N_VGetArrayPointer(this->Ghost);
-	realtype * TG			= N_VGetArrayPointer(TempGrad);
-	realtype * ScratchData	= N_VGetArrayPointer(Scratch);
-	//Lookup data tables pointers
-	realtype * LookupTemp	= N_VGetArrayPointer(this->TempTable);
-	realtype * LookupCp		= N_VGetArrayPointer(this->CPPoly);
-	realtype * LookupDiff	= N_VGetArrayPointer(this->DiffTable);
-	realtype * LookupRho	= N_VGetArrayPointer(this->RhoTable);
-
-	realtype LeftTemp		= 0;
-	realtype RightTemp		= 0;
-	int End 				= this->NumGridPts-1;			//The final vector entry
-	int TInd				= 0;
-	//See Dr. Bisetti's book, chapter 17 for full details.
-	
-	//Set the chemistry information:  omegaT / (rho * cp * Temp)
-	SUPER_2_VEC(End, ScratchData, SD, this->num_equations, this->NumGridPts);//copy right ghost state from far right
-	this->GhostChem(0, Scratch, this->SmallChem, this);			//Right Floating Chem using Scratch
-	this->RHS_Chem(0, State, this->Tmp, this);
-	//SUPER_CHEM_RHS_TCHEM(0, State, this->Tmp, this);			//Set post integration Chem term
-
-	//calculate OmegaT/(T rho c_p)= SUPER_CHEM_RHS_TCHEM / T
-	for(int i = 0 ; i < this->NumGridPts; i ++)				//Put the temp int VTemp
-		VTempData[i]	= TmpD[i]/(SD[i]); 					//Divide by temperature
-	LeftTemp  = SCP[0]/(GD[0]);								//May need to be zero //Set left boundary data, fixed point
-	RightTemp = VTempData[End];								//Set right boundary 0 N conditions
-	
-	N_VScale(0.0, this->Tmp, this->Tmp);					//Clean out Tmp Vec for later use
-
-
-	//New Derivative and flame front position.
-	//Set grad(T)(x)
-	/*
-	this->TempGradient(State, TempGrad);				//Call the method to set TempGrad
-	N_VScale(this->Diff, TempGrad, TempGrad);			//Scale TempGrad by Diff setting, 0 or 1 
-	for(int i = 0; i < this->NumGridPts; i++)			//Loop over Temp indices.
-	{
-		TInd 	= this->TempTableLookUp(SD[i], this->TempTable);	//Find Temp lookup value
-		TG[i]	= LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  ) * TG[i]/SD[i];//Divide by the temperature.
-	}
-	TG[End+1]	= TG[End];
-	*/
-	//Set the diffusion term.
-	this->RHS_Diff(0, State, this->Tmp, this);
-	//SUPER_RHS_DIFF_CP(0, State, this->Tmp, this);
-	N_VScale(this->Diff, TempGrad, TempGrad);			//Scale TempGrad by Diff setting, 0 or 1 
-	for(int i = 0; i < this->NumGridPts; i++)			//Loop over Temp indices.
-		VTempData[i]	+=	TmpD[i]/SD[i];				//New, adds the Temp Integral
-	RightTemp+=VTempData[End];							//New, possibly problematic
-
-	//Heating component
-	//This will turn on/off depending on Temperature max value or time.
-	if(this->HeatingOn==1)
-	{
-		this->RHS_Heat(0, State, this->Tmp, this);
-		//SUPER_RHS_HEATING(0, State, this->Tmp, this);			//Calculate heating
-		N_VScale(this->Power, this->Tmp, this->Tmp);			//Scale on/off
-		this->HeatingRightGhost	= this->HeatingOn *
-			this->Power*this->HeatingRightGhost;	//Scale on/off the ghost point
-		for( int i =0 ; i < this->NumGridPts; i ++)
-			VTempData[i] 	+= TmpD[i]/SD[i];		
-		//Set boundaries
-		LeftTemp += 0;											//Should always be zero
-		RightTemp+= this->HeatingRightGhost/SD[End];			//Call the end boundary.
-	}
-	/**/
-	//======================
-	//Finalize
-	//======================
-	this->VelIntegrate(VTempData, State, LeftTemp, RightTemp);
-	//V(x) = Integral( omega/(rho T c_p) ,[0,x] ) + V(0);		See VelIntegrate function
-	N_VLinearSum(1.0, this->Vel, 1.0, TempGrad, this->Vel);		//V+=Grad(T)(x)
-	//N_VAddConst(this->Vel, -1.0*TG[0], this->Vel);				//V-=Grad(T)(0), when Grad(T) method is used.
-	this->SetVelAve();											//Modify VelAve
-	if(N_VMin(this->Vel)<0  &&  abs(N_VMin(this->Vel)>1e-1) )
-		std :: cout << "Warning: negative vel @" << this->t <<"\n";
-	//Destroy Temp Vectors
-	N_VDestroy(VTemp);
-	N_VDestroy(TempGrad);
-	N_VDestroy(Scratch);
-	//Exit
-}
 
 // ================================
 // The dead
 // ================================
-// Officially depreciated 10/04/22                                                                                      
-// void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N_Vector tmp, realtype * JV)
-// {
-//     realtype * TMP  = NV_DATA_S(tmp);
-// 	realtype * X 	= NV_DATA_S(x);
-// 	for (int i=0; i< number_of_equations; i++)//for each state
-// 	{
-// 		for(int j=0; j<number_of_equations; j++)//marches across the column
-// 		{
-// 			TMP[j]=JacD[j+i*number_of_equations];//Stored row major
-// 			//JV[i] += X[j] * JacD[i * number_of_equations + j];
-// 		}
-// 		JV[i]=N_VDotProd(tmp,x);
-// 	}
-// }																						  \
-// Officially depreciated 10/04/22                                                                                      
-//void myPb2::Set_GasWeight(N_Vector State)
-// {
-// 	realtype * GWPtr 	= NV_DATA_S(this->GasWeight);
-// 	realtype * SDPtr 	= NV_DATA_S(State);
-// 	realtype * SMPtr 	= NV_DATA_S(this->MolarWeights);
-// 	N_VConst(0.0, this->GasWeight);
-// 	//March through each grid point and grab each mass fraction and multiply by the weight of each molecule
-// 	for(int i = 0; i < this->NumGridPts; i ++)
-// 	{
-// 		for(int j = 0; j < this->num_equations; j++)
-// 		{	//Sigma W_i*Y_i
-// 			//update    =  current + W_i    *  Y_i
-// 			//GWPtr[i]	= GWPtr[i] + SMPtr[j] * SDPtr[i + j * this->num_equations];
-// 			GWPtr[i]	+= SMPtr[j] * SDPtr[i + j * this->NumGridPts];
-
-// 		}
-// 		//std :: cout << GWPtr[i] << std :: endl;
-// 	}
-// 	// std :: cout << std :: endl;	
-// 	// std :: cout << N_VMaxNorm(this->GasWeight) << std :: endl;
-
-// 	//N_VPrint_Serial(this->GasWeight);  //I don't understand why this line prints 0's
-
-// }
-//void myPb2::Test_GasWeight(N_Vector TestState)
-// {
-// 	//grab the grid length scratch vector and fill it with ones.
-// 	N_VConst(1.0, this->SmallScrap);
-
-// 	std :: cout << "Running Gas weight tests\n";
-
-// 	//Tests the constant default state
-// 	this->Set_GasWeight(TestState);
-// 	//This should return constant check this:
-// 	if(abs(N_VDotProd(this->GasWeight, this->SmallScrap) - N_VGetLength(this->GasWeight)* N_VMaxNorm(this->GasWeight))<this->delx)
-// 		std :: cout << "Congrats, you passed the constant default state test\n";
-
-// 	std :: cout << abs(N_VDotProd(this->GasWeight, this->SmallScrap) - N_VGetLength(this->GasWeight)* N_VMaxNorm(this->GasWeight)) << "\n";
-	
-// 	//Set the states to a cosine wave.  the sum of the grid should be 0 in this case.
-// 	SinWave(NV_DATA_S(TestState), this->NumGridPts, this->NumGridPts*this->num_equations, this->delx);
-// 	N_VAddConst(TestState, -1.0, TestState);
-// 	this->Set_GasWeight(TestState);
-// 	//Mimic the integral with the non-delx integeral, just sum the indices.
-// 	if( N_VDotProd(this->GasWeight, this->SmallScrap) < 10*this->delx)
-// 	{
-// 		std :: cout << "Congrats, you passed the cosine state test\n";
-// 	}
-// 	std :: cout << N_VDotProd(this->GasWeight, this->SmallScrap) << std :: endl;
-	
-// }

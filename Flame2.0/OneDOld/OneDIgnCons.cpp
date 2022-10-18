@@ -179,6 +179,7 @@ int main(int argc, char* argv[])
 		return 0; // print help return
 
 	ofstream myfile(MyFile, std::ios_base::app);
+	ofstream VelFile("VelDiv.txt", std::ios_base::app);
 	int Steps=CheckStep(FinalTime, StepSize);		//Checks the number of steps
 	realtype VelStep = min(1e-5, FinalTime);
 
@@ -267,10 +268,25 @@ int main(int argc, char* argv[])
 	
 
 		//read in data, error if files do not exist
-		ReadData(problem2.CPPoly,		"Cp_fT.txt");
-		ReadData(problem2.TempTable,	"Tf.txt");
-		ReadData(problem2.RhoTable, 	"rho_fT.txt");
-		ReadData(problem2.DiffTable,	"Diff_fT.txt");
+		//These tables extend into a higher temp range, Dth=DT
+		ReadData(problem2.CPPoly,		"BisettiCp.txt");
+		ReadData(problem2.TempTable,	"BisettiTemp.txt");
+		ReadData(problem2.RhoTable, 	"BisettiRho.txt");
+		ReadData(problem2.DiffTable,	"BisettiNewDiff.txt");
+
+		// ReadData(problem2.CPPoly,		"Cp_fT.txt");
+		// ReadData(problem2.TempTable,	"Tf.txt");
+		// ReadData(problem2.RhoTable, 	"rho_fT.txt");
+		// ReadData(problem2.DiffTable,	"Diff_fT.txt");
+		//Need to modify the first entries of the DiffTable to fix my error.
+		realtype * CpPtr 	= NV_DATA_S(problem2.CPPoly);
+		realtype * RhoPtr 	= NV_DATA_S(problem2.RhoTable); 
+		realtype * DiffPtr	= NV_DATA_S(problem2.DiffTable);
+		// for( int i = 0 ; i < 500 ; i++)
+		// {
+		// 	DiffPtr[i]= DiffPtr[i]*(RhoPtr[i]*CpPtr[i]);//Generates Lambda.
+		// }
+		//DiffPtr[1:500] are lambdas for fixed temperatures.
 		//problem2.VerifyTempTable(State);
 
 		
@@ -449,10 +465,15 @@ int main(int argc, char* argv[])
 			//Vel Update
 			if(VelUp==1)
 			{
+				problem2.SetTransportGrid(State);
 				//problem2.UpdateOneDVel(State);
 				problem2.Set_VelocityDivergence(State);
+				problem2.Print_MaterialDerivative(problem2.VelAve, VelFile);
 				problem2.VelIntegrate(NV_DATA_S(problem2.VelAve), State, problem2.VelAveLeftBnd, problem2.VelAveRightBnd);
-				problem2.SetVelAve();								
+				problem2.SetVelAve();
+				
+				problem2.Set_MaterialDerivative(StepSize, problem2.MatDerivative);
+				problem2.Print_MaterialDerivative(problem2.VelScrap, VelFile);								
 			}
 			//Check heating
 			problem2.CheckHeating(State, TNow);
@@ -669,6 +690,7 @@ void ReadData(N_Vector target, string fileName)
 //These use the second version of the problem class, myPb2.
 //========================================================
 //ToDo: Cleanup timing protocols
+//Cross Diffusion turned off.
 int OneD_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
 {
 	//Top Declarations==================================
@@ -750,8 +772,8 @@ int OneD_RHS_First		(realtype t, N_Vector State, N_Vector StateDot, void * UserD
 	auto StartDiff=std::chrono::high_resolution_clock::now();	//Start Timing Diff
 	pb->RHS_Diff(t, State, pb->Tmp, UserData);
 	N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);
-	OneD_RHS_CrossDiff(t, State, pb->Tmp, UserData);
-	N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);
+	//OneD_RHS_CrossDiff(t, State, pb->Tmp, UserData);
+	//N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);
 	//SUPER_RHS_DIFF_CP(t, State, pb->Tmp, UserData);				//Diff call	
 	auto StopDiff=std::chrono::high_resolution_clock::now();
 	auto PassDiff = std::chrono::duration_cast<std::chrono::nanoseconds>(StopDiff-StartDiff);
@@ -940,37 +962,47 @@ int OneD_RHS_Diff(realtype t, N_Vector u, N_Vector uDot, void * userData)
     myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
     realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
     realtype * resultData   = NV_DATA_S(uDot);//stuff goes in here.
-	realtype * LookupTemp	= N_VGetArrayPointer(problem->TempTable);
-	realtype * LookupCp		= N_VGetArrayPointer(problem->CPPoly);
-	realtype * LookupDiff	= N_VGetArrayPointer(problem->DiffTable);
-	realtype * LookupRho	= N_VGetArrayPointer(problem->RhoTable);
+	//realtype * LookupTemp	= N_VGetArrayPointer(problem->TempTable);
+	//realtype * LookupCp		= N_VGetArrayPointer(problem->CPPoly);
+	//realtype * LookupDiff	= N_VGetArrayPointer(problem->DiffTable);
+	//realtype * LookupRho	= N_VGetArrayPointer(problem->RhoTable);
     int numPts 				= problem->NumGridPts;
     realtype divisor        = 1.0/(problem->delx * problem->delx);
     int grid 				= 0;
-    int tempInd 			= 0;
+    //int tempInd 			= 0;
 	int TI					= 0;
     realtype T  			= 1;
-	int TInd 				= 0;
+	//int TInd 				= 0;
     realtype * Ghost 		= NV_DATA_S(problem->Ghost);
     int vecLength 			= problem->num_equations * problem->NumGridPts;
+	realtype * 	DiffGridPtr = NV_DATA_S(problem->DiffGrid);
+	realtype *  RhoGridPtr	= NV_DATA_S(problem->RhoGrid);
+	realtype *  CpGridPtr	= NV_DATA_S(problem->CpGrid); 
+	realtype *	MassPtr		= NV_DATA_S(problem->MolarWeights);
 	//Start main loop
 	for (int i = 0; i < vecLength; i++)
 	{
 		TI		= i % numPts;
 		grid 	= floor(i/problem->NumGridPts);
 
-
-		auto Start=std::chrono::high_resolution_clock::now();
-		TInd = problem->TempTableLookUp(uData[TI], problem->TempTable);
-		auto Stop=std::chrono::high_resolution_clock::now();
-		auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-		problem->rhsDiffLookTime+=Pass.count()/1e9;
+		//No clue why I would still be using this.
+		//auto Start=std::chrono::high_resolution_clock::now();
+		//TInd = problem->TempTableLookUp(uData[TI], problem->TempTable);
+		//auto Stop=std::chrono::high_resolution_clock::now();
+		//auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
+		//problem->rhsDiffLookTime+=Pass.count()/1e9;
 
 
 		if(i < numPts)//If we are looking at temp
-			T = LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  );
+		{
+			T = DiffGridPtr[TI];//(CpGridPtr[TI]*RhoGridPtr[TI]); 
+			//T = LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  );
+		}
 		else
-			T = LookupDiff[ grid * 500 + TInd];	
+		{
+			T = DiffGridPtr[TI];///MassPtr[grid];//Uniform DT=Dth
+			//T = DiffGridPtr[grid * problem->NumGridPts + TI];
+		}
 		
 		//Set the result
         if(i% numPts == 0)//left
@@ -1000,6 +1032,7 @@ int OneD_RHS_Diff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 // _|  |    |  |   \   /
 //|____|    |__|    \_/
 //=============================
+//Cross Diffusion turned off.
 int OneD_JtV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void * pb, N_Vector tmp)
 {
 	myPb2 * pbPtr{static_cast<myPb2 *> (pb)};			//Recast
@@ -1076,10 +1109,11 @@ int OneD_JtV_First(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu,
 	
 	// Diff
 	auto StartDiff=std::chrono::high_resolution_clock::now();
-	OneD_JtV_Diff(v,tmp,t,u, fu, pb, tmp);
+	pbPtr->JtV_Diff(v,tmp,t,u, fu, pb, tmp);
+	//OneD_JtV_Diff(v,tmp,t,u, fu, pb, tmp);
 	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
-	pbPtr->JtV_CrossDiff(v,tmp, t, u , fu, pb, tmp);
-	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
+	//pbPtr->JtV_CrossDiff(v,tmp, t, u , fu, pb, tmp);
+	//N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
 	auto StopDiff=std::chrono::high_resolution_clock::now();
 	auto PassDiff = std::chrono::duration_cast<std::chrono::nanoseconds>(StopDiff-StartDiff);
 	pbPtr->jtv_Diff+=PassDiff.count()/1e9;
@@ -1185,53 +1219,6 @@ int OneD_JtV_Adv(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, v
 //Diff JTV
 //Current version with lookup timing
 //=====================
-int OneD_JtV_Diff(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu,void* userData, N_Vector tmp)
-{
-	myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
-    realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
-    realtype * resultData   = NV_DATA_S(Jv);//stuff goes in here.
-    realtype * vData        = NV_DATA_S(v);//Stuff also comes from here
-	realtype * LookupTemp	= N_VGetArrayPointer(problem->TempTable);
-	realtype * LookupCp		= N_VGetArrayPointer(problem->CPPoly);
-	realtype * LookupDiff	= N_VGetArrayPointer(problem->DiffTable);
-	realtype * LookupRho	= N_VGetArrayPointer(problem->RhoTable);
-    int numPts              = problem->NumGridPts;
-    realtype delx           = problem->delx;
-    realtype divisor        = 1.0/(delx * delx);
-    int TI                  = 0;
-    int grid                = 0;
-	int TInd				= 0;
-    realtype * Ghost        = NV_DATA_S(problem->Ghost);
-    realtype T              = 0;					//Diff term
-    int vecLength           = problem->vecLength;
-    //realtype c              = divisor;
-	for (int i = 0; i < problem->vecLength; i++)
-	{
-		TI   = i%numPts;
-		grid = floor(i/numPts);
-		auto Start=std::chrono::high_resolution_clock::now();
-		TInd = problem->TempTableLookUp(uData[TI], problem->TempTable);
-		auto Stop=std::chrono::high_resolution_clock::now();
-		auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-		problem->jtvDiffLookTime+=Pass.count()/1e9;
-		//Set Coefficient for step
-		if(i < numPts)						//Parse if we are in Temp or not
-			T 	= LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  ); //get lambda/rhoCp for this temp
-		else 
-			T 	= LookupDiff[ grid * 500 + TInd];								//We need to get DT for species i
-		//End parse Thermal lookup
-		//Main if
-		if(i% numPts == 0)														//left
-			resultData[i] = divisor * T * (-2*vData[i] + vData[i+1]);
-    	else if (i % numPts == (numPts - 1) )									//right 0 neumann
-            resultData[i] = divisor * T * ( vData[i-1] - vData[i] );
-        else
-        	resultData[i] = divisor * T * (vData[i-1] - 2*vData[i] + vData[i+1]);
-    }
-	JtvDif++;
-    return 0;
-}
-
 int OneD_JtV_DiffFast(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu,void* userData, N_Vector tmp)
 {
 	myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
@@ -1241,6 +1228,7 @@ int OneD_JtV_DiffFast(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector 
 	realtype * CpPtr		= NV_DATA_S(problem->CpGrid);
 	realtype * DiffPtr		= NV_DATA_S(problem->DiffGrid);
 	realtype * RhoPtr		= NV_DATA_S(problem->RhoGrid);
+	realtype * WPtr			= NV_DATA_S(problem->MolarWeights);
 
     int numPts              = problem->NumGridPts;
     realtype delx           = problem->delx;
@@ -1255,9 +1243,15 @@ int OneD_JtV_DiffFast(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector 
 		grid = floor(i/numPts);
 		//Set Coefficient for step
 		if(i < numPts)						//Parse if we are in Temp or not
-			T 	= DiffPtr[ i ] / (RhoPtr[ i ] * CpPtr [i]  ); //get lambda/rhoCp for this temp
+		{
+			T 		= DiffPtr[ i ];
+			//T 	= DiffPtr[ i ] / (RhoPtr[ i ] * CpPtr [i]  ); //get lambda/rhoCp for this temp
+		}
 		else 
-			T 	= DiffPtr[ grid * numPts + TI];								//We need to get DT for species i
+		{
+			//T			= DiffPtr[TI];///WPtr[grid];
+			T 		= DiffPtr[ grid * numPts + TI];								//We need to get DT for species i
+		}
 		//End parse Thermal lookup
 		//Main if
 		//std :: cout << T  << std :: endl;
@@ -1373,8 +1367,8 @@ int OneD_JacArray(realtype t, N_Vector State, N_Vector StateDot, SUNMatrix Jac, 
 	real_type_2d_view_type J;
 	
 	//member Kokkos::Impl::HostThreadTeamMember<Kokkos::Serial>;
-	omp_set_dynamic(0);     // Explicitly disable dynamic teams
-	omp_set_num_threads(8); // Use 4 threads for all consecutive parallel regions
+	//omp_set_dynamic(0);     // Explicitly disable dynamic teams
+	//omp_set_num_threads(8); // Use 4 threads for all consecutive parallel regions
 	//#pragma omp parallel for private(DATA, STATEDATA, LittleJacPtr, x, J, pbPtr)
 	for(int i = 0 ; i < grid_sz ; i ++ )
 	{//March over copies/grid points and grab the data needed
@@ -1492,6 +1486,7 @@ int OneD_RHS_CrossDiff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 	//realtype * CpGradPtr	= NV_DATA_S(problem->CpGrad);
 	realtype * RhoGradPtr	= NV_DATA_S(problem->RhoGrad);
 	realtype * DiffGradPtr	= NV_DATA_S(problem->DiffGrad);
+	realtype * LambdaGradPtr= NV_DATA_S(problem->lambdaGrad);
 	realtype GradData		= 0;
 	//Run internal checks.
 
@@ -1503,13 +1498,11 @@ int OneD_RHS_CrossDiff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 		GradData= GradDataPtr[i];
 		if(i < numPts)//If we are looking at temp
 		{
-			resultData[i] = 1.0 / (RhoPtr[i] * CpPtr[i] ) * DiffGradPtr[i] * GradData;
+			resultData[i] = 1.0 / (RhoPtr[i] * CpPtr[i] ) * LambdaGradPtr[i] * GradData;
 		}
 		else
-		{
-			resultData[i] = 1.0/ (RhoPtr[TI])	*(RhoGradPtr[TI]*DiffPtr[TI] + RhoPtr[TI] * DiffGradPtr[i]) * GradData;
-
-			
+		{	//Use a uniform Dth = DT
+			resultData[i] = 1.0/ (RhoPtr[TI])	*(RhoGradPtr[TI]*DiffPtr[TI] + RhoPtr[TI] * DiffGradPtr[TI]) * GradData;
 		}
     }
     return 0;
@@ -1538,6 +1531,7 @@ int OneD_JtV_CrossDiff(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector
 	realtype * CpGradPtr	= NV_DATA_S(problem->CpGrad);
 	realtype * RhoGradPtr	= NV_DATA_S(problem->RhoGrad);
 	realtype * DiffGradPtr	= NV_DATA_S(problem->DiffGrad);
+	realtype * LambdaGradPtr= NV_DATA_S(problem->lambdaGrad);
 	realtype GradData		= 0;
 	realtype denom			= 1.0/(2*problem->delx);
 	//Start main loop
@@ -1563,11 +1557,11 @@ int OneD_JtV_CrossDiff(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector
 		//GradData= GradDataPtr[i];
 		if(i < numPts)//If we are looking at temp
 		{
-			resultData[i] = 1.0 / (RhoPtr[i] * CpPtr[i] ) * DiffGradPtr[i] * GradData;
+			resultData[i] = 1.0 / (RhoPtr[i] * CpPtr[i] ) * LambdaGradPtr[i] * GradData;
 		}
 		else
 		{
-			resultData[i] = 1.0/ (RhoPtr[TI])	*(RhoGradPtr[TI]*DiffPtr[TI] + RhoPtr[TI] * DiffGradPtr[i]) * GradData;			
+			resultData[i] = 1.0/ (RhoPtr[TI])	*(RhoGradPtr[TI]*DiffPtr[i] + RhoPtr[TI] * DiffGradPtr[i]) * GradData;			
 		}
     }
 

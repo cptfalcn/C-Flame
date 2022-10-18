@@ -11,6 +11,8 @@
 #include "TChem_KineticModelData.hpp"
 #include "TChem_Impl_IgnitionZeroD_Problem.hpp" // here is where Ignition Zero D problem is implemented
 #include "InitialConditions.h"
+#include <fstream>
+#include <iostream>
 #include <chrono>
 #include <string>
 
@@ -69,7 +71,9 @@ class myPb2{
 	//New grids for transport
 	N_Vector	CpGrid;
 	N_Vector	RhoGrid;
+	N_Vector 	RhoGridPrev;
 	N_Vector	DiffGrid;
+	N_Vector 	LambdaGrid;  //This contains DT*rho*cp.
 
 	SUNMatrix	Mat;
 	myPb2(ordinal_type, real_type_1d_view_type, WORK, int, N_Vector, realtype);
@@ -130,6 +134,8 @@ class myPb2{
 	N_Vector	Vel;
 	N_Vector	Scrap;
 	N_Vector	Scrap2;
+	N_Vector	MatDerivative;
+	N_Vector	MatDerScrap;
 	N_Vector	VelScrap;
 	N_Vector	SmallScrap;
 	N_Vector	VelAve;
@@ -145,6 +151,7 @@ class myPb2{
 	N_Vector	RhoGrad;
 	N_Vector	DiffGrad;
 	N_Vector	TempGrad;
+	N_Vector    lambdaGrad;
 
 	//Parameter selectors
 	realtype	Adv;
@@ -213,7 +220,13 @@ class myPb2{
 	void Set_VelocityDivergence_TempHeat(N_Vector);
 	//Tests the set
 	void Test_VelocityDivergence(N_Vector);
-
+	//===========================
+	//Material derivative  module
+	//===========================
+	//All follow the standard input, output format.
+	int 	Set_RhoTimeDerivative(realtype, N_Vector);
+	int 	Set_MaterialDerivative(realtype, N_Vector);
+	int 	Print_MaterialDerivative(N_Vector, std :: ofstream & fileName);
 };
 
 //End class stuff
