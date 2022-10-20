@@ -88,6 +88,9 @@ Out="ScrapVar.txt"
 ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method="EPI3V" --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-10 --relTol=1e-1 --Movie=0 --Input=gri3.0/sample.dat
 ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method="EPI3VCntrl" --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-10 --relTol=1e-1 --Movie=0 --Input=gri3.0/sample.dat
 ./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method="EPI3V" --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-10 --relTol=5e-2 --Movie=0 --Input=gri3.0/sample.dat
+echo ============================================Testing 10 atm as input =======================================
+./ZeroDIgnVar.x --chemfile=gri3.0/"chem.inp" --thermfile=gri3.0/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=$Sam --Method="EPI3V" --Profiling=1 --Experiment=2 --maxSS=5e-1 --absTol=1e-10 --relTol=5e-2 --Movie=0 --Input=gri3.0/sample.dat --PressMult=20
+
 #Both these stall and will not run.  But TChem TrBDF2 will run this sample okay.
 TF=5e-2
 #./ZeroDIgnVar.x --chemfile=iso-oct/"chem.inp" --thermfile=iso-oct/"therm.dat" --StepSize=1e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method="CVODEKry" --Profiling=1 --Experiment=3 --maxSS=1e-2 --absTol=1e-10 --relTol=1e-10 --Movie=0 --Input=iso-oct/"sample1_10atm.dat"

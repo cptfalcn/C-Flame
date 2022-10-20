@@ -79,7 +79,7 @@ void PrintBanner();
 int RHS_TCHEM(realtype, N_Vector, N_Vector, void *);
 
 //JtV functions
-int Jtv_TCHEM		(N_Vector , N_Vector ,realtype, N_Vector, N_Vector , void* , N_Vector );
+// int Jtv_TCHEM		(N_Vector , N_Vector ,realtype, N_Vector, N_Vector , void* , N_Vector );
 int JtV_TCHEM_Fast	(N_Vector , N_Vector ,realtype, N_Vector, N_Vector , void* , N_Vector );
 
 
@@ -146,6 +146,7 @@ int main(int argc, char* argv[])
 	realtype maxSS 				= StepSize;
 	int Movie 					= 0;
 	string inputFile;
+	int PressMult = 1;
 	
 
 	//=====================================================
@@ -174,6 +175,7 @@ int main(int argc, char* argv[])
 	opts.set_option<realtype>("absTol", "Solver Absolulte Tol", &absTol);
 	opts.set_option<string>("Input", "Input TChem file name", &inputFile);
 	opts.set_option<realtype>("maxSS", "Maximum StepSize", &maxSS);
+	opts.set_option<int>("PressMult", "Pressure Multiplier", &PressMult);
 	const bool r_parse = opts.parse(argc, argv);
 
 	if (r_parse)
@@ -230,7 +232,7 @@ int main(int argc, char* argv[])
 		//======================
 		//Init Cons
 		//=======================
-		int PressMult = 1;
+		
 		if(Experiment == 3 || Experiment==6)
 		{
 			PressMult = 10;
@@ -616,36 +618,13 @@ int CVodeComputeJacWrapper(realtype t, N_Vector u, N_Vector fy, SUNMatrix Jac,
 ||N_Vector tmp:	temporary vector used here to grab rows of the Jacobian
 \\=============================================================
 */
-int Jtv_TCHEM(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void* pb, N_Vector tmp)
-{
-	//problem_type problem;
-	myPb * pbPtr{static_cast<myPb *> (pb)};//Recast
-	int number_of_equations=pbPtr->num_equations;//Get number of equations
-	//======================================
-	//Set the necessary vectors and pointers
-	//======================================
-	realtype *y= NV_DATA_S(u);
-	realtype *JacD= NV_DATA_S(pbPtr->Jac);
-	realtype *JV=NV_DATA_S(Jv);
-	//===================
-	//Compute JV
-	//===================
-	g_timer.reset();
-	MatrixVectorProduct(number_of_equations, JacD, v, tmp, JV);
-	//MatrixVectorProductFast(number_of_equations, pbPtr->Jac, v, tmp, JV);
-
-	MatVecTime+=g_timer.seconds();
-	JtvCnt ++;
-	return 0;
-}
-
 int JtV_TCHEM_Fast(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void* pb, N_Vector tmp)
 {
-	myPb * pbPtr{static_cast<myPb *> (pb)};//Recast
-	N_VConst(0.0, Jv);
-	g_timer.reset();
-	MatrixVectorProductFast(pbPtr->num_equations, pbPtr->Jac, v, tmp, NV_DATA_S(Jv));
-	MatVecTime += g_timer.seconds();
+	myPb * pbPtr{static_cast<myPb *> (pb)};	//Recast
+	N_VConst(0.0, Jv);						//Clear data to not poison results
+	g_timer.reset();						//Time... lets GO!
+	MatrixVectorProductFast(pbPtr->num_equations, pbPtr->Jac, v, tmp, NV_DATA_S(Jv));//Run
+	MatVecTime += g_timer.seconds();		//End timing
 	JtvCnt ++;
 	return 0;
 }
@@ -733,22 +712,6 @@ void ErrorCheck(ofstream & myfile, N_Vector y, realtype * data, int number_of_eq
 //By doing this, we don't have to transpose the data.
 //Does Jac*v = JV
 */
-void MatrixVectorProduct(int number_of_equations, realtype * JacD, N_Vector x, N_Vector tmp, realtype * JV)
-{
-    realtype * TMP  = NV_DATA_S(tmp);
-	realtype * X 	= NV_DATA_S(x);
-	for (int i=0; i< number_of_equations; i++)//for each state
-	{
-		for(int j=0; j<number_of_equations; j++)//marches across the column
-		{
-			TMP[j]=JacD[j+i*number_of_equations];//Stored row major, pointer copy
-			//JV[i] = JV[i] + X[j] * JacD[i * number_of_equations + j];
-		}
-		JV[i]=N_VDotProd(tmp,x);
-	}
-}
-
-
 void MatrixVectorProductFast(int len, N_Vector Jac, N_Vector x, N_Vector tmp, realtype * JV)
 {
 	realtype * X 			= NV_DATA_S(x);

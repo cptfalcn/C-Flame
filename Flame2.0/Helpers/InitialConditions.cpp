@@ -176,7 +176,7 @@ void IntConGri30(realtype * data, int SampleNum)
 		data[53] =          	0.0;
 		cout << BAR << "Gri Sample 1: Post Ign" << BAR << endl;
 		break;
-	case 4: //Aditya's case, runs at three ATM
+	case 4: //Aditya's case, runs at 4 ATM
 		data[0] 	=  800;//Temp
         data[14]	=  0.0392661; //CH4
         data[4] 	=  0.2237715;//O2
