@@ -500,13 +500,14 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	int ProgressDots	= 0;
 	myPb * pb{static_cast<myPb *> (userData)};    		//Recast
 	//Now need to dump the jac, rhs and y to file on a failure
-	//realtype * jacPtr	= N_VGetArrayPointer(pb->Jac);
+	realtype * jacPtr	= N_VGetArrayPointer(pb->Jac);
 	//realtype * Rem 		= NV_DATA_S(Remainder);
 	ofstream myfile;
 	pb->MaxStepTaken		= 0;
 	pb->MinStepTaken		= 1;
 
-    //myfile.open(pb->dumpJacFile, std:: ios_base::app);
+	//std :: cout << "Movie?" << pb->Movie << std :: endl;
+    myfile.open(pb->dumpJacFile, std:: ios_base::app);
 	ofstream datafile;
 	//datafile.open("EPI3VData.txt", std::ios_base::app);
 
@@ -723,14 +724,17 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 		}
 		pb->t=t;					//Set time for pass back;
 		
-		// if(pb->Movie==1)//If we want a movie
-		// {
-		// 	for(int i = 0 ; i < N_VGetLength(pb->Jac); i ++)
-		// 	{
-		// 		myfile << jacPtr[i];
-		// 		myfile.flush();
-		// 		myfile << "\n";
-		// 	}
+		if(pb->Movie==1)//If we want a movie
+		{
+			//std :: cout << "printing\n";
+			for(int i = 0 ; i < N_VGetLength(pb->Jac); i ++)
+			{
+			//	std :: cout << "printing\n";
+				myfile << jacPtr[i];
+				//myfile.flush();
+				myfile << "\n";
+			}
+		}
 		// 	myfile << h << "\n";
 		// 	//Print y data to file
 		// 	for(int i = 0 ; i < N_VGetLength(y); i++)

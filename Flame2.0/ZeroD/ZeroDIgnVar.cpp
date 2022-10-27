@@ -145,6 +145,7 @@ int main(int argc, char* argv[])
 	realtype absTol				= 1e-10;
 	realtype maxSS 				= StepSize;
 	int Movie 					= 0;
+	string JacFile				= "";
 	string inputFile;
 	int PressMult = 1;
 	
@@ -176,6 +177,8 @@ int main(int argc, char* argv[])
 	opts.set_option<string>("Input", "Input TChem file name", &inputFile);
 	opts.set_option<realtype>("maxSS", "Maximum StepSize", &maxSS);
 	opts.set_option<int>("PressMult", "Pressure Multiplier", &PressMult);
+	opts.set_option<int>("Movie", "Jacobian Movie data", &Movie);
+	opts.set_option<std::string>("JacFile", "OptionalJacFile", &JacFile);
 	const bool r_parse = opts.parse(argc, argv);
 
 	if (r_parse)
@@ -259,6 +262,8 @@ int main(int argc, char* argv[])
 		problem.Jac					= N_VNew_Serial(number_of_equations*number_of_equations, sunctx);//Make the Jacobian
 		problem.t					= 0;
 		problem.stepRatioFile		= "";
+		problem.dumpJacFile			= JacFile;
+		problem.Movie				= Movie;
 		//problem.stepRatioFile		= "ZeroDVariableExp"+to_string(Experiment)+"Stepfile.txt";
 		problem.KiopsTime			= 0;
 		//==============================================
@@ -340,7 +345,7 @@ int main(int argc, char* argv[])
 		cout << "Mass Fraction error: "<<abs( N_VL1NormLocal(y)-data[0]-1.0)<<endl;
 		if (Profiling ==1){//Invalid for experiment 0
 			cout << BAR << "    Profiling   " << BAR << endl;
-			ofstream ProFile("ZeroDVariableExp"+to_string(Experiment)+ "Method"+ Method + "Sample" + to_string(SampleNum) +"Profile.txt", std::ios_base::app);
+			ofstream ProFile("ZeroDVariableExp"+to_string(Experiment)+ "Method"+ Method + "Sample" + to_string(SampleNum) + "Pressure" + to_string(PressMult)+"Profile.txt", std::ios_base::app);
 			//ofstream ProFile("Profiling.txt", std::ios_base::app);//Profiling  File
 
 			if(Method == "EPI3V" || Method == "EPI3VCntrl")
