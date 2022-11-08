@@ -23,7 +23,8 @@
 #include "TChem_CommandLineParser.hpp"
 #include <omp.h>
 #include <optional>
-
+#include "cantera/base/Solution.h"
+#include "cantera/thermo.h"
 //These two will be needed in the future
 //#include "TChem_Impl_NewtonSolver.hpp"
 //#include "TChem_KineticModelData.hpp"
@@ -288,8 +289,11 @@ int main(int argc, char* argv[])
 		// }
 		//DiffPtr[1:500] are lambdas for fixed temperatures.
 		//problem2.VerifyTempTable(State);
-
+		//Create Cantera
+		auto sol = Cantera::newSolution("gri3.0/gri30.yaml", "gri30", "None");
 		
+
+		//End Cantera
 		void *UserData = &problem2;
 		int MaxKrylovIters = max(vecLength, 500);//500 is the base
 		//==================
