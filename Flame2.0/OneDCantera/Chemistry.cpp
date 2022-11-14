@@ -30,7 +30,7 @@ myPb2::myPb2(ordinal_type num_eqs, real_type_1d_view_type work, WORK kmcd, int G
 	this->pb._p 	= 101325;				//Standard (1 atm) pressure
 	this->pb._work	= work;
 	this->pb._kmcd 	= kmcd;
-	this->GasConst  = 8.31446261815324;		//wikipedia gas constant
+	//this->GasConst  = 8.31446261815324;		//wikipedia gas constant
 	//End TChem problem
 	//Critical parameters 
 	this->NumGridPts= GridPts;
@@ -868,7 +868,7 @@ void myPb2::Set_VelocityDivergence(N_Vector State)
 
 	//===================================================
 	//Given the temperature, set all the grids
-	this->SetTransportGrid(State);
+	//this->SetTransportGrid(State);
 	this->Set_ScalarGradient(State);
 	this->Set_TransportGradient(State);
 	//Species Terms==========================================

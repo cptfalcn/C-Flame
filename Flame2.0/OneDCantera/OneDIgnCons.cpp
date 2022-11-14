@@ -25,6 +25,8 @@
 #include <optional>
 #include "cantera/base/Solution.h"
 #include "cantera/thermo.h"
+#include "cantera/kinetics.h"
+#include "cantera/transport.h"
 //These two will be needed in the future
 //#include "TChem_Impl_NewtonSolver.hpp"
 //#include "TChem_KineticModelData.hpp"
@@ -85,6 +87,10 @@ void TrackCVODEKryIters(SUNLinearSolver, realtype *, realtype, int *, int*, int*
 void ReadData(N_Vector, string);
 void CheckNanBlowUp(N_Vector, int);
 
+//=======================================================
+//SolArray class which interfaces with the problem class.
+//=======================================================
+int Set_ThermTransData(myPb2*, N_Vector, std::shared_ptr<Cantera::Solution>);
 //=====================
 //Namespaces and globals
 //=====================
@@ -141,10 +147,6 @@ int main(int argc, char* argv[])
 	realtype CHEM 			= 1.0;
 	realtype POW			= 0.0;
 
-	//omp_set_thread_num(4);
-	//std :: cout << "max omp threads: " << omp_get_max_threads() << std :: endl;
-	//std :: cout << "omp threads: " << omp_get_num_threads() << std :: endl;
-
 	//=====================================================
 	//Kokkos Input Parser
 	//=====================================================
@@ -180,10 +182,7 @@ int main(int argc, char* argv[])
 		return 0; // print help return
 
 	ofstream myfile(MyFile, std::ios_base::app);
-	ofstream VelFile("VelDiv.txt", std::ios_base::app);
 	int Steps=CheckStep(FinalTime, StepSize);		//Checks the number of steps
-	realtype VelStep = min(1e-5, FinalTime);
-
 	//=====================================
 	//Kokkos Sub-declarations
 	//=====================================
@@ -194,7 +193,6 @@ int main(int argc, char* argv[])
 	{
 		using host_device_type = typename Tines::UseThisDevice<TChem::host_exec_space>::type;
 		using real_type_1d_view_type = Tines::value_type_1d_view<real_type,host_device_type>;
-		//using real_type_2d_view_type = Tines::value_type_2d_view<real_type,host_device_type>;
 		// construct TChem's kinect model and read reaction mechanism
 		TChem::KineticModelData kmd(chemFile, thermFile);
 
@@ -269,12 +267,6 @@ int main(int argc, char* argv[])
 	
 
 		//read in data, error if files do not exist
-		//These tables extend into a higher temp range, Dth=DT
-		// ReadData(problem2.CPPoly,		"BisettiCp.txt");
-		// ReadData(problem2.TempTable,	"BisettiTemp.txt");
-		// ReadData(problem2.RhoTable, 	"BisettiRho.txt");
-		// ReadData(problem2.DiffTable,	"BisettiNewDiff.txt");
-
 		ReadData(problem2.CPPoly,		"Cp_fT.txt");
 		ReadData(problem2.TempTable,	"Tf.txt");
 		ReadData(problem2.RhoTable, 	"rho_fT.txt");
@@ -283,15 +275,48 @@ int main(int argc, char* argv[])
 		realtype * CpPtr 	= NV_DATA_S(problem2.CPPoly);
 		realtype * RhoPtr 	= NV_DATA_S(problem2.RhoTable); 
 		realtype * DiffPtr	= NV_DATA_S(problem2.DiffTable);
-		// for( int i = 0 ; i < 500 ; i++)
-		// {
-		// 	DiffPtr[i]= DiffPtr[i]*(RhoPtr[i]*CpPtr[i]);//Generates Lambda.
-		// }
-		//DiffPtr[1:500] are lambdas for fixed temperatures.
 		//problem2.VerifyTempTable(State);
+		//===================
 		//Create Cantera
-		auto sol = Cantera::newSolution("gri3.0/gri30.yaml", "gri30", "None");
-		
+		//===================
+		//Set a solution per the gri standard
+		auto sol = Cantera::newSolution("gri3.0/gri30.yaml", "gri30");
+		//cout << sol << endl;
+		//Set a gas object
+		//auto gas = sol->thermo();
+		//gas->density() to get density
+
+	    // Set the thermodynamic state by specifying T (500 K) P (2 atm) and the mole
+	    // fractions. Note that the mole fractions do not need to sum to 1.0 - they will
+	    // be normalized internally. Also, the values for any unspecified species will be
+	    // set to zero.
+		//Need to set appropriately
+	    // gas->setState_TPX(1000.0, 1.0*Cantera::OneAtm, "CH4:1.0, O2:8.0, AR:1.0");
+		// gas->setState_PY(1.0*Cantera::OneAtm, data+1); //Be clever with pointers, make temp shift away
+		// auto kin = sol->kinetics();
+		// auto trans = sol->transport();
+		//gas->equilibrate("HP");
+		// N_Vector Coeff = N_VClone(y);
+		// Cantera::vector_fp wdot(kin->nReactions());
+		// trans->getMixDiffCoeffs(NV_DATA_S(Coeff)+1);
+		// Cantera::writelog("Index     Diffusion Coefficient\n");
+    	// Cantera::writelog("------   ----------------------\n");
+		// for (int i =0; i < number_of_equations; i ++)
+		// 	std :: cout << i << "\t" << NV_DATA_S(Coeff)[i] << "\n";
+	    // kin->getNetRatesOfProgress(wdot.data());
+    	// Cantera::writelog("T        viscosity     thermal conductivity\n");
+    	// Cantera::writelog("------   -----------   --------------------\n");
+    	// for (size_t n = 0; n < 5; n++) {
+        // 	double T = 1000 + 100 * n;
+        // 	gas->setState_TP(T, gas->pressure());
+        // 	Cantera::writelog("{:.1f}    {:.4e}    {:.4e}\n",
+        //     T, trans->viscosity(), trans->thermalConductivity());
+    	// }
+    	// // Print a summary report of the state of the gas.
+    	// std::cout << gas->report() << std::endl;
+		// std :: cout << sol->thermo()->density() << endl;
+		// std :: cout << sol->thermo()->cp_mass() << endl;
+		Set_ThermTransData(&problem2, State, sol);
 
 		//End Cantera
 		void *UserData = &problem2;
@@ -368,22 +393,7 @@ int main(int argc, char* argv[])
 		//====================
 		//Testing block
 		//====================
-		// problem2.Test_ScalarGradient(problem2.Scrap);
-		// cout << "Constant 1 test run\n\n";
-		// problem2.Test_ScalarGradient(State);
-		//problem2.Test_TransportGradient(State);
-		//problem2.Test_RHS_CrossDiff(State);
-		//problem2.Test_JtV_CrossDiff(State);
-		// cout << "State test run\n";
-		
-		//problem2.Test_GasWeight(State);
-
-
-		// problem2.Test_VelocityDivergence(State);
 		// exit(EXIT_FAILURE);
-		//if(problem2.NumGridPts>1)
-		//	problem2.RunTests(State);
-
         //=================================
         // Run the time integrator loop
         //=================================
@@ -397,9 +407,9 @@ int main(int argc, char* argv[])
 			problem2.t	= TNow;
 			//Integrate
 			auto Start	=std::chrono::high_resolution_clock::now();//Time integrator
-			problem2.Set_ScalarGradient(State);
-			problem2.SetTransportGrid(State);
-			problem2.Set_TransportGradient(State);
+			problem2.Set_ScalarGradient(State);//Cantera Change
+			//problem2.SetTransportGrid(State);//Cantera Change
+			problem2.Set_TransportGradient(State);//Cantera Change 
 			
 
 			if(Method == "EPI2")
@@ -465,19 +475,15 @@ int main(int argc, char* argv[])
 
 			//Clean
 			Clean(vecLength, StateData);
-
+			Set_ThermTransData(&problem2, State, sol);
 			//Vel Update
 			if(VelUp==1)
 			{
-				problem2.SetTransportGrid(State);
-				//problem2.UpdateOneDVel(State);
+				//problem2.SetTransportGrid(State);//Cantera change.
+				//Set_ThermTransData(&problem2, State, sol);
 				problem2.Set_VelocityDivergence(State);
-				problem2.Print_MaterialDerivative(problem2.VelAve, VelFile);
 				problem2.VelIntegrate(NV_DATA_S(problem2.VelAve), State, problem2.VelAveLeftBnd, problem2.VelAveRightBnd);
 				problem2.SetVelAve();
-				
-				problem2.Set_MaterialDerivative(StepSize, problem2.MatDerivative);
-				problem2.Print_MaterialDerivative(problem2.VelScrap, VelFile);								
 			}
 			//Check heating
 			problem2.CheckHeating(State, TNow);
@@ -706,12 +712,6 @@ int OneD_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
 	N_VScale(0.0, StateDot, StateDot);
 	N_VScale(0.0, pb->Tmp, pb->Tmp);
 	//===================================================
-
-	//Given the temperature, set all the grids
-	// pb->SetTransportGrid(State);
-	// pb->Set_ScalarGradient(State);
-	// pb->Set_TransportGradient(State);
-
 	//ChemRHS============================================
 	auto StartChem=std::chrono::high_resolution_clock::now();	//Clock
 	pb->RHS_Chem(t, State, StateDot, UserData);
@@ -1042,11 +1042,6 @@ int OneD_JtV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void 
 	myPb2 * pbPtr{static_cast<myPb2 *> (pb)};			//Recast
 	N_VScale(0.0, Jv, Jv);
 	N_VScale(0.0, tmp, tmp);
-	//pbPtr->SetTransportGrid(u);
-	//pbPtr->Set_ScalarGradient(u);
-	//pbPtr->Set_TransportGradient(u);
-
-
 	if(pbPtr->React>0){//Get Chem
 		//Chem
 		//OneD_Jtv_ChemArray(v, Jv, t, u, fu, pb, tmp);
@@ -1370,10 +1365,7 @@ int OneD_JacArray(realtype t, N_Vector State, N_Vector StateDot, SUNMatrix Jac, 
 	real_type_1d_view_type x;
 	real_type_2d_view_type J;
 	
-	//member Kokkos::Impl::HostThreadTeamMember<Kokkos::Serial>;
-	//omp_set_dynamic(0);     // Explicitly disable dynamic teams
-	//omp_set_num_threads(8); // Use 4 threads for all consecutive parallel regions
-	//#pragma omp parallel for private(DATA, STATEDATA, LittleJacPtr, x, J, pbPtr)
+
 	for(int i = 0 ; i < grid_sz ; i ++ )
 	{//March over copies/grid points and grab the data needed
 		SUPER_2_VEC(i, DATA, STATEDATA, num_eqs, grid_sz);
@@ -1569,5 +1561,42 @@ int OneD_JtV_CrossDiff(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector
 		}
     }
 
+	return 0;
+}
+
+//New stuff
+int Set_ThermTransData(myPb2* pbPtr, N_Vector State, std::shared_ptr<Cantera::Solution> sol)
+{
+	//Declare ytemp and pointers
+	N_Vector yTemp 		= N_VNew_Serial(pbPtr->num_equations);
+	N_Vector Coeff = N_VClone(yTemp);
+	realtype * yPtr 	= NV_DATA_S(yTemp);
+	realtype * DATA		= NV_DATA_S(State);
+	realtype * CpPtr	= NV_DATA_S(pbPtr->CpGrid);
+	realtype * RhoPtr	= NV_DATA_S(pbPtr->RhoGrid);
+	realtype * DiffPtr 	= NV_DATA_S(pbPtr->DiffGrid);  //Stores [Lambda, Diffs]
+	auto gas = sol->thermo();
+	auto kin = sol->kinetics();
+	auto trans = sol->transport();
+	//Over this loop get the little Y.
+	for( int i = 0 ; i < pbPtr->NumGridPts ; i ++)
+	{
+		SUPER_2_VEC(i, yPtr, DATA, pbPtr->num_equations, pbPtr->NumGridPts);
+		gas->setState_TPY(yPtr[0], pbPtr->pb._p, yPtr+1);//Reconfigure the gas.
+		kin = sol->kinetics();
+		trans = sol->transport();
+		trans->getMixDiffCoeffs(NV_DATA_S(Coeff)+1); //Get Diffusion Coefficients
+		//Set into Grids.
+		DiffPtr[i] = trans->thermalConductivity();
+		for(int j = 1 ; j < pbPtr->num_equations; j++)
+		{
+			DiffPtr[i + j*pbPtr->NumGridPts] = NV_DATA_S(Coeff)[j];
+		}
+		//gas->setState_PY(pbPtr->pb._p, yPtr+1); //Be clever with pointers, make temp shift away
+		RhoPtr[i] = sol->thermo()->density();
+		CpPtr[i] = sol->thermo()->cp_mass();
+	}
+	N_VDestroy_Serial(yTemp);
+	N_VDestroy_Serial(Coeff);
 	return 0;
 }
