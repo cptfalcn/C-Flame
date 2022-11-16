@@ -63,7 +63,7 @@ int OneD_JacArray		(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector,
 
 int OneD_JtV			(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 int OneD_JtV_Adv		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
-int OneD_JtV_Diff		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+//int OneD_JtV_Diff		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 int OneD_JtV_DiffFast	(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 
 int OneD_JtV_CrossDiff	(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
@@ -71,7 +71,7 @@ int OneD_Jtv_Chem		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_V
 
 int OneD_Jtv_ChemArray	(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 //Split Jac Adv Diff
-int OneD_JtV_First		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+//int OneD_JtV_First		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 
 int OneD_VelDivergence 	(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 
@@ -91,6 +91,7 @@ void CheckNanBlowUp(N_Vector, int);
 //SolArray class which interfaces with the problem class.
 //=======================================================
 int Set_ThermTransData(myPb2*, N_Vector, std::shared_ptr<Cantera::Solution>);
+int Set_Derivatives(myPb2*, N_Vector, std::shared_ptr<Cantera::Solution>);
 //=====================
 //Namespaces and globals
 //=====================
@@ -271,11 +272,7 @@ int main(int argc, char* argv[])
 		ReadData(problem2.TempTable,	"Tf.txt");
 		ReadData(problem2.RhoTable, 	"rho_fT.txt");
 		ReadData(problem2.DiffTable,	"Diff_fT.txt");
-		//Need to modify the first entries of the DiffTable to fix my error.
-		realtype * CpPtr 	= NV_DATA_S(problem2.CPPoly);
-		realtype * RhoPtr 	= NV_DATA_S(problem2.RhoTable); 
-		realtype * DiffPtr	= NV_DATA_S(problem2.DiffTable);
-		//problem2.VerifyTempTable(State);
+		//Removing these lines creates a bug.
 		//===================
 		//Create Cantera
 		//===================
@@ -284,7 +281,7 @@ int main(int argc, char* argv[])
 		//cout << sol << endl;
 		//Set a gas object
 		//auto gas = sol->thermo();
-		//gas->density() to get density
+		// gas->density() to get density
 
 	    // Set the thermodynamic state by specifying T (500 K) P (2 atm) and the mole
 	    // fractions. Note that the mole fractions do not need to sum to 1.0 - they will
@@ -318,6 +315,8 @@ int main(int argc, char* argv[])
 		// std :: cout << sol->thermo()->cp_mass() << endl;
 		Set_ThermTransData(&problem2, State, sol);
 
+		//Set the pointer to the object into the problem
+		problem2.sol = sol;
 		//End Cantera
 		void *UserData = &problem2;
 		int MaxKrylovIters = max(vecLength, 500);//500 is the base
@@ -326,8 +325,6 @@ int main(int argc, char* argv[])
 		//==================
 		//CVODE
 		void * cvode_mem;
-		void * cvode_split;
-		cvode_split = CVodeCreate(CV_BDF);
 		int retVal=0;
 		SUNMatrix A							= SUNDenseMatrix(vecLength, vecLength);
 		SUNLinearSolver SUPERLS 			= SUNLinSol_SPGMR(State, PREC_NONE, 20);
@@ -337,63 +334,19 @@ int main(int argc, char* argv[])
 		//Set EPI_KIOPS methods
 		Epi2_KIOPS	*Epi2					= NULL;
 		IntegratorStats *integratorStats 	= NULL;
-		IntegratorStats *intStatsSplit2		= NULL;
-
-		//Split EPI2
-		Epi2_KIOPS	*Epi2_AdvDiff			= NULL;
-		Epi2_KIOPS	*Epi2_ChemHeat			= NULL;
 		//===================================================
 		//Parse the experiment cases and make the integrators
 		//===================================================
 		Epi2 = 	new Epi2_KIOPS(OneD_RHS,OneD_JtV,UserData,MaxKrylovIters,State,vecLength);
-		
-		//Segfaults if not done this way.  However, we skip Split if done this way.
 		if(Method == "CVODEKry")
 		{
 			cvode_mem = CreateCVODE(OneD_RHS, OneD_JtV, OneD_JacArray, UserData, A,
 					SUPERLS, SUPERNLS, vecLength, State, relTol, absTol, StepSize, 1);
 		}
-		if(Method == "CVODESplit")
-		{
-			//cout << "Setting split method\n";
-			cvode_mem = CreateCVODE(OneD_RHS_First, OneD_JtV, OneD_JacArray, UserData, A,
-				SUPERLS, SUPERNLS, vecLength, State, relTol, absTol, StepSize, 1);
-			N_Vector AbsTol= N_VNew_Serial(num_eqs);
-			for ( int i = 0 ; i < num_eqs ; i++)
-				NV_Ith_S(AbsTol,i)=absTol;
-
-			cvode_mem = CVodeCreate (CV_BDF);
-			CVodeSetUserData(cvode_split, UserData);
-			CVodeInit(cvode_split, OneD_RHS_First, 0, State);
-			CVodeSetInitStep(cvode_split, StepSize);
-			CVodeSetMaxStep(cvode_split, StepSize);
-			CVodeSVtolerances(cvode_split, relTol, AbsTol);
-			CVodeSetLinearSolver(cvode_split, SUPERLS, A);//A might be null, try that
-			CVodeSetNonlinearSolver(cvode_split, SUPERNLS);
-			if (UseJac==1)
-			{
-				CVodeSetJacTimes(cvode_split, NULL, OneD_JtV_First);
-				CVodeSetLSetupFrequency(cvode_split, 1); //Remove because also stupid.
-				CVodeSetJacEvalFrequency(cvode_split, 1);//Remove becuase this is stupid.
-				CVodeSetJacFn(cvode_split, OneD_JacArray);		//Error if removed .
-				CVodeSetMaxNumSteps(cvode_split, 500);
-			}
-			N_VDestroy_Serial(AbsTol);
-		}
 		
-
-		Epi2_AdvDiff = new Epi2_KIOPS(OneD_RHS_First, OneD_JtV_First, UserData,
-										MaxKrylovIters,State,vecLength);
-		
-		Epi2_ChemHeat = new Epi2_KIOPS(OneD_RHS_Second, OneD_Jtv_ChemArray, UserData,
-										MaxKrylovIters,State,vecLength);
 
 		PrintPreRun(StepSize, Delx, Steps, KrylovTol, absTol, relTol, Method, num_pts, BAR);
 
-		//====================
-		//Testing block
-		//====================
-		// exit(EXIT_FAILURE);
         //=================================
         // Run the time integrator loop
         //=================================
@@ -407,6 +360,8 @@ int main(int argc, char* argv[])
 			problem2.t	= TNow;
 			//Integrate
 			auto Start	=std::chrono::high_resolution_clock::now();//Time integrator
+			//Set data
+			Set_ThermTransData(&problem2, State, sol);//Cantera Change
 			problem2.Set_ScalarGradient(State);//Cantera Change
 			//problem2.SetTransportGrid(State);//Cantera Change
 			problem2.Set_TransportGradient(State);//Cantera Change 
@@ -416,34 +371,6 @@ int main(int argc, char* argv[])
 			{
 				OneD_JacArray(TNow, State, StateDot, A, UserData, State, State, State);
 				integratorStats =Epi2->Integrate(StepSize, TNow, TNext, NumBands,
-					State, KrylovTol, startingBasisSizes);
-			}
-			else if(Method == "EPI2Split")
-			{
-				OneD_JacArray(TNow, State, StateDot, A, UserData, State, State, State);
-				integratorStats =Epi2_AdvDiff->Integrate(StepSize, TNow, TNext, NumBands,
-					State, KrylovTol, startingBasisSizes);
-
-				OneD_JacArray(TNow, State, StateDot, A, UserData, State, State, State);
-				intStatsSplit2 =Epi2_ChemHeat->Integrate(StepSize, TNow, TNext, NumBands,
-					State, KrylovTol, startingBasisSizes);
-
-			}
-			else if(Method =="CVODESplit")
-			{
-				//cout << "Attemping CVODE\n";
-				// if(StepCount ==0)
-				// 	{
-				// 		OneD_JacArray(TNow, State, StateDot, A, UserData, State, State, State);
-				// 		integratorStats =Epi2_AdvDiff->Integrate(StepSize, TNow, TNext, NumBands,
-				// 			State, KrylovTol, startingBasisSizes);
-				// 	}
-				// else
-					CVode(cvode_split, TNext, State, &TNextC, CV_ONE_STEP);//CV_NORMAL/CV_ONE_STEP
-				cout << "CVODE Step done\n";
-				OneD_JacArray(TNow, State, StateDot, A, UserData, State, State, State);
-				//cout << "Attempting EPI2\n";
-				integratorStats =Epi2_ChemHeat->Integrate(StepSize, TNow, TNext, NumBands,
 					State, KrylovTol, startingBasisSizes);
 			}
 			else if(Method == "CVODEKry")
@@ -511,11 +438,6 @@ int main(int argc, char* argv[])
 		PrintExpParam(FinalTime, TNow, StepSize, StepCount, KrylovTol, absTol, relTol, KTime, BAR);
 		PrintSuperVector(StateData, Experiment, NumScalarPoints, BAR);
 		PrintProfiling(integratorStats, Profiling, Method,  BAR, cvode_mem);
-		if(Method == "EPI2Split")
-		{
-			std :: cout << "\nSplit second stats\n\n";
-			intStatsSplit2->PrintStats();
-		}
 		PrintDataToFile(myfile, StateData, vecLength, absTol, BAR, MyFile, KTime);//change  4th
 		if(Profiling == 1)//Refactor into profiling later.
 		{
@@ -547,8 +469,6 @@ int main(int argc, char* argv[])
 		//==========================
 		delete Epi2;
 
-		delete Epi2_AdvDiff;
-		delete Epi2_ChemHeat;
 		N_VDestroy_Serial(y);
 		N_VDestroy_Serial(State);
 		N_VDestroy_Serial(StateDot);
@@ -757,96 +677,7 @@ int OneD_RHS(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
 	return 0;													//Return to caller
 }
 
-//=================================
-//    __   ___   _     _   _____
-//   /  \ |   \ | |   | | |_   _|
-//   \ \/ |  _/ | |   | |   | |
-//   /\ \ | |   | |_  | |   | |
-//   \__/ |_|   |___| |_|   |_|
-//================================================
-//The first RHS of the split method uses ADV-Diff
-//================================================
-int OneD_RHS_First		(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
-{
-	myPb2 * pb{static_cast<myPb2 *> (UserData)};//Recast
-	N_VScale(0.0, StateDot, StateDot);
-	N_VScale(0.0, pb->Tmp, pb->Tmp);
-	//Given the temperature, set all the grids
-	auto Start=std::chrono::high_resolution_clock::now();
-	auto StartDiff=std::chrono::high_resolution_clock::now();	//Start Timing Diff
-	pb->RHS_Diff(t, State, pb->Tmp, UserData);
-	N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);
-	//OneD_RHS_CrossDiff(t, State, pb->Tmp, UserData);
-	//N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);
-	//SUPER_RHS_DIFF_CP(t, State, pb->Tmp, UserData);				//Diff call	
-	auto StopDiff=std::chrono::high_resolution_clock::now();
-	auto PassDiff = std::chrono::duration_cast<std::chrono::nanoseconds>(StopDiff-StartDiff);
-	pb->rhs_Diff+=PassDiff.count()/1e9;							//Finish timing Diff
-	//N_VLinearSum(pb->Diff, pb->Tmp, 1.0, StateDot, StateDot);	//Add Diff to soln
 
-
-	auto StartAdv=std::chrono::high_resolution_clock::now();	//Start timing Adv
-	pb->RHS_Adv(t,State,pb->Tmp, UserData);
-	//SUPER_RHS_ADV_UPW(t,State,pb->Tmp,UserData);				//Centered Adv call into tmp
-	auto StopAdv=std::chrono::high_resolution_clock::now();
-	auto PassAdv = std::chrono::duration_cast<std::chrono::nanoseconds>(StopAdv-StartAdv);
-	pb->rhs_Adv+=PassAdv.count()/1e9;							//Finish timing Adv
-	N_VLinearSum(pb->Adv, pb->Tmp, 1.0, StateDot, StateDot);	//Add Adv (tmp) to StateDot
-
-	N_VScale(0.0, pb->Tmp, pb->Tmp);							//Clean Tmp
-
-
-	auto Stop=std::chrono::high_resolution_clock::now();
-    auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-    pb->rhsTime+=Pass.count()/1e9;									//Final timing set
-	RHSCnt ++;
-	return 0;
-
-}
-
-//==========================
-//Kinetics and Heating
-//==========================
-int OneD_RHS_Second		(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
-{
-	myPb2 * pb{static_cast<myPb2 *> (UserData)};//Recast
-	N_VScale(0.0, StateDot, StateDot);
-	N_VScale(0.0, pb->Tmp, pb->Tmp);
-
-	auto Start=std::chrono::high_resolution_clock::now();
-	
-
-	auto StartChem=std::chrono::high_resolution_clock::now();	//Clock
-	pb->RHS_Chem(t, State, StateDot, UserData);
-	//SUPER_CHEM_RHS_TCHEM(t, State, StateDot, UserData);			//Call RHS_TCHEM onto StateDot
-	//N_VScale(pb->React, StateDot, pb->Scrap);					//Save the reaction in Scrap
-	N_VScale(pb->React, StateDot, StateDot);					//Move Reaction to StateDot
-	auto StopChem =std::chrono::high_resolution_clock::now();
-	auto PassChem = std::chrono::duration_cast<std::chrono::nanoseconds>(StopChem-StartChem);
-	pb->rhs_Chem+=PassChem.count()/1e9;
-	pb->RHS_Heat(t,State,pb->Tmp, UserData);
-	//SUPER_RHS_HEATING(t, State, pb->Tmp, UserData); 				//Heating
-	N_VLinearSum(pb->Power, pb->Tmp, 1.0, StateDot, StateDot);		//Add the heating to stateDot
-
-	N_VScale(0.0, pb->Tmp, pb->Tmp);							//Clean Tmp
-
-
-	auto Stop=std::chrono::high_resolution_clock::now();
-    auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-    pb->rhsTime+=Pass.count()/1e9;									//Final timing set
-	RHSCnt ++;
-	return 0;														//Return to caller
-
-
-}
-
-
-//=================================
-//    ___  ____  ___  _____  __
-//   |   \/    \|	\|_   _|/  \ 
-//   |  _/| () ||	/  | |  \ \/
-//   | |  | __ ||	\  | |	/\ \
-//   |_|  |_||_||_|\_\ |_|  \__/
 
 //==========================================
 //  ______  _____  __  __  _____  __     __
@@ -973,10 +804,8 @@ int OneD_RHS_Diff(realtype t, N_Vector u, N_Vector uDot, void * userData)
     int numPts 				= problem->NumGridPts;
     realtype divisor        = 1.0/(problem->delx * problem->delx);
     int grid 				= 0;
-    //int tempInd 			= 0;
 	int TI					= 0;
     realtype T  			= 1;
-	//int TInd 				= 0;
     realtype * Ghost 		= NV_DATA_S(problem->Ghost);
     int vecLength 			= problem->num_equations * problem->NumGridPts;
 	realtype * 	DiffGridPtr = NV_DATA_S(problem->DiffGrid);
@@ -989,23 +818,15 @@ int OneD_RHS_Diff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 		TI		= i % numPts;
 		grid 	= floor(i/problem->NumGridPts);
 
-		//No clue why I would still be using this.
-		//auto Start=std::chrono::high_resolution_clock::now();
-		//TInd = problem->TempTableLookUp(uData[TI], problem->TempTable);
-		//auto Stop=std::chrono::high_resolution_clock::now();
-		//auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-		//problem->rhsDiffLookTime+=Pass.count()/1e9;
-
-
 		if(i < numPts)//If we are looking at temp
 		{
-			T = DiffGridPtr[TI];//(CpGridPtr[TI]*RhoGridPtr[TI]); 
+			T = DiffGridPtr[TI]/(CpGridPtr[TI]*RhoGridPtr[TI]); 
 			//T = LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  );
 		}
 		else
 		{
-			T = DiffGridPtr[TI];///MassPtr[grid];//Uniform DT=Dth
-			//T = DiffGridPtr[grid * problem->NumGridPts + TI];
+			//T = DiffGridPtr[TI];///MassPtr[grid];//Uniform DT=Dth
+			T = DiffGridPtr[grid * problem->NumGridPts + TI];
 		}
 		
 		//Set the result
@@ -1063,7 +884,6 @@ int OneD_JtV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void 
 	// Diff
 	auto StartDiff=std::chrono::high_resolution_clock::now();
 	pbPtr->JtV_Diff(v,tmp,t,u, fu, pb, tmp);
-	//OneD_JtV_Diff(v,tmp,t,u, fu, pb, tmp);
 	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
 	pbPtr->JtV_CrossDiff(v,tmp, t, u , fu, pb, tmp);
 	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
@@ -1080,55 +900,6 @@ int OneD_JtV(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void 
 }
 
 
-//=================================
-//    __   ___   _     _   _____
-//   /  \ |  _\ | |   | | |_   _|
-//   \ \/ |  _/ | |   | |   | |
-//   /\ \ | |   | |_  | |   | |
-//   \__/ |_|   |___| |_|   |_|
-//==================================
-//Split Part 1: Adv-Diff, then call Chem Jtv Directly
-//============================
-int OneD_JtV_First(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void * pb, N_Vector tmp)
-{
-	myPb2 * pbPtr{static_cast<myPb2 *> (pb)};			//Recast
-	N_VScale(0.0, Jv, Jv);
-	N_VScale(0.0, tmp, tmp);
-	pbPtr->SetTransportGrid(u);
-
-	auto Start=std::chrono::high_resolution_clock::now();
-
-	//Adv
-	auto StartAdv=std::chrono::high_resolution_clock::now();
-	OneD_JtV_Adv(v, tmp, t, u, fu, pb, tmp);
-	auto StopAdv=std::chrono::high_resolution_clock::now();
-	auto PassAdv = std::chrono::duration_cast<std::chrono::nanoseconds>(StopAdv-StartAdv);
-	pbPtr->jtv_Adv+=PassAdv.count()/1e9;
-	N_VLinearSum(pbPtr->Adv, tmp , 1.0, Jv, Jv);
-	
-	// Diff
-	auto StartDiff=std::chrono::high_resolution_clock::now();
-	pbPtr->JtV_Diff(v,tmp,t,u, fu, pb, tmp);
-	//OneD_JtV_Diff(v,tmp,t,u, fu, pb, tmp);
-	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
-	//pbPtr->JtV_CrossDiff(v,tmp, t, u , fu, pb, tmp);
-	//N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
-	auto StopDiff=std::chrono::high_resolution_clock::now();
-	auto PassDiff = std::chrono::duration_cast<std::chrono::nanoseconds>(StopDiff-StartDiff);
-	pbPtr->jtv_Diff+=PassDiff.count()/1e9;
-	N_VLinearSum(pbPtr->Diff, tmp, 1.0, Jv, Jv);
-
-	
-	//Finish total timing
-	auto Stop=std::chrono::high_resolution_clock::now();
-    auto Pass = std::chrono::duration_cast<std::chrono::nanoseconds>(Stop-Start);
-    pbPtr->jacTime+=Pass.count()/1e9;
-	JtvDif ++;
-	JtvAdv ++;
-	JtvCnt ++;
-	//cout << "Exiting JtV_First\n";
-    return 0;
-}
 
 //=================================
 //    ___  ____  ___  _____  __
@@ -1243,8 +1014,8 @@ int OneD_JtV_DiffFast(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector 
 		//Set Coefficient for step
 		if(i < numPts)						//Parse if we are in Temp or not
 		{
-			T 		= DiffPtr[ i ];
-			//T 	= DiffPtr[ i ] / (RhoPtr[ i ] * CpPtr [i]  ); //get lambda/rhoCp for this temp
+			//T 		= DiffPtr[ i ];
+			T 	= DiffPtr[ i ] / (RhoPtr[ i ] * CpPtr [i]  ); //get lambda/rhoCp for this temp
 		}
 		else 
 		{
@@ -1498,7 +1269,7 @@ int OneD_RHS_CrossDiff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 		}
 		else
 		{	//Use a uniform Dth = DT
-			resultData[i] = 1.0/ (RhoPtr[TI])	*(RhoGradPtr[TI]*DiffPtr[TI] + RhoPtr[TI] * DiffGradPtr[TI]) * GradData;
+			resultData[i] = 1.0/ (RhoPtr[TI])	*(RhoGradPtr[TI]*DiffPtr[i] + RhoPtr[TI] * DiffGradPtr[i]) * GradData;
 		}
     }
     return 0;
@@ -1549,8 +1320,8 @@ int OneD_JtV_CrossDiff(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector
 			GradData= (vData[i+1]-vData[i-1])*denom;
 
 		}
-		//std :: cout <<  "index: " << i << "V[i]= " << vData[i] << "V Gradient: " << GradData << std :: endl;
-		//GradData= GradDataPtr[i];
+
+
 		if(i < numPts)//If we are looking at temp
 		{
 			resultData[i] = 1.0 / (RhoPtr[i] * CpPtr[i] ) * LambdaGradPtr[i] * GradData;
@@ -1564,20 +1335,24 @@ int OneD_JtV_CrossDiff(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector
 	return 0;
 }
 
+
+
+
+
 //New stuff
 int Set_ThermTransData(myPb2* pbPtr, N_Vector State, std::shared_ptr<Cantera::Solution> sol)
 {
 	//Declare ytemp and pointers
 	N_Vector yTemp 		= N_VNew_Serial(pbPtr->num_equations);
-	N_Vector Coeff = N_VClone(yTemp);
+	N_Vector Coeff 		= N_VClone(yTemp);
 	realtype * yPtr 	= NV_DATA_S(yTemp);
 	realtype * DATA		= NV_DATA_S(State);
 	realtype * CpPtr	= NV_DATA_S(pbPtr->CpGrid);
 	realtype * RhoPtr	= NV_DATA_S(pbPtr->RhoGrid);
 	realtype * DiffPtr 	= NV_DATA_S(pbPtr->DiffGrid);  //Stores [Lambda, Diffs]
-	auto gas = sol->thermo();
-	auto kin = sol->kinetics();
-	auto trans = sol->transport();
+	auto gas 			= sol->thermo();
+	auto kin 			= sol->kinetics();
+	auto trans 			= sol->transport();
 	//Over this loop get the little Y.
 	for( int i = 0 ; i < pbPtr->NumGridPts ; i ++)
 	{
@@ -1595,8 +1370,44 @@ int Set_ThermTransData(myPb2* pbPtr, N_Vector State, std::shared_ptr<Cantera::So
 		//gas->setState_PY(pbPtr->pb._p, yPtr+1); //Be clever with pointers, make temp shift away
 		RhoPtr[i] = sol->thermo()->density();
 		CpPtr[i] = sol->thermo()->cp_mass();
+		// std :: cout << trans->thermalConductivity() << std :: endl;
+		// for( int j = 0; j < pbPtr->num_equations; j++)
+		// {
+		// 	std :: cout << DiffPtr[j] << std :: endl;
+		// }
 	}
+	//std::cout << gas->report() << std::endl;
+	//Set the boundary information.
+
+
 	N_VDestroy_Serial(yTemp);
 	N_VDestroy_Serial(Coeff);
 	return 0;
+}
+
+int Set_Derivatives(myPb2* pbPtr, N_Vector State, std::shared_ptr<Cantera::Solution> sol)
+{
+	N_Vector yTemp 		= N_VNew_Serial(pbPtr->num_equations);
+	N_Vector Coeff 		= N_VClone(yTemp);
+	realtype * yPtr 	= NV_DATA_S(pbPtr->Ghost);
+	realtype * DATA		= NV_DATA_S(State);
+	realtype * CpPtr	= NV_DATA_S(pbPtr->CpGrad);
+	realtype * RhoPtr	= NV_DATA_S(pbPtr->RhoGrad);
+	realtype * DiffPtr 	= NV_DATA_S(pbPtr->DiffGrad);  //Stores [Lambda, Diffs]
+	realtype  Delx		= pbPtr->delx;
+	//Sets with messed up end points
+	pbPtr->Set_TransportGradient(State);
+	//Manually fix the left end points. RhoGrad, CpGrad, LambdaGrad, DiffGrad.
+	//Set a point using inlet information.
+	
+	auto gas 			= sol->thermo();
+	gas->setState_TPY(yPtr[0], pbPtr->pb._p, yPtr+1);//Reconfigure the gas based on the intial point
+	auto kin 			= sol->kinetics();
+	auto trans 			= sol->transport();
+	trans->getMixDiffCoeffs(NV_DATA_S(Coeff)+1); //Get Diffusion Coefficients
+
+	CpPtr[0] 			= 1.0/(2.0*Delx)* (NV_DATA_S(pbPtr->RhoGrid)[1] - sol->thermo()->density() );  
+	RhoPtr[0]			= 1.0/(2.0*Delx)* (NV_DATA_S(pbPtr->CpGrid)[1] - sol->thermo()->cp_mass() ); 
+
+	return 0;	
 }

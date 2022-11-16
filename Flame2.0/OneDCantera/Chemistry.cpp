@@ -665,6 +665,8 @@ void myPb2::Set_ScalarGradient(N_Vector State)
 		}
     }
 }
+
+//Need to modify the boundary data.
 //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 //This derivative is on the scalar grid
 //Should be called only once per step.
@@ -689,37 +691,57 @@ void myPb2::Set_TransportGradient(N_Vector State)
 	realtype * GhostP		= NV_DATA_S(this->Ghost);
 	//Get the transport scalars derivative pointers.
 	index				= this->TempTableLookUp(GhostP[0], this->TempTable);//Ghost temp
-	//std :: cout << "o\n";
-	realtype * GradDiff	= NV_DATA_S(this->DiffGrad);  //This line randomly cannot access DiffGrad when gridpts <50
-	//std :: cout << "x\n";
+	
+	//Generate another solution with the Cantera pointer for the ghost data.
+	//Set-up cantera information
+	N_Vector yTemp 		= N_VNew_Serial(this->num_equations);
+	N_Vector Coeff 		= N_VClone(yTemp);
+	auto gas 			= this->sol->thermo();
+	gas->setState_TPY(GhostP[0], this->pb._p, GhostP+1);//Reconfigure the gas based on the intial point
+	auto kin 			= this->sol->kinetics();
+	auto trans 			= this->sol->transport();
+	trans->getMixDiffCoeffs(NV_DATA_S(Coeff)+1); //Get Diffusion Coefficients
+	
+	realtype RhoGhost 	= this->sol->thermo()->density();
+	realtype CpGhost 	= this->sol->thermo()->cp_mass();
+	realtype LambdaGhost= this->sol->transport()->thermalConductivity();
+	NV_DATA_S(Coeff)[0] = LambdaGhost;
+	//Ready to rock and roll with Cantera for the boundary.
 
+	realtype * GradDiff	= NV_DATA_S(this->DiffGrad);  //??This line randomly cannot access DiffGrad when gridpts <50
 	realtype * GradT	= NV_DATA_S(this->TempGrad);
 	realtype * GradRho	= NV_DATA_S(this->RhoGrad);
 	realtype * GradCp	= NV_DATA_S(this->CpGrad);
 
-
 	//Run the boundary data
 	//Left boundary
-	GradRho	[0]	=	(RhoData[1] - LookupRho[index])	*denom; // Boundary GradRho
-	GradCp	[0] = 	(CpData[1]- LookupCp[index])	*denom;	// Boundary Cp
+	// GradRho	[0]	=	(RhoData[1] - LookupRho[index])	*denom; // Boundary GradRho
+	// GradCp	[0] = 	(CpData[1]	- LookupCp[index])	*denom;	// Boundary Cp
+	//Rocking
+	GradRho	[0]	=	(RhoData[1] - RhoGhost)	*denom; // Boundary GradRho
+	GradCp	[0] = 	(CpData[1]	- CpGhost)	*denom;	// Boundary Cp
 	//Right boundary
 	int End= this->NumGridPts-1;
 	GradRho	[End]	=	(RhoData[End] - RhoData[End-1])	*denom; // Boundary GradRho
 	GradCp	[End] = 	(CpData[End]- CpData[End-1])	*denom;	// Boundary Cp
 
-	//std:: cout << CpData[1] << " " << LookupCp[index] << std :: endl;
-	
 	//This needs to be fixed. Does the full set of boundary 
 	for(int i = 0 ; i < this->num_equations; i ++)
-	{	//============================================v jth diffusion @ i+1              v Ghost of jth diffusion
+	{	//Left
+		//============================================v jth diffusion @ i+1              v Ghost of jth diffusion
 		GradDiff[this->NumGridPts*i] 		=	( DiffData[i*this->NumGridPts + 1] - LookupDiff[i*500 + index])*denom; //Left
-		//============================================v jth diffusion @ end v jth diffusion @ end-1	
-		GradDiff[this->NumGridPts*(i+1)-1] 	=	( DiffData[(i+1)*this->NumGridPts-1]- DiffData[(i+1)*this->NumGridPts-2] )*denom; //Right
+		//and rolling
+		GradDiff[this->NumGridPts*i] 		=	( DiffData[i*this->NumGridPts + 1] - NV_DATA_S(Coeff)[i])*denom; //Left
 		
-		// GradDiff[this->num_equations*(i+1)-1] 	=	( DiffData[(i+1)*500-1]- DiffData[(i+1)*500-2] )*denom; //Right
-	}
+		//Right
+		//============================================v jth diffusion @ end v jth diffusion @ end-1	
+		GradDiff[this->NumGridPts*(i+1)-1] 	=	( DiffData[(i+1)*this->NumGridPts-1]- DiffData[(i+1)*this->NumGridPts-2] )*denom; //Right		
 
-	//Do the large nasty grid.
+	}
+	//=====================================
+	//No Changes
+	//Do the large nasty grid. Grad Rho/Cp/Di/Lambda
+	//=====================================
 	int gridjump 		= this->NumGridPts;
 	//Loop over interior
 	for( int i = 1 ; i < this->NumGridPts-1; i ++)
@@ -731,13 +753,15 @@ void myPb2::Set_TransportGradient(N_Vector State)
 			GradDiff[j*gridjump + i] = (DiffData[j* gridjump+ i +1] - DiffData[j*gridjump+ i - 1 ])*denom;
 		}
 	}
-	//Set the lambda grad
+
+	//Set the Thermal Diff grad Note:   This is incongruent needs fixing.
 	realtype * LambdaGradPtr 	= NV_DATA_S(this->lambdaGrad);
 	for( int i = 0 ; i < this->NumGridPts ; i++)
 	{
-		LambdaGradPtr[i] = GradDiff[i] * RhoData[i] * CpData[i] +
-							DiffData[i] * GradRho[i] * CpData[i] +
-						 	DiffData[i] * RhoData[i] * GradCp[i]; 
+		// LambdaGradPtr[i] = GradDiff[i] * RhoData[i] * CpData[i] +
+		// 					DiffData[i] * GradRho[i] * CpData[i] +
+		// 				 	DiffData[i] * RhoData[i] * GradCp[i]; 
+		LambdaGradPtr[i] 	= GradDiff[i];
 	}
 
 }

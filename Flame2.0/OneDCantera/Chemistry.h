@@ -22,6 +22,12 @@
 #include "TChem_SpecificHeatCapacityPerMass.hpp"
 #include <omp.h>
 
+//Cantera
+#include "cantera/base/Solution.h"
+#include "cantera/thermo.h"
+#include "cantera/kinetics.h"
+#include "cantera/transport.h"
+
 //#define TCHEMPB TChem::Impl::IgnitionZeroD_Problem<TChem::KineticModelConstData<Kokkos::Device<Kokkos::OpenMP, Kokkos::HostSpace> >>
 #define TCHEMPB TChem::Impl::IgnitionZeroD_Problem      <TChem::KineticModelConstData   <Kokkos::Device <Kokkos::Serial, Kokkos::HostSpace>  >  >
 #define BAR "===================="
@@ -59,7 +65,6 @@ class myPb2{
 	public:
 	TCHEMPB pb;
 	ordinal_type	num_equations;
-	realtype		TubeLength;			//Marked for removal
 	int 		NumGridPts;
 	int 		vecLength;
 	realtype 	delx;
@@ -73,7 +78,9 @@ class myPb2{
 	N_Vector	RhoGrid;
 	N_Vector 	RhoGridPrev;
 	N_Vector	DiffGrid;
-	N_Vector 	LambdaGrid;  //This contains DT*rho*cp.
+	N_Vector 	LambdaGrid;  //This contains lambda, not DT.
+
+	std::shared_ptr<Cantera::Solution> sol;
 
 	SUNMatrix	Mat;
 	myPb2(ordinal_type, real_type_1d_view_type, WORK, int, N_Vector, realtype);
