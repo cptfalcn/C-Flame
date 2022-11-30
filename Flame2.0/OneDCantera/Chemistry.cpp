@@ -670,7 +670,7 @@ void myPb2::Set_ScalarGradient(N_Vector State)
 //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 //This derivative is on the scalar grid
 //Should be called only once per step.
-//Set Gradients of the transport properties.  Called by cross diffusion.
+//Set Gradients of the transport properties.
 //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 void myPb2::Set_TransportGradient(N_Vector State)
 {
@@ -678,19 +678,14 @@ void myPb2::Set_TransportGradient(N_Vector State)
 	realtype * resultData	= NV_DATA_S(this->ScalarGradient); //Target for result
 	int index				= 0;
 	realtype 	denom		= 1.0/(2*this->delx);
-	//Used for ghost data
-	realtype * LookupTemp	= NV_DATA_S(this->TempTable);
-	realtype * LookupCp		= N_VGetArrayPointer(this->CPPoly);
-	realtype * LookupDiff	= N_VGetArrayPointer(this->DiffTable);
-	realtype * LookupRho	= N_VGetArrayPointer(this->RhoTable);
-	//Grids resolved for that spots current temperature (user need make sure it is updated).
+
+	//Grids resolved for that spot's current temperature (user need make sure it is updated).
 	realtype * CpData		= NV_DATA_S(this->CpGrid);
 	realtype * RhoData		= NV_DATA_S(this->RhoGrid);
 	realtype * DiffData 	= NV_DATA_S(this->DiffGrid);
 	realtype * data 		= NV_DATA_S(State);
 	realtype * GhostP		= NV_DATA_S(this->Ghost);
 	//Get the transport scalars derivative pointers.
-	index				= this->TempTableLookUp(GhostP[0], this->TempTable);//Ghost temp
 	
 	//Generate another solution with the Cantera pointer for the ghost data.
 	//Set-up cantera information
@@ -700,8 +695,7 @@ void myPb2::Set_TransportGradient(N_Vector State)
 	gas->setState_TPY(GhostP[0], this->pb._p, GhostP+1);//Reconfigure the gas based on the intial point
 	auto kin 			= this->sol->kinetics();
 	auto trans 			= this->sol->transport();
-	trans->getMixDiffCoeffs(NV_DATA_S(Coeff)+1); //Get Diffusion Coefficients
-	
+	trans->getMixDiffCoeffs(NV_DATA_S(Coeff)+1); //Get Diffusion Coefficients	
 	realtype RhoGhost 	= this->sol->thermo()->density();
 	realtype CpGhost 	= this->sol->thermo()->cp_mass();
 	realtype LambdaGhost= this->sol->transport()->thermalConductivity();
@@ -717,7 +711,8 @@ void myPb2::Set_TransportGradient(N_Vector State)
 	//Left boundary
 	// GradRho	[0]	=	(RhoData[1] - LookupRho[index])	*denom; // Boundary GradRho
 	// GradCp	[0] = 	(CpData[1]	- LookupCp[index])	*denom;	// Boundary Cp
-	//Rocking
+	//=============================
+	//Rocking======================
 	GradRho	[0]	=	(RhoData[1] - RhoGhost)	*denom; // Boundary GradRho
 	GradCp	[0] = 	(CpData[1]	- CpGhost)	*denom;	// Boundary Cp
 	//Right boundary
@@ -729,8 +724,8 @@ void myPb2::Set_TransportGradient(N_Vector State)
 	for(int i = 0 ; i < this->num_equations; i ++)
 	{	//Left
 		//============================================v jth diffusion @ i+1              v Ghost of jth diffusion
-		GradDiff[this->NumGridPts*i] 		=	( DiffData[i*this->NumGridPts + 1] - LookupDiff[i*500 + index])*denom; //Left
-		//and rolling
+		//GradDiff[this->NumGridPts*i] 		=	( DiffData[i*this->NumGridPts + 1] - LookupDiff[i*500 + index])*denom; //Left
+		//and rolling========================
 		GradDiff[this->NumGridPts*i] 		=	( DiffData[i*this->NumGridPts + 1] - NV_DATA_S(Coeff)[i])*denom; //Left
 		
 		//Right
@@ -758,9 +753,6 @@ void myPb2::Set_TransportGradient(N_Vector State)
 	realtype * LambdaGradPtr 	= NV_DATA_S(this->lambdaGrad);
 	for( int i = 0 ; i < this->NumGridPts ; i++)
 	{
-		// LambdaGradPtr[i] = GradDiff[i] * RhoData[i] * CpData[i] +
-		// 					DiffData[i] * GradRho[i] * CpData[i] +
-		// 				 	DiffData[i] * RhoData[i] * GradCp[i]; 
 		LambdaGradPtr[i] 	= GradDiff[i];
 	}
 
@@ -864,9 +856,10 @@ void myPb2::VelIntegrate(realtype * fMid, N_Vector State, realtype LeftGhost, re
 
 void myPb2::Set_VelocityDivergence(N_Vector State)
 {
+	//========================================
 	//ToDo: Set Global Boundary Left and right
-
-	//Top Declarations==================================
+	//========================================
+	//Top Declarations========================
 	int Length 			= N_VGetLength(State);
 	realtype * TmpData 	= NV_DATA_S(this->Tmp);
 	realtype * GhostD	= NV_DATA_S(this->Ghost);
@@ -875,8 +868,7 @@ void myPb2::Set_VelocityDivergence(N_Vector State)
 	realtype * CpPtr	= NV_DATA_S(this->CpGrid);
 	N_VScale(0.0, this->Tmp, this->Tmp);
 	N_VScale(0.0, this->SmallScrap, this->SmallScrap);
-	//realtype GasConst  	= this->GasConst;  //8.31446261815324;
-	this->Set_GasWeightBisetti(State);
+	//this->Set_GasWeightBisetti(State);
 
 	realtype * SD			= N_VGetArrayPointer(State);
 	realtype * TmpD			= N_VGetArrayPointer(Tmp);			//Small Tmp data
@@ -888,29 +880,45 @@ void myPb2::Set_VelocityDivergence(N_Vector State)
 	realtype LeftTemp		= 0;
 	realtype RightTemp		= 0;
 	int End 				= this->NumGridPts-1;			//The final vector entry
-	//See Dr. Bisetti's book, chapter 18 for full details.
-
-	//===================================================
 	//Given the temperature, set all the grids
-	//this->SetTransportGrid(State);
 	this->Set_ScalarGradient(State);
 	this->Set_TransportGradient(State);
+	//===================================================
+	//Begin
+	//See Dr. Bisetti's book, chapter 18 for full details.
+	//===================================================
 	//Species Terms==========================================
 	//WARNING:  This must be run first, writes directly to the VelAve
+	//Sets term 4 from eq 18.90
+	//=======================================================
+	//Notes:  11/17/22
+	//The above appears to have a very minor effect on the solution.
+	//ToDo:  Verify the boundary condition.
 	//=======================================================
 	this->Set_VelocityDivergence_SpecDiff(State);
+
+
 	//Temp Terms============================================
+	//TempReac----------------------------------------------
+	//Sets term 3 from eq 18.90
+	//This is more important for the post reaction zone.
+	//======================================================
 	this->Set_VelocityDivergence_TempReac(State);				//Data Written to small scrap
 	N_VLinearSum(1.0, this->SmallScrap, 1.0, this->VelAve, this->VelAve);
 	//Set the boundary
 	SUPER_2_VEC(End, NV_DATA_S(this->PointScrap), SD, this->num_equations, this->NumGridPts);//copy right ghost state from far right
-	this->GhostChem(0, this->PointScrap, this->SmallChem, this);			//Right Floating Chem using Scratch
+	this->GhostChem(0, this->PointScrap, this->SmallChem, this);			//Left Floating Chem using Scratch
 	this->VelAveLeftBnd= NV_DATA_S(SmallChem)[0]/GD[0];
+	//The right boundary is identically 0
+	//Grad(T) = 0 and Grad(Div(T)) = 0 @ right 0 derivative boundary.
+	//End TempReac--------------------------------------------
 
-	//Temp Diff---
-	//N_VPrint_Serial(this->VelAve);
+	//Temp Diff-----------------------------------------------
+	//Sets terms 1 & 2 from eq 18.90
+	//========================================================
 	this->Set_VelocityDivergence_TempDiff(State);				//Data written to small scrap
 	N_VLinearSum(1.0, this->SmallScrap, 1.0, this->VelAve, this->VelAve);
+	
 	//Set the boundary
 	this->VelAveRightBnd = VelBndPtr[End];
 
@@ -925,8 +933,6 @@ void myPb2::Set_VelocityDivergence(N_Vector State)
 		this->HeatingRightGhost	= this->Power*this->HeatingRightGhost;	//Scale on/off the ghost point
 		this->VelAveRightBnd+= this->HeatingRightGhost/SD[End];			//Call the end boundary.
 	}
-	//N_VPrint_Serial(this->VelAve);
-
 	//Finalize==============================================
 	N_VScale(0.0, this->Tmp, this->Tmp);							//Clean Tmp		
 }
@@ -982,23 +988,17 @@ void myPb2::Set_VelocityDivergence_TempDiff(N_Vector State)
 //Reactive term for Temperature:  omegadot/( cp rho T)
 void myPb2::Set_VelocityDivergence_TempReac(N_Vector State)
 {
-	realtype * CpPtr	= NV_DATA_S(this->CpGrid);
-	realtype * RhoPtr	= NV_DATA_S(this->RhoGrid);
 	realtype * SSPtr 	= NV_DATA_S(this->SmallScrap);
 	realtype * TmpPtr 	= NV_DATA_S(this->Tmp);
 	realtype * Data 	= NV_DATA_S(State);
 
 	//Generate the chemistry state data
-	this->RHS_Chem(t, State, this->Tmp, this);
+	this->RHS_Chem(0, State, this->Tmp, this);
 	
-	// This is wrong, try the replacement above ln 2 in for loop
 	// R/cp * 1/p where p = rho R T gives:  R/ ( cp * rho * R * T) = 1/(cp rho T)
-
 	for (int i = 0 ; i < this->NumGridPts; i ++ )
 	{
 		SSPtr[i]		= TmpPtr[i] / Data[i];
-
-		//SSPtr[i]		= TmpPtr[i] * (RhoPtr[i] * this->GasConst )/(this->pb._p* CpPtr[i]);
 	}
 
 }
@@ -1017,7 +1017,6 @@ void myPb2::Set_VelocityDivergence_TempHeat(N_Vector State)
 		for( int i =0 ; i < this->NumGridPts; i ++)
 			VTempData[i] 	= TmpD[i]/SD[i];		
 	}
-	//N_VPrint_Serial(this->SmallScrap);
 }
 
 //==============================
@@ -1032,16 +1031,15 @@ void myPb2::Set_VelocityDivergence_SpecDiff(N_Vector State)//This MUST be called
 	this->RHS_Chem(this->t, State, this->Tmp, this); //Saves into Tmp
 	//Get Diffusion
 	this->RHS_Diff(this->t, State, this->Scrap, this);//into Scrap
-	//Combine into Scrap
+	//Combine into Scrap Chem and Diff
 	N_VLinearSum(1.0, this->Tmp, 1.0, this->Scrap, this->Scrap);
 	//Now Chem & Diffusion are on the same grid.
 	//Get Cross Diffusion onto Tmp
+	N_VConst(0.0, this->Tmp);
 	this->RHS_CrossDiff(this->t, State, this->Tmp, this);
-	//Combine
+	//Combine Adv-Diff-CrossDiff
 	N_VLinearSum(1.0, this->Scrap, 1.0, this->Tmp, this->Scrap);
-	//All terms combined
-	this->Set_GasWeightBisetti(State);
-	//Get Pointer to Diff-Chem terms
+	//Get Pointer to Adv-Diff_CrossDiff
 	realtype * SpecDiffPtr 	= NV_DATA_S(this->Scrap);
 
 	//Pointer to the molar weight
@@ -1057,6 +1055,7 @@ void myPb2::Set_VelocityDivergence_SpecDiff(N_Vector State)//This MUST be called
 	N_VConst(0.0, this->VelAve);
 
 	int 		StateInd	= 0;
+	//March Across the grid points, and sum over all species, 1:neqs
 	for(int i = 0; i < this->NumGridPts; i ++)
 	{
 		for(int j = 1 ; j < this->num_equations; j++)
@@ -1066,7 +1065,7 @@ void myPb2::Set_VelocityDivergence_SpecDiff(N_Vector State)//This MUST be called
 			//output   add    weight @ i  spec j mass  * Diffusion @ i on grid j 
 			TmpPtr[i]  += SpecDiffPtr[StateInd] /MassPtr[j];
 		}
-		TmpPtr[i] = GasWPtr[i] * TmpPtr[i];
+		TmpPtr[i] = 1.0/GasWPtr[i] * TmpPtr[i];
 	}
 
 }
@@ -1165,6 +1164,122 @@ void myPb2::UpdateOneDVel(N_Vector State)
 	this->SetVelAve();											//Modify VelAve
 	if(N_VMin(this->Vel)<0  &&  abs(N_VMin(this->Vel)>1e-1) )
 		std :: cout << "Warning: negative vel @" << this->t <<"\n";
+	//Destroy Temp Vectors
+	N_VDestroy(VTemp);
+	//N_VDestroy(TempGrad);
+	N_VDestroy(Scratch);
+	//Exit
+}
+void myPb2::UpdateOneDVelCrossDiff(N_Vector State)
+{
+	//Declare and clean
+	N_Vector VTemp 			= N_VClone(this->VelAve);			//Scalar size
+	N_Vector Scratch		= N_VClone(this->SmallChem);		//Used for right ghost
+	N_VConst(0.0, VTemp);										//Clean
+	N_VConst(0.0, Tmp);											//Clean
+	//Set relevent data pointers.
+	realtype * SD			= N_VGetArrayPointer(State);
+	realtype * VTempData	= N_VGetArrayPointer(VTemp);
+	realtype * TmpD			= N_VGetArrayPointer(Tmp);			//Small Tmp data
+	realtype * SCP			= N_VGetArrayPointer(this->SmallChem);
+	realtype * GD			= N_VGetArrayPointer(this->Ghost);
+	realtype * ScratchData	= N_VGetArrayPointer(Scratch);
+	//Ghosts
+	realtype LeftTemp		= 0;
+	realtype RightTemp		= 0;
+	int End 				= this->NumGridPts-1;			//The final vector entry
+	int TInd				= 0;
+	this->Set_ScalarGradient(State);
+	this->Set_TransportGradient(State);
+	//See Dr. Bisetti's book, chapter 18 for full details.
+	//Species Cross Diff
+	//The following is suspect, needs a re-write.
+	this->Set_VelocityDivergence_SpecDiff(State);//Removing this causes a KIOPS crash.
+	//----------------------------------------------------------------
+	//Set Temp Reac chemistry information:  omegaT / (rho * cp * Temp)
+	//Ghost Prep: Call functions.
+	//-----------------------------------------------------------------
+	SUPER_2_VEC(End, ScratchData, SD, this->num_equations, this->NumGridPts);//copy right ghost state from far right
+	this->GhostChem(0, Scratch, this->SmallChem, this);			//Right Floating Chem using Scratch
+	this->RHS_Chem(0, State, this->Tmp, this);
+	//Loop set: calculate OmegaT/(T rho c_p)= SUPER_CHEM_RHS_TCHEM / T
+	for(int i = 0 ; i < this->NumGridPts; i ++)			//Put the temp int VTemp
+		VTempData[i]	+= TmpD[i]/(SD[i]); 			//Divide by temperature
+	LeftTemp  = SCP[0]/(GD[0]);							//May need to be zero //Set left boundary data, fixed point
+	RightTemp = VTempData[End];							//Set right boundary 0 N conditions
+	
+	N_VScale(0.0, this->Tmp, this->Tmp);				//Clean out Tmp Vec for later use
+
+	//------------------------------------------
+	//Set the diffusion term.  DT/T nablagrad(T)
+	this->RHS_Diff(0, State, this->Tmp, this);
+	for(int i = 0; i < this->NumGridPts; i++)			//Loop over Temp indices.
+		VTempData[i]	+=	TmpD[i]/SD[i];				//New, adds the Temp Integral
+	LeftTemp 			+=  TmpD[0]/SD[0];
+	RightTemp			+=VTempData[End];				//New, possibly problematic
+	N_VScale(0.0, this->Tmp, this->Tmp);
+
+	//Set Cross Diffusion:  1/(Rho cp T)* grad(Lambda) dot grad(T)
+	this->RHS_CrossDiff(0, State, this->Tmp, this);  //Tmp=1/(Rho cp)* grad(Lambda) dot grad(T)
+	for(int i = 0; i < this->NumGridPts; i++)			//Loop over Temp indices.
+		VTempData[i]	+=	TmpD[i]/SD[i];				
+	LeftTemp 			+=  TmpD[0]/SD[0];
+	RightTemp			+=VTempData[End];				
+	N_VScale(0.0, this->Tmp, this->Tmp);
+
+
+
+	//Heating component
+	//This will turn on/off depending on Temperature max value or time.
+	if(this->HeatingOn==1)
+	{
+		this->RHS_Heat(0, State, this->Tmp, this);
+		N_VScale(this->Power, this->Tmp, this->Tmp);			//Scale on/off
+		this->HeatingRightGhost	= this->HeatingOn *
+			this->Power*this->HeatingRightGhost;	//Scale on/off the ghost point
+		for( int i =0 ; i < this->NumGridPts; i ++)
+			VTempData[i] 	+= TmpD[i]/SD[i];		
+		//Set boundaries
+		LeftTemp += 0;											//Should always be zero
+		RightTemp+= this->HeatingRightGhost/SD[End];			//Call the end boundary.
+	}
+	/*Error Check*/
+	bool NaNDiv = 0;
+	int  NaNDivCnt = 0;
+	for(int i =0; i< this->NumGridPts+1; i++)
+	{
+		if(isnan(VTempData[i]))
+		{
+			NaNDiv=1;
+			NaNDivCnt++;
+		}
+
+	}
+	if(NaNDiv)
+	{
+		std :: cout << std:: endl << BAR << std :: endl;
+		std :: cout << "!!Critical Error @ t = " << this->t << std :: endl;
+		std :: cout << "!!Error: NaN in VelDiv calculation in " << NaNDivCnt << " entries!\n";
+		std :: cout << BAR << std :: endl;
+		exit(EXIT_FAILURE);
+	}
+	//======================
+	//Finalize
+	//======================
+	this->VelIntegrate(VTempData, State, LeftTemp, RightTemp);
+	//V(x) = Integral( omega/(rho T c_p) ,[0,x] ) + V(0);		See VelIntegrate function
+	//this->SetVelAve();											//Modify VelAve
+	if(N_VMin(this->Vel)<0  &&  abs(N_VMin(this->Vel)>1e-1) )
+		std :: cout << "Warning: negative vel @" << this->t <<"\n";
+	if(N_VMaxNorm(this->Vel)>50)
+	{
+		std :: cout << std:: endl << BAR << std :: endl;
+		std :: cout << "!!Critical Error @ t = " << this->t << std :: endl;
+		std :: cout << "!!Error: Velocity outside Tolerance of 20 M/S \n";
+		std :: cout << "!!Acheived " << N_VMaxNorm(this->Vel) << "M/S \n";
+		std :: cout << BAR << std :: endl;
+		exit(EXIT_FAILURE);
+	}	
 	//Destroy Temp Vectors
 	N_VDestroy(VTemp);
 	//N_VDestroy(TempGrad);

@@ -92,6 +92,7 @@ class myPb2{
 	void SetVels(int, int);
 	void SetVelAve();
 	void UpdateOneDVel(N_Vector);
+	void UpdateOneDVelCrossDiff(N_Vector);
 	void VelIntegrate(realtype *, N_Vector, realtype, realtype);
 	void RunTests(N_Vector State);
 	void CheckHeating(N_Vector State, realtype t);

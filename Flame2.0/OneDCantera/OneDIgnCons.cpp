@@ -51,9 +51,6 @@ int OneD_RHS_Chem		(realtype, N_Vector, N_Vector, void *);
 int OneD_RHS_Diff		(realtype, N_Vector, N_Vector, void *);
 int OneD_RHS_CrossDiff	(realtype, N_Vector, N_Vector, void *);
 int OneD_RHS_Heat		(realtype, N_Vector, N_Vector, void *);
-//Split RHS
-int OneD_RHS_First		(realtype, N_Vector, N_Vector, void *);	//Adv-Diff
-int OneD_RHS_Second		(realtype, N_Vector, N_Vector, void *); //Kinetics-Heating
 
 //Create Jacobians
 int OneD_Jac			(realtype, N_Vector, N_Vector, SUNMatrix, void *, N_Vector,
@@ -70,8 +67,9 @@ int OneD_JtV_CrossDiff	(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*,
 int OneD_Jtv_Chem		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 
 int OneD_Jtv_ChemArray	(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
-//Split Jac Adv Diff
-//int OneD_JtV_First		(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
+
+//Finite difference RHS
+int OneD_RHS_FD			(realtype, N_Vector, N_Vector, void *);
 
 int OneD_VelDivergence 	(N_Vector, N_Vector, realtype, N_Vector, N_Vector, void*, N_Vector);
 
@@ -278,42 +276,8 @@ int main(int argc, char* argv[])
 		//===================
 		//Set a solution per the gri standard
 		auto sol = Cantera::newSolution("gri3.0/gri30.yaml", "gri30");
-		//cout << sol << endl;
-		//Set a gas object
-		//auto gas = sol->thermo();
-		// gas->density() to get density
-
-	    // Set the thermodynamic state by specifying T (500 K) P (2 atm) and the mole
-	    // fractions. Note that the mole fractions do not need to sum to 1.0 - they will
-	    // be normalized internally. Also, the values for any unspecified species will be
-	    // set to zero.
-		//Need to set appropriately
-	    // gas->setState_TPX(1000.0, 1.0*Cantera::OneAtm, "CH4:1.0, O2:8.0, AR:1.0");
-		// gas->setState_PY(1.0*Cantera::OneAtm, data+1); //Be clever with pointers, make temp shift away
-		// auto kin = sol->kinetics();
-		// auto trans = sol->transport();
-		//gas->equilibrate("HP");
-		// N_Vector Coeff = N_VClone(y);
-		// Cantera::vector_fp wdot(kin->nReactions());
-		// trans->getMixDiffCoeffs(NV_DATA_S(Coeff)+1);
-		// Cantera::writelog("Index     Diffusion Coefficient\n");
-    	// Cantera::writelog("------   ----------------------\n");
-		// for (int i =0; i < number_of_equations; i ++)
-		// 	std :: cout << i << "\t" << NV_DATA_S(Coeff)[i] << "\n";
-	    // kin->getNetRatesOfProgress(wdot.data());
-    	// Cantera::writelog("T        viscosity     thermal conductivity\n");
-    	// Cantera::writelog("------   -----------   --------------------\n");
-    	// for (size_t n = 0; n < 5; n++) {
-        // 	double T = 1000 + 100 * n;
-        // 	gas->setState_TP(T, gas->pressure());
-        // 	Cantera::writelog("{:.1f}    {:.4e}    {:.4e}\n",
-        //     T, trans->viscosity(), trans->thermalConductivity());
-    	// }
-    	// // Print a summary report of the state of the gas.
-    	// std::cout << gas->report() << std::endl;
-		// std :: cout << sol->thermo()->density() << endl;
-		// std :: cout << sol->thermo()->cp_mass() << endl;
 		Set_ThermTransData(&problem2, State, sol);
+		//sol->basis();
 
 		//Set the pointer to the object into the problem
 		problem2.sol = sol;
@@ -333,11 +297,13 @@ int main(int argc, char* argv[])
 		
 		//Set EPI_KIOPS methods
 		Epi2_KIOPS	*Epi2					= NULL;
+		Epi2_KIOPS  *Epi2_FD				= NULL;
 		IntegratorStats *integratorStats 	= NULL;
 		//===================================================
 		//Parse the experiment cases and make the integrators
 		//===================================================
-		Epi2 = 	new Epi2_KIOPS(OneD_RHS,OneD_JtV,UserData,MaxKrylovIters,State,vecLength);
+		Epi2 	= new Epi2_KIOPS(OneD_RHS,OneD_JtV,UserData,MaxKrylovIters,State,vecLength);
+		Epi2_FD = new Epi2_KIOPS(OneD_RHS_FD, UserData, MaxKrylovIters, State, vecLength);
 		if(Method == "CVODEKry")
 		{
 			cvode_mem = CreateCVODE(OneD_RHS, OneD_JtV, OneD_JacArray, UserData, A,
@@ -367,10 +333,15 @@ int main(int argc, char* argv[])
 			problem2.Set_TransportGradient(State);//Cantera Change 
 			
 
-			if(Method == "EPI2")
+			if(Method == "EPI2" && UseJac==1)
 			{
 				OneD_JacArray(TNow, State, StateDot, A, UserData, State, State, State);
 				integratorStats =Epi2->Integrate(StepSize, TNow, TNext, NumBands,
+					State, KrylovTol, startingBasisSizes);
+			}
+			else if(Method == "EPI2" && UseJac==0)
+			{
+				integratorStats =Epi2_FD->Integrate(StepSize, TNow, TNext, NumBands,
 					State, KrylovTol, startingBasisSizes);
 			}
 			else if(Method == "CVODEKry")
@@ -402,14 +373,18 @@ int main(int argc, char* argv[])
 
 			//Clean
 			Clean(vecLength, StateData);
-			Set_ThermTransData(&problem2, State, sol);
+			Set_ThermTransData(&problem2, State, sol);//Cantera Update
 			//Vel Update
 			if(VelUp==1)
 			{
 				//problem2.SetTransportGrid(State);//Cantera change.
-				//Set_ThermTransData(&problem2, State, sol);
-				problem2.Set_VelocityDivergence(State);
-				problem2.VelIntegrate(NV_DATA_S(problem2.VelAve), State, problem2.VelAveLeftBnd, problem2.VelAveRightBnd);
+				///problem2.Set_VelocityDivergence(State);
+
+				// problem2.VelIntegrate(NV_DATA_S(problem2.VelAve), State, problem2.VelAveLeftBnd, problem2.VelAveRightBnd);
+				//problem2.UpdateOneDVel(State);
+				//Rewritting the following.  Running without gives a decent FFS
+				//Adding it creates a crash.
+				problem2.UpdateOneDVelCrossDiff(State);
 				problem2.SetVelAve();
 			}
 			//Check heating
@@ -797,10 +772,6 @@ int OneD_RHS_Diff(realtype t, N_Vector u, N_Vector uDot, void * userData)
     myPb2 * problem{static_cast<myPb2 *> (userData)};//Recast
     realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
     realtype * resultData   = NV_DATA_S(uDot);//stuff goes in here.
-	//realtype * LookupTemp	= N_VGetArrayPointer(problem->TempTable);
-	//realtype * LookupCp		= N_VGetArrayPointer(problem->CPPoly);
-	//realtype * LookupDiff	= N_VGetArrayPointer(problem->DiffTable);
-	//realtype * LookupRho	= N_VGetArrayPointer(problem->RhoTable);
     int numPts 				= problem->NumGridPts;
     realtype divisor        = 1.0/(problem->delx * problem->delx);
     int grid 				= 0;
@@ -821,11 +792,9 @@ int OneD_RHS_Diff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 		if(i < numPts)//If we are looking at temp
 		{
 			T = DiffGridPtr[TI]/(CpGridPtr[TI]*RhoGridPtr[TI]); 
-			//T = LookupDiff[ TInd ] / (LookupRho[ TInd ] * LookupCp [ TInd]  );
 		}
 		else
 		{
-			//T = DiffGridPtr[TI];///MassPtr[grid];//Uniform DT=Dth
 			T = DiffGridPtr[grid * problem->NumGridPts + TI];
 		}
 		
@@ -1268,7 +1237,7 @@ int OneD_RHS_CrossDiff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 			resultData[i] = 1.0 / (RhoPtr[i] * CpPtr[i] ) * LambdaGradPtr[i] * GradData;
 		}
 		else
-		{	//Use a uniform Dth = DT
+		{	//Use a uniform Dth = DT? No
 			resultData[i] = 1.0/ (RhoPtr[TI])	*(RhoGradPtr[TI]*DiffPtr[i] + RhoPtr[TI] * DiffGradPtr[i]) * GradData;
 		}
     }
@@ -1278,7 +1247,7 @@ int OneD_RHS_CrossDiff(realtype t, N_Vector u, N_Vector uDot, void * userData)
 int OneD_JtV_CrossDiff(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector fu, void* userData, N_Vector tmp)
 {
 	myPb2 * problem{static_cast<myPb2 *> (userData)};	//Recast
-    realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
+    //realtype * uData        = NV_DATA_S(u);//Stuff comes from here.
 	realtype * vData		= NV_DATA_S(v);
     realtype * resultData   = NV_DATA_S(Jv);//stuff goes in here.
 	//Transport Grids
@@ -1290,15 +1259,15 @@ int OneD_JtV_CrossDiff(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector
     int grid 				= 0;
     int tempInd 			= 0;
 	int TI					= 0;
-    realtype T  			= 1;
+    //realtype T  			= 1;
 	int TInd 				= 0;
-    realtype * Ghost 		= NV_DATA_S(problem->Ghost);
+    //realtype * Ghost 		= NV_DATA_S(problem->Ghost);
     int vecLength 			= problem->num_equations * problem->NumGridPts;
 	//Transport Gradients
 	realtype * CpGradPtr	= NV_DATA_S(problem->CpGrad);
 	realtype * RhoGradPtr	= NV_DATA_S(problem->RhoGrad);
-	realtype * DiffGradPtr	= NV_DATA_S(problem->DiffGrad);
-	realtype * LambdaGradPtr= NV_DATA_S(problem->lambdaGrad);
+	realtype * DiffGradPtr	= NV_DATA_S(problem->DiffGrad);		//Contains Grad[lambda,Diff]
+	//realtype * LambdaGradPtr= NV_DATA_S(problem->lambdaGrad);
 	realtype GradData		= 0;
 	realtype denom			= 1.0/(2*problem->delx);
 	//Start main loop
@@ -1324,7 +1293,7 @@ int OneD_JtV_CrossDiff(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector
 
 		if(i < numPts)//If we are looking at temp
 		{
-			resultData[i] = 1.0 / (RhoPtr[i] * CpPtr[i] ) * LambdaGradPtr[i] * GradData;
+			resultData[i] = 1.0 / (RhoPtr[i] * CpPtr[i] ) * DiffGradPtr[i] * GradData;
 		}
 		else
 		{
@@ -1350,6 +1319,7 @@ int Set_ThermTransData(myPb2* pbPtr, N_Vector State, std::shared_ptr<Cantera::So
 	realtype * CpPtr	= NV_DATA_S(pbPtr->CpGrid);
 	realtype * RhoPtr	= NV_DATA_S(pbPtr->RhoGrid);
 	realtype * DiffPtr 	= NV_DATA_S(pbPtr->DiffGrid);  //Stores [Lambda, Diffs]
+	realtype * GWPtr	= NV_DATA_S(pbPtr->GasWeight); 
 	auto gas 			= sol->thermo();
 	auto kin 			= sol->kinetics();
 	auto trans 			= sol->transport();
@@ -1361,20 +1331,18 @@ int Set_ThermTransData(myPb2* pbPtr, N_Vector State, std::shared_ptr<Cantera::So
 		kin = sol->kinetics();
 		trans = sol->transport();
 		trans->getMixDiffCoeffs(NV_DATA_S(Coeff)+1); //Get Diffusion Coefficients
-		//Set into Grids.
+		//Set Cp & Rho into Grids.
+		RhoPtr[i] = sol->thermo()->density();
+		CpPtr[i] = sol->thermo()->cp_mass();
+		//Set GW
+		GWPtr[i]= gas->meanMolecularWeight();
+		//Set [Lambda,Diff] grid 
 		DiffPtr[i] = trans->thermalConductivity();
 		for(int j = 1 ; j < pbPtr->num_equations; j++)
 		{
 			DiffPtr[i + j*pbPtr->NumGridPts] = NV_DATA_S(Coeff)[j];
 		}
-		//gas->setState_PY(pbPtr->pb._p, yPtr+1); //Be clever with pointers, make temp shift away
-		RhoPtr[i] = sol->thermo()->density();
-		CpPtr[i] = sol->thermo()->cp_mass();
-		// std :: cout << trans->thermalConductivity() << std :: endl;
-		// for( int j = 0; j < pbPtr->num_equations; j++)
-		// {
-		// 	std :: cout << DiffPtr[j] << std :: endl;
-		// }
+
 	}
 	//std::cout << gas->report() << std::endl;
 	//Set the boundary information.
@@ -1410,4 +1378,12 @@ int Set_Derivatives(myPb2* pbPtr, N_Vector State, std::shared_ptr<Cantera::Solut
 	RhoPtr[0]			= 1.0/(2.0*Delx)* (NV_DATA_S(pbPtr->CpGrid)[1] - sol->thermo()->cp_mass() ); 
 
 	return 0;	
+}
+int OneD_RHS_FD(realtype t, N_Vector State, N_Vector StateDot, void * UserData)
+{
+	myPb2 * pbPtr{static_cast<myPb2 *> (UserData)};//Recast	
+	Set_ThermTransData(pbPtr, State, pbPtr->sol);
+	pbPtr->Set_TransportGradient(State);
+	OneD_RHS(t, State, StateDot, UserData);
+	return 0;
 }
