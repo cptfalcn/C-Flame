@@ -236,7 +236,7 @@ int main(int argc, char* argv[])
 		//Init Cons
 		//=======================
 		
-		if(Experiment == 3 || Experiment==6)
+		if(Experiment == 3)
 		{
 			PressMult = 10;
 		}
@@ -264,7 +264,7 @@ int main(int argc, char* argv[])
 		problem.stepRatioFile		= "";
 		problem.dumpJacFile			= JacFile;
 		problem.Movie				= Movie;
-		//problem.stepRatioFile		= "ZeroDVariableExp"+to_string(Experiment)+"Stepfile.txt";
+		problem.stepRatioFile		= "ZeroDVariableExp"+to_string(Experiment)+"Stepfile.txt";
 		problem.KiopsTime			= 0;
 		//==============================================
 		//Create integrators

@@ -498,6 +498,12 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	realtype KiopsTimer	= 0;
 	int PercentDots		= 0;
 	int ProgressDots	= 0;
+	//Intermediate timers 
+	realtype StepOrthog = 0;
+	realtype StepProj	= 0;
+	realtype LastOrthog = 0;
+	realtype LastProj	= 0;
+	realtype StepKiops	= 0;
 	myPb * pb{static_cast<myPb *> (userData)};    		//Recast
 	//Now need to dump the jac, rhs and y to file on a failure
 	realtype * jacPtr	= N_VGetArrayPointer(pb->Jac);
@@ -512,13 +518,9 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	//datafile.open("EPI3VData.txt", std::ios_base::app);
 
 	//Debugging output files
-	//Need RHS(y), hJac, y, and Remainder.
 	ofstream	StepFile;
 	StepFile.open(pb->stepRatioFile, std::ios_base::app);
-	// ofstream	hRHS;
-	// ofstream    hJAC;
-	// ofstream    Y;
-	// ofstream 	REM;
+
 
 	// hRHS.open("FailedIsoRHS.txt",  std::ios_base::app);
 	// hJAC.open("FailedIsohJac.txt",  std::ios_base::app);
@@ -561,8 +563,10 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 	int retVal		= 0;
 	int ForceRej 	= 0;
 	//Main integration loop
+	
 	while(t<tFinal)
     {
+		auto StartStep=std::chrono::high_resolution_clock::now();
 		realtype Err=5.0;
 		realtype ErrEst=0;
 		IntSteps ++;
@@ -571,11 +575,12 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 		JTimesV jtimesv(jtv, f, delta, t, y, fy, userData, tmpVec);
 		while(Err > 1 )//was 1
 		{//Iterate until error is low enough
-			if(InternalSteps>1)//Output the step analysis to a new file
-			{
-				StepFile << t <<"\t"<< InternalSteps << "\t" <<hNew;
-				StepFile << "\t" <<  h/hNew <<"\t";
-			}
+			StepKiops = 0;
+			// if(InternalSteps>1)//Output the step analysis to a new file
+			// {
+			// 	StepFile << t <<"\t"<< InternalSteps << "\t" <<hNew;
+			// 	StepFile << "\t" <<  h/hNew <<"\t";
+			// }
 			InternalSteps ++;
 			h=hNew;//h = k;
 			N_VScale(h, fy, hfy); 				//Scale f(y);
@@ -598,7 +603,8 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 
 			auto StopK=std::chrono::high_resolution_clock::now();
 			auto PassK = std::chrono::duration_cast<std::chrono::nanoseconds>(StopK-StartK);
-			KiopsTimer += PassK.count()/1e9;	
+			KiopsTimer += PassK.count()/1e9;
+			StepKiops  =  PassK.count()/1e9;	
 			if(retVal!=0)
 			{
 				ForceRej 	= 1;
@@ -626,6 +632,7 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 			auto StopK2=std::chrono::high_resolution_clock::now();
 			auto PassK2 = std::chrono::duration_cast<std::chrono::nanoseconds>(StopK2-StartK2);
 			KiopsTimer += PassK2.count()/1e9;
+			StepKiops  += PassK2.count()/1e9;
 			if(retVal!=0)
 			{
 				//cout << "We have returned an error in Phi3\n";
@@ -639,21 +646,6 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 				Err			= 1000;
 				hNew 		= h/2;
 				ForceRej 	= 0;
-				//Optional additional printing
-				// for (int i = 0; i < N_VGetLength(pb->Jac); i++ )
-				// 	hJAC << jacPtr[i] << endl;
-				
-				// hJAC << endl << endl;
-
-				// realtype * hfyData= NV_DATA_S(hfy);
-				// for (int i = 0; i < N_VGetLength(y); i++)
-				// {
-				// 	hRHS << hfyData[i] << endl;
-				// 	Y   << data[i] << endl;
-				// 	REM << Rem[i] << endl;
-				// }
-				// hRHS << endl << endl;
-				// Y << endl << endl;
 
 			}
 			else
@@ -689,12 +681,15 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 					hNew=hMax;
 				if(hNew<1e-15)//if( hNew <= ZERO)
 				{
-					//Perform Data dump
-					printf("There is a possible singularity in the solution\n");
-					std :: cout << "time stamp: " << t << std :: endl;
-					std :: cout << "hNew: " << hNew<< std :: endl;
-					std :: cout << "ErrEst: " << Err << std :: endl;
-					std :: cout << "y: \n";
+					//Perform Data dump on Error
+					std :: cout << BAR << endl;
+					printf("===Error!!!\n ===Code: Possible solution singularity\n");
+					printf("===Consult the following");
+					std :: cout << "===time stamp: " << t << std :: endl;
+					std :: cout << "===hNew: " << hNew<< std :: endl;
+					std :: cout << "===ErrEst: " << Err << std :: endl;
+					std :: cout << BAR << endl;
+					//std :: cout << "y: \n";
 					//N_VPrint_Serial(y);
 					exit(EXIT_FAILURE);
 				}
@@ -723,31 +718,34 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 			pb->ignTime= t - h/2.0;
 		}
 		pb->t=t;					//Set time for pass back;
-		
+		//Get Step Statistics
+		StepOrthog		= this->NewKrylov->OrthogTime-LastOrthog;
+		StepProj		= this->NewKrylov->ProjectTime- LastProj;
+		LastOrthog 		= this->NewKrylov->OrthogTime;
+		LastProj		= this->NewKrylov->ProjectTime;
+		//std :: cout << LastProj << endl;
 		if(pb->Movie==1)//If we want a movie
 		{
 			//std :: cout << "printing\n";
 			for(int i = 0 ; i < N_VGetLength(pb->Jac); i ++)
 			{
 			//	std :: cout << "printing\n";
-				myfile << jacPtr[i];
+				myfile << setprecision(17) << jacPtr[i];
 				//myfile.flush();
 				myfile << "\n";
 			}
+			//std :: cout << "time:" << t << endl;
+			myfile << setprecision(17) << t << "\n";  //Give the user the time.
+			myfile.flush();
+			myfile << StepOrthog 	<< "\n";  //Give the user the Orth time.
+			//std :: cout << StepOrthog << "\n";
+			myfile << StepProj		<< "\n";  //Give the user the Proj time.
+			myfile << StepKiops		<< "\n";  //Give the user the KIOP time.
 		}
-		// 	myfile << h << "\n";
-		// 	//Print y data to file
-		// 	for(int i = 0 ; i < N_VGetLength(y); i++)
-		// 		datafile << data[i] << endl;
-
-		// 	datafile << h << endl;
-		// 	datafile << Err << endl;
-		// 	datafile << IgnDelay << endl;
-		// 	datafile << t << endl;
-		// 	datafile << relTol << endl;
-		// 	datafile << absTol << endl;
-		// }
 		ProgressDots = TrackProgress(tFinal, t, PercentDone, ProgressDots);
+		auto StopStep=std::chrono::high_resolution_clock::now();
+		auto PassStep = std::chrono::duration_cast<std::chrono::nanoseconds>(StopStep-StartStep);
+		StepFile<< PassStep.count()/1e9 << endl;
 		//Check exit conditions
 		if(finalStep)
 			break;						//Yes?  	Exit
@@ -758,15 +756,13 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 				break;					//Yes?  	Exit
 			finalStep = true;			//No?  		One more step
 		}
+		//auto StartStep=std::chrono::high_resolution_clock::now();
 	}//end Loop
 
+	//===========================
+	//Clean up and exit
+	//===========================
 	std :: cout << std :: endl;
-	//std :: cout << KiopsTimer << endl;
-	// std :: cout << "Internal step:" << InternalSteps << std :: endl;
-	// std :: cout << "Kiops Errors: " << KiopsErrors << std :: endl;
-	// std :: cout << "Integration steps: " << IntSteps << std :: endl;
-	// std :: cout << "Phi Blowups: " << NaNPhiCount << std :: endl;
-	// std :: cout << "Poor Error Est: " << ErrEstPoor << std :: endl;
 	pb->InternalSteps	= InternalSteps;
 	pb->BadErrSteps		= ErrEstPoor;
 	pb->BlowupSteps		= NaNPhiCount;
@@ -779,12 +775,8 @@ IntegratorStats *Epi3VChem_KIOPS::NewIntegrate(const realtype hStart, const real
 		myfile.close();
 		datafile.close();
 	}
-	
-	// hRHS.close();
-	// hJAC.close();
-	// Y.close();
-	// REM.close();
-	StepFile << std :: endl;
+
+	//StepFile << std :: endl;
 	StepFile.close();
 	return integratorStats;
 }

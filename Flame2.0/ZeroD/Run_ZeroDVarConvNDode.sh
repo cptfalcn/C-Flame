@@ -41,23 +41,23 @@ TF=5e-4
 Sam=1
 Exp=4
 #Specific inputs
-Out="ZeroDVariableNDodecane10atmEpi3V.txt"
-JacOut="ZeroDVariableNDodecane10atmEPi3VJac.txt"
+#Out="ZeroDVariableNDodecane10atmEpi3V.txt"
+JacOut="ZeroDVariableNDodecane10atmEpi3VJac.txt"
 #Out=""
 Method="EPI3V"
 #NDodecane
 #ehco "\nRunning NButane mechanism test"
-./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=1e-5 --relTol=5e-4 --Movie=0 --PressMult=10
-./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=2e-6 --relTol=2e-4 --Movie=0 --PressMult=10
-./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=1e-7 --relTol=5e-5 --Movie=0 --PressMult=10
-./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=1e-8 --relTol=1e-5 --Movie=0 --PressMult=10 
-./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=5e-9 --relTol=5e--6 --Movie=0 --PressMult=10
-./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=1e-10 --relTol=1e-6 --Movie=0 --PressMult=10
+# ./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=1e-5 --relTol=5e-4 --Movie=0 --PressMult=10
+# ./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=2e-6 --relTol=2e-4 --Movie=0 --PressMult=10
+# ./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=1e-7 --relTol=5e-5 --Movie=0 --PressMult=10
+# ./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=1e-8 --relTol=1e-5 --Movie=0 --PressMult=10 
+# ./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=5e-9 --relTol=5e--6 --Movie=0 --PressMult=10
+# ./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=1e-10 --relTol=1e-6 --Movie=0 --PressMult=10
 ./ZeroDIgnVar.x --chemfile=$Mech/"chem.inp" --thermfile=$Mech/"therm.dat" --StepSize=5e-5 --FinalTime=$TF --MyFile=$Out --KrylovTol=1e-5 --UseJac=1 --SampleNum=1 --Method=$Method --Profiling=1 --Experiment=4 --maxSS=5e-5 --absTol=1e-11 --relTol=1e-7 --Movie=1 --PressMult=10 --JacFile=$JacOut
 
 mv ./$Out ./SampleOutput/
 mv ./$JacOut ./SampleJacOutput/
-mv ./*Profile.txt ./ProfilingOutPut
+mv ./*Profile.txt ./Profiling
 
 # Out="ZeroDVariableNDodecane10atmCvode.txt"
 # Method="CVODEKry"
