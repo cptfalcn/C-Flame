@@ -1,0 +1,26 @@
+#compile helper functions
+echo ========================================Building helpers=============================================
+#epic builds
+/usr/bin/c++ -I ~/Code/C++/epic-cpp/Integrators/AdaptiveKrylov/ -I ~/Code/C++/epic-cpp/Integrators/EpiRK -c ~/Code/C++/epic-cpp/Integrators/EpiRK/Epi3_KIOPS.cpp -o trash.o
+
+/usr/bin/c++ -I ~/Code/C++/epic-cpp/Integrators/AdaptiveKrylov/ -I ~/Code/C++/epic-cpp/Integrators/EpiRK -c ~/Code/C++/epic-cpp/Integrators/EpiRK/Epi3SC_KIOPS.cpp -o Epi3SC.o
+
+/usr/bin/c++ -I ~/Code/C++/epic-cpp/Integrators/AdaptiveKrylov/ -I ~/Code/C++/epic-cpp/Integrators/EpiRK -c ~/Code/C++/epic-cpp/Integrators/EpiRK/Epi3Ros.cpp -o Epi3Ros.o
+
+/usr/bin/c++ -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -I ~/Code/C++/Flame/OneD/ -I ~/Code/C++/epic-cpp/Integrators/AdaptiveKrylov/ -I ~/Code/C++/epic-cpp/Integrators/EpiRK -c ~/Code/C++/epic-cpp/Integrators/EpiRK/EpiP2_KIOPS.cpp -o EpiP2.o
+#RetCodeEPI2
+/usr/bin/c++ -I ~/Code/C++/epic-cpp/Integrators/AdaptiveKrylov/ \
+-I ~/Code/C++/epic-cpp/Integrators/EpiRK \
+-I ~/Code/C++/Flame2.0/Helpers \
+-c ~/Code/C++/Flame2.0/Helpers/Epi2RetCode.cpp -o Epi2RetCode.o
+
+#Local builds 
+/usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame2.0/OneDOldCantera/InitialConditions.cpp -o InitConditions.o
+
+/usr/bin/c++  -g -pg -O0 -c /home/jstewart23/Code/C++/Flame2.0/OneDOldCantera/Print.cpp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -o Print.o
+#build Chem.o Rework to include Cantera
+/usr/bin/c++  -g -pg -O3 -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame2.0/OneDOldCantera/Chemistry.cpp -o Chemistry.o
+#build Integrators.o
+/usr/bin/c++  -g -pg -O3 -DKOKKOS_DEPENDENCE -I/home/jstewart23/Code/C++/TChem/build/build/tchem -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/impl -I/home/jstewart23/Code/C++/TChem/build/repos/tchem/src/core/problems -isystem /home/jstewart23/Code/C++/TChem/build/install/kokkos/include -isystem /home/jstewart23/Code/C++/TChem/build/install/tines/include/tines -isystem /home/jstewart23/Code/C++/TChem/build/install/openblas/include -DNDEBUG -fopenmp -I/home/jstewart23/Code/C++/epic-cpp/Integrators/AdaptiveKrylov -I/home/jstewart23/Code/C++/epic-cpp/Integrators/EpiRK -c /home/jstewart23/Code/C++/Flame2.0/OneDOldCantera/CreateIntegrators.cpp -o Integrators.o
+
+echo =========================================Helpers built===============================================

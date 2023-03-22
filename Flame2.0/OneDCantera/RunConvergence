@@ -1,0 +1,10 @@
+#Run 1-D convergence from 0 to 1e-5
+#======================================
+#Perform a series of runs with refinining Delt, starting @ 5e-7
+
+./OneDIgnCons.x --chemfile=gri3.0/chem.inp --thermfile=gri3.0/therm.dat --StepSize=5e-7 --FinalTime=1e-5 --MyFile="EPI2Conv2.txt" --KrylovTol=1e-8 --UseJac=0 --SampleNum=4 --Method="EPI2" --Experiment=2 --NumPts=100 --Pow=1.0 --VelUp=1 --Profiling=1 --Movie=0 --absTol=1e-10 --relTol=1e-8 --Delx=1e-5
+./OneDIgnCons.x --chemfile=gri3.0/chem.inp --thermfile=gri3.0/therm.dat --StepSize=2e-7 --FinalTime=1e-5 --MyFile="EPI2Conv2.txt" --KrylovTol=1e-8 --UseJac=0 --SampleNum=4 --Method="EPI2" --Experiment=2 --NumPts=100 --Pow=1.0 --VelUp=1 --Profiling=1 --Movie=0 --absTol=1e-10 --relTol=1e-8 --Delx=1e-5
+./OneDIgnCons.x --chemfile=gri3.0/chem.inp --thermfile=gri3.0/therm.dat --StepSize=1e-7 --FinalTime=1e-5 --MyFile="EPI2Conv2.txt" --KrylovTol=1e-8 --UseJac=0 --SampleNum=4 --Method="EPI2" --Experiment=2 --NumPts=100 --Pow=1.0 --VelUp=1 --Profiling=1 --Movie=0 --absTol=1e-10 --relTol=1e-8 --Delx=1e-5
+./OneDIgnCons.x --chemfile=gri3.0/chem.inp --thermfile=gri3.0/therm.dat --StepSize=5e-8 --FinalTime=1e-5 --MyFile="EPI2Conv2.txt" --KrylovTol=1e-8 --UseJac=0 --SampleNum=4 --Method="EPI2" --Experiment=2 --NumPts=100 --Pow=1.0 --VelUp=1 --Profiling=1 --Movie=0 --absTol=1e-10 --relTol=1e-8 --Delx=1e-5
+./OneDIgnCons.x --chemfile=gri3.0/chem.inp --thermfile=gri3.0/therm.dat --StepSize=2e-8 --FinalTime=1e-5 --MyFile="EPI2Conv2.txt" --KrylovTol=1e-8 --UseJac=0 --SampleNum=4 --Method="EPI2" --Experiment=2 --NumPts=100 --Pow=1.0 --VelUp=1 --Profiling=1 --Movie=0 --absTol=1e-10 --relTol=1e-8 --Delx=1e-5
+./OneDIgnCons.x --chemfile=gri3.0/chem.inp --thermfile=gri3.0/therm.dat --StepSize=1e-8 --FinalTime=1e-5 --MyFile="EPI2Conv2.txt" --KrylovTol=1e-8 --UseJac=0 --SampleNum=4 --Method="EPI2" --Experiment=2 --NumPts=100 --Pow=1.0 --VelUp=1 --Profiling=1 --Movie=0 --absTol=1e-10 --relTol=1e-8 --Delx=1e-5
