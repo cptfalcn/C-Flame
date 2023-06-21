@@ -83,7 +83,7 @@ void TrackCVODEKryIters(SUNLinearSolver, realtype *, realtype, int *, int*, int*
 void ReadData(N_Vector, string);
 void CheckNanBlowUp(N_Vector, int);
 
-int LocalInitCons(realtype *, int);
+int LocalInitCons(realtype *, int, int);
 int LocalPrint(realtype *, int, int, string); //Print the data for n-butane and hydrogen
 
 //=======================================================
@@ -140,6 +140,7 @@ int main(int argc, char* argv[])
 	int VelUp 				= 1;			//Do we update Velocity, refactor to be yes always
 	int Movie				= 0;
 	int Restart				= 0;			//NULL implementation
+	int PressMult			= 1;			//1 atm
 	string InitialData		= "InitialData.txt";	// ""
 	string Mechanism 		= "gri3.0/gri30.yaml";
 	string Mechphase		= "gri30";
@@ -247,7 +248,7 @@ int main(int argc, char* argv[])
 
 		//Initial Conditions sub-block
 		SetIntCons(Experiment, SampleNum, data);		//Set Initial Conditions
-		LocalInitCons(data, Experiment);				//Custom for this project
+		LocalInitCons(data, Experiment, SampleNum);		//Custom for this project
 
 		SetSuperInitCons(data, StateData, num_eqs, num_pts);//Copy IC to State.
 		//===================================================
@@ -269,7 +270,8 @@ int main(int argc, char* argv[])
 		problem2.RHS_CrossDiff=OneD_RHS_CrossDiff;//Attach optional cross diffusion for testing.
 		problem2.JtV_CrossDiff=OneD_JtV_CrossDiff;//Attach optional cross diffusion jtv for testing.
 		problem2.RHS_Full=OneD_RHS;
-
+		problem2.pb._p= 4*101325;
+		std :: cout << "Pressure (atm): " << problem2.pb._p << " (" << problem2.pb._p/101325  <<") " << std :: endl;
 		//===================
 		//Create Cantera
 		//===================
@@ -1265,13 +1267,23 @@ int OneD_JtV_CrossDiff(N_Vector v, N_Vector Jv, realtype t, N_Vector u, N_Vector
 }
 
 //Initial Conditions
-int LocalInitCons(realtype * data, int Experiment)
+int LocalInitCons(realtype * data, int Experiment, int Sample)
 {
 	if (Experiment==1) //Hydrogen
 	{
-		data[0]=900.0;				//Temp
-		data[2]=2.7431213550e-01; 	//H2
-		data[4]=1.0-data[2];		//O2
+		if(Sample==2)
+		{
+			data[0] 	= 4.4579829e+02;	//Temp
+			data[2] 	= 2.0130322e-02;	//H2
+			data[4]		= 2.2822068e-01;	//O2 N2 
+			data[7]		= 7.5164900e-01;	//N2
+		}
+		else if(Sample==1)
+		{
+			 data[0]=900.0;				//Temp
+			data[2]=2.7431213550e-01; 	//H2
+			data[4]=1.0-data[2];		//O2
+		}
 	}
 	else if(Experiment==5) //n-butane
 	{
