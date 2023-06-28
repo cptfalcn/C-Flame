@@ -151,6 +151,8 @@ int main(int argc, char* argv[])
 	realtype CHEM 			= 1.0;
 	realtype POW			= 0.0;
 
+	int	StepRate			= 1;
+
 	//=====================================================
 	//Kokkos Input Parser
 	//=====================================================
@@ -182,6 +184,7 @@ int main(int argc, char* argv[])
 	opts.set_option<int>("NumPts", "Interior points for each grid", &NumScalarPoints);
 	opts.set_option<int>("Movie", "Generate a data set at every step", &Movie);
 	opts.set_option<realtype>("HeatEnd", "When to stop heating", &HeatEnd);
+	opts.set_option<int>("StepRate", "How many steps to skip when making a video", &StepRate);
 	const bool r_parse = opts.parse(argc, argv);
 	if (r_parse)
 		return 0; // print help return
@@ -276,15 +279,16 @@ int main(int argc, char* argv[])
 		//Create Cantera
 		//===================
 		//Set a solution per the gri standard
-		auto sol = Cantera::newSolution(Mechanism, Mechphase);
+		std :: cout << "Using Mechanism: " << Mechanism << " and phase " << Mechphase << std :: endl;
+		std::shared_ptr<Cantera::Solution> sol = Cantera::newSolution(Mechanism, Mechphase);
 		Set_ThermTransData(&problem2, State, sol);
-		//sol->basis();
+		std::cout << sol->thermo()->report() << std::endl; //Remove the report in the final version
 
 		//Set the pointer to the object into the problem
 		problem2.sol = sol;
 		//End Cantera
 		void *UserData = &problem2;
-		int MaxKrylovIters = max(vecLength, 500);//500 is the base
+		int MaxKrylovIters = 500;//max(vecLength, 500);//500 is the base
 		//==================
 		//Create integrators
 		//==================
@@ -385,13 +389,16 @@ int main(int argc, char* argv[])
 
 			//Track Progress
 			ProgressDots=TrackProgress(FinalTime, TNext, PercentDone, ProgressDots);
-
+			StepCount++;
 			if(Movie ==1 ) //Use if we want a time-series plot
 			{
+				if(StepCount%StepRate==0)
+				{
 				PrintDataToFile(myfile, StateData,vecLength, absTol, BAR, MyFile, TNext);
 				PrintDataToFile(myfile, N_VGetArrayPointer(problem2.Vel), num_pts+1, 0, BAR, MyFile, 0);
+				}
 			}
-            StepCount++;
+            
         }//End integration loop
 		TNow=TNext;
 		cout << "]100%\n" << BAR << "\tIntegration complete\t" << BAR <<endl;
@@ -1274,6 +1281,7 @@ int LocalInitCons(realtype * data, int Experiment, int Sample)
 		if(Sample==2)
 		{
 			data[0] 	= 4.4579829e+02;	//Temp
+			data[1]		= 0.0;
 			data[2] 	= 2.0130322e-02;	//H2
 			data[4]		= 2.2822068e-01;	//O2 N2 
 			data[7]		= 7.5164900e-01;	//N2
@@ -1287,11 +1295,21 @@ int LocalInitCons(realtype * data, int Experiment, int Sample)
 	}
 	else if(Experiment==5) //n-butane
 	{
-		data[0]         = 1200.0;
-		data[11]        = 2.173895119224689421e-01;  //O2
-		data[155]       = 7.092943418325631244e-01;  //N2
-		data[154]       = 1.256572768198739760e-02;  //AR
-		data[58]        = 6.075041856298054460e-02;  //C4H10
+		if(Sample==1)
+		{
+			data[0]         = 1200.0;
+			data[11]        = 2.173895119224689421e-01;  //O2
+			data[155]       = 7.092943418325631244e-01;  //N2
+			data[154]       = 1.256572768198739760e-02;  //AR
+			data[58]        = 6.075041856298054460e-02;  //C4H10
+		}
+		else if(Sample==2)
+		{
+			data[0]			= 4.4579829e+02; //Temp
+			data[11]		= 2.2275981e-01; //O2
+			data[155] 		= 7.3366351e-01; //N2
+			data[58]		= 4.3576684e-02; //C4H10
+		}
 	}
 	return 0;
 }
